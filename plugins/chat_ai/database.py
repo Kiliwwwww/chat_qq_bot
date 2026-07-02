@@ -28,6 +28,12 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS group_whitelist (
+                        group_id INTEGER PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 logger.info("数据库初始化完成")
         except Exception as e:
@@ -78,4 +84,51 @@ class Database:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"检查用户失败: {e}")
+            return False
+
+    def get_all_groups(self) -> set[int]:
+        """获取所有白名单群"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT group_id FROM group_whitelist")
+                return {row["group_id"] for row in cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"获取群白名单失败: {e}")
+            return set()
+
+    def add_group(self, group_id: int) -> bool:
+        """添加群到白名单"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO group_whitelist (group_id) VALUES (?)",
+                    (group_id,),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"添加群失败: {e}")
+            return False
+
+    def remove_group(self, group_id: int) -> bool:
+        """从白名单移除群"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM group_whitelist WHERE group_id = ?", (group_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"移除群失败: {e}")
+            return False
+
+    def group_exists(self, group_id: int) -> bool:
+        """检查群是否在白名单中"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM group_whitelist WHERE group_id = ?", (group_id,)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"检查群失败: {e}")
             return False

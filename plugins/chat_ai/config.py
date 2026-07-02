@@ -14,6 +14,12 @@ class Config(BaseModel):
     ai_temperature: float = 1.0
     ai_top_p: float = 0.95
     
+    # 管理员QQ号
+    admin_qq: int = 1154798056
+    
+    # 群消息回复概率 (0.0~1.0)
+    group_reply_chance: float = 0.3
+    
     # 系统提示词
     ai_system_prompt: str = (
         "You are MiMo, an AI assistant developed by Xiaomi. "

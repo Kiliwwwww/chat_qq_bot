@@ -1,6 +1,8 @@
 from pathlib import Path
+import random
+import time
 from nonebot import on_command, on_message, get_plugin_config, require
-from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment, PrivateMessageEvent, GroupMessageEvent
 from nonebot.params import CommandArg
 from nonebot.exception import FinishedException
 from nonebot import logger
@@ -18,6 +20,8 @@ PROMPT_FILE = Path(__file__).parent.parent.parent / "data" / "md" / "system_prom
 
 # 存储用户对话历史和AI服务实例
 user_histories: dict[int, list[dict[str, str]]] = {}
+group_histories: dict[int, list[dict[str, str]]] = {}
+group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
 ai_service: AIService = None
 
 # 初始化数据库
@@ -47,14 +51,36 @@ def init_ai_service():
 # 注册命令处理器
 reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
 settings_cmd = on_command("settings", aliases={"设置"}, priority=5, block=True)
+groupsettings_cmd = on_command("groupsettings", aliases={"群设置"}, priority=5, block=True)
+help_cmd = on_command("help", aliases={"帮助"}, priority=5, block=True)
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
 private_msg = on_message(priority=10, block=True)
 
+# 群消息处理器
+group_msg = on_message(priority=10, block=True)
+
+
+@help_cmd.handle()
+async def handle_help(event: MessageEvent):
+    """显示帮助信息"""
+    help_text = """可用命令：
+/help 或 /帮助 - 显示此帮助
+/reset 或 /重置对话 - 重置当前对话历史
+/settings <QQ号> 或 /设置 - 管理用户白名单（管理员）
+/groupsettings <群号> 或 /群设置 - 管理群白名单（管理员）"""
+    await help_cmd.finish(help_text)
+
 
 @settings_cmd.handle()
 async def handle_settings(event: MessageEvent, args: Message = CommandArg()):
-    """处理设置命令"""
+    """处理设置命令（仅管理员可用）"""
+    config = get_plugin_config(Config)
+    
+    # 管理员权限校验
+    if event.user_id != config.admin_qq:
+        await settings_cmd.finish("权限不足，仅管理员可使用此命令")
+
     arg = args.extract_plain_text().strip()
 
     if not arg:
@@ -79,6 +105,41 @@ async def handle_settings(event: MessageEvent, args: Message = CommandArg()):
     else:
         db.add_user(qq_id)
         await settings_cmd.finish(f"已添加用户 {qq_id}")
+
+
+@groupsettings_cmd.handle()
+async def handle_groupsettings(event: MessageEvent, args: Message = CommandArg()):
+    """处理群设置命令（仅管理员可用）"""
+    config = get_plugin_config(Config)
+    
+    # 管理员权限校验
+    if event.user_id != config.admin_qq:
+        await groupsettings_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    arg = args.extract_plain_text().strip()
+
+    if not arg:
+        # 显示当前群白名单
+        allowed_groups = db.get_all_groups()
+        if allowed_groups:
+            group_list = "\n".join([str(gid) for gid in sorted(allowed_groups)])
+            await groupsettings_cmd.finish(f"当前允许的群:\n{group_list}")
+        else:
+            await groupsettings_cmd.finish("当前没有允许的群，使用 /groupsettings <群号> 添加")
+
+    # 解析群号
+    try:
+        group_id = int(arg)
+    except ValueError:
+        await groupsettings_cmd.finish("请输入有效的群号")
+
+    # 添加或移除群白名单
+    if db.group_exists(group_id):
+        db.remove_group(group_id)
+        await groupsettings_cmd.finish(f"已移除群 {group_id}")
+    else:
+        db.add_group(group_id)
+        await groupsettings_cmd.finish(f"已添加群 {group_id}")
 
 
 @private_msg.handle()
@@ -163,16 +224,132 @@ async def handle_private_msg(event: MessageEvent):
         raise
     except Exception as e:
         logger.error(f"AI 调用失败: {e}")
+        # 高风险拦截兜底回复
+        if "high risk" in str(e).lower():
+            await private_msg.finish("别发些乱七八糟的东西！")
         await private_msg.finish(f"AI 调用失败: {e}")
+
+
+@group_msg.handle()
+async def handle_group_msg(event: MessageEvent):
+    """处理群消息"""
+    # 只处理群消息
+    if not isinstance(event, GroupMessageEvent):
+        await group_msg.skip()
+
+    config = get_plugin_config(Config)
+    group_id = event.group_id
+
+    # 群白名单检查
+    if not db.group_exists(group_id):
+        await group_msg.skip()
+
+    # 冷却检查：防止短时间内重复回复同一群
+    current_time = time.time()
+    if group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
+        await group_msg.skip()
+
+    # 判断是否被@：被@则立即回复，不受概率限制
+    is_at_me = event.is_tome()
+
+    # 未被@时，进行概率检查
+    if not is_at_me and random.random() > config.group_reply_chance:
+        await group_msg.skip()
+
+    if not ai_service:
+        init_ai_service()
+
+    if not ai_service:
+        await group_msg.skip()
+
+    # 获取消息内容
+    message = event.get_message()
+    user_message = event.get_plaintext().strip()
+    
+    # 检查是否包含图片
+    image_urls = []
+    for segment in message:
+        if segment.type == "image":
+            image_url = segment.data.get("url", "")
+            if image_url:
+                image_urls.append(image_url)
+    
+    # 忽略空消息或命令
+    if (not user_message or user_message.startswith("/")) and not image_urls:
+        await group_msg.skip()
+
+    # 获取群对话历史
+    if group_id not in group_histories:
+        group_histories[group_id] = []
+
+    # 构建用户消息内容
+    if image_urls:
+        user_content = []
+        if user_message:
+            user_content.append({"type": "text", "text": user_message})
+        for img_url in image_urls:
+            user_content.append({"type": "image_url", "image_url": {"url": img_url}})
+        
+        group_histories[group_id].append({
+            "role": "user",
+            "content": user_content,
+        })
+    else:
+        group_histories[group_id].append({
+            "role": "user",
+            "content": user_message,
+        })
+
+    try:
+        reply = ai_service.chat_with_history(
+            messages=group_histories[group_id],
+        )
+
+        group_histories[group_id].append({
+            "role": "assistant",
+            "content": reply,
+        })
+
+        # 限制历史记录长度
+        if len(group_histories[group_id]) > 20:
+            group_histories[group_id] = group_histories[group_id][-20:]
+
+        # 更新最后回复时间戳
+        group_last_reply[group_id] = time.time()
+        logger.info(f"群消息已回复 群:{group_id} 消息:{user_message[:20]}...")
+        await group_msg.finish(reply)
+
+    except FinishedException:
+        raise
+    except Exception as e:
+        logger.error(f"群消息 AI 调用失败: {e}")
+        # 更新最后回复时间戳
+        group_last_reply[group_id] = time.time()
+        # 高风险拦截兜底回复
+        if "high risk" in str(e).lower():
+            await group_msg.finish("别发些奇奇怪怪的东西！")
+        await group_msg.finish(f"AI 调用失败: {e}")
 
 
 @reset_cmd.handle()
 async def handle_reset(event: MessageEvent):
-    """重置用户对话历史"""
+    """重置对话历史"""
     user_id = event.user_id
+    reset_anything = False
 
+    # 重置用户私聊历史
     if user_id in user_histories:
         del user_histories[user_id]
+        reset_anything = True
+
+    # 如果是群消息，同时重置群对话历史
+    if isinstance(event, GroupMessageEvent):
+        group_id = event.group_id
+        if group_id in group_histories:
+            del group_histories[group_id]
+            reset_anything = True
+
+    if reset_anything:
         await reset_cmd.finish("对话历史已重置")
     else:
         await reset_cmd.finish("没有对话历史需要重置")
