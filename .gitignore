@@ -5,5 +5,4 @@ __pycache__/
 *.pyc
 .idea/
 .DS_Store
-*.txt
 .venv/
