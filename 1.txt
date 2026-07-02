@@ -1,0 +1,98 @@
+'/Applications/QQ.app/Contents/MacOS/QQ' --no-sandbox
+2026-07-02 17:10:09.387 QQ[97982:5567928] IsVersionsDirExist: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/
+2026-07-02 17:10:09.387 QQ[97982:5567928] IsVersionsDirExist: exists: 1
+2026-07-02 17:10:09.387 QQ[97982:5567928] IsVersionsDirExist: isDir: 1
+2026-07-02 17:10:09.387 QQ[97982:5567928] version_config_filename : /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/config.json
+2026-07-02 17:10:09.388 QQ[97982:5567928] app_package_filename : /Applications/QQ.app/Contents/Resources/app/package.json
+2026-07-02 17:10:09.388 QQ[97982:5567928] config_build_id: 24815
+2026-07-02 17:10:09.388 QQ[97982:5567928] config_base_version: 6.9.38-24815
+2026-07-02 17:10:09.388 QQ[97982:5567928] config_current_version: 6.9.96-49738
+2026-07-02 17:10:09.388 QQ[97982:5567928] app_build_version: 24815
+2026-07-02 17:10:09.388 QQ[97982:5567928] notarized: 1
+2026-07-02 17:10:09.388 QQ[97982:5567928] retryTimes: 0
+2026-07-02 17:10:09.388 QQ[97982:5567928] system version: 15.0.0
+LoadFromHotUpdateVersion, config_current_version: 6.9.96-49738 , need_startup_app:0
+framework_path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Frameworks/QQNT.framework/QQNT
+frameworks path is not exists, frameworks_path:/Applications/QQ.app/Contents/Frameworks
+not mini app.
+IsVersionsDirExist: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/
+IsVersionsDirExist: exists: 1
+IsVersionsDirExist: isDir: 1
+version_config_filename :/Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/config.json
+app_package_filename :/Applications/QQ.app/Contents/Resources/app/package.json
+config_build_id :24815
+config_base_version :6.9.38-24815
+config_current_version :6.9.96-49738
+app_build_version :24815
+[preload] succeeded. /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/major.node
+objc[97982]: Class JSONReader is implemented in both /Applications/QQ.app/Contents/MacOS/QQ (0x1041ad420) and /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/wrapper.node (0x125c8a7d8). One of the two will be used. Which one is undefined.
+[preload] succeeded. /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/wrapper.node
+[preload] succeeded. /Applications/QQ.app/Contents/Resources/app/app_launcher/launcher.node
+resourcesPath: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources
+[preload] register done. major.node
+[bytecode]current path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/application.asar/
+[bytecode]current path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/application.asar/
+[97982:0702/171009.686082:ERROR:gpu/command_buffer/service/service_utils.cc:337] Skia Graphite backend = "" not found - falling back to Ganesh!
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] IsVersionsDirExist: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] IsVersionsDirExist: exists: 1
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] IsVersionsDirExist: isDir: 1
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] version_config_filename : /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/config.json
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] app_package_filename : /Applications/QQ.app/Contents/Resources/app/package.json
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] config_build_id: 24815
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] config_base_version: 6.9.38-24815
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] config_current_version: 6.9.96-49738
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] app_build_version: 24815
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] notarized: 1
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] retryTimes: 0
+2026-07-02 17:10:09.697 QQ Helper (GPU)[97983:5567964] system version: 15.0.0
+LoadFromHotUpdateVersion, config_current_version: 6.9.96-49738 , need_startup_app:0
+framework_path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Frameworks/QQNT.framework/QQNT
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] IsVersionsDirExist: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] IsVersionsDirExist: exists: 1
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] IsVersionsDirExist: isDir: 1
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] version_config_filename : /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/config.json
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] app_package_filename : /Applications/QQ.app/Contents/Resources/app/package.json
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] config_build_id: 24815
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] config_base_version: 6.9.38-24815
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] config_current_version: 6.9.96-49738
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] app_build_version: 24815
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] notarized: 1
+2026-07-02 17:10:09.700 QQ Helper[97984:5567968] retryTimes: 0
+2026-07-02 17:10:09.701 QQ Helper[97984:5567968] system version: 15.0.0
+LoadFromHotUpdateVersion, config_current_version: 6.9.96-49738 , need_startup_app:0
+framework_path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Frameworks/QQNT.framework/QQNT
+frameworks path is not exists, frameworks_path:/Applications/QQ.app/Contents/Frameworks
+frameworks path is not exists, frameworks_path:/Applications/QQ.app/Contents/Frameworks
+2026-07-02 17:10:09.783 QQ Helper (Renderer)[97985:5567996] IsVersionsDirExist: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] IsVersionsDirExist: exists: 1
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] IsVersionsDirExist: isDir: 1
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] version_config_filename : /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/config.json
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] app_package_filename : /Applications/QQ.app/Contents/Resources/app/package.json
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] config_build_id: 24815
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] config_base_version: 6.9.38-24815
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] config_current_version: 6.9.96-49738
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] app_build_version: 24815
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] notarized: 1
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] retryTimes: 0
+2026-07-02 17:10:09.784 QQ Helper (Renderer)[97985:5567996] system version: 15.0.0
+LoadFromHotUpdateVersion, config_current_version: 6.9.96-49738 , need_startup_app:0
+framework_path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Frameworks/QQNT.framework/QQNT
+frameworks path is not exists, frameworks_path:/Applications/QQ.app/Contents/Frameworks
+IsVersionsDirExist: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/
+IsVersionsDirExist: exists: 1
+IsVersionsDirExist: isDir: 1
+version_config_filename :/Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/config.json
+app_package_filename :/Applications/QQ.app/Contents/Resources/app/package.json
+config_build_id :24815
+config_base_version :6.9.38-24815
+config_current_version :6.9.96-49738
+app_build_version :24815
+[preload] succeeded. /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/major.node
+[bytecode]current path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/application.asar/
+[bytecode]current path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/application.asar/
+[bytecode]current path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/application.asar/
+[preload] register done. wrapper.node
+[bytecode]current path: /Users/kiki/Library/Containers/com.tencent.qq/Data/Library/Application Support/QQ/versions/6.9.96-49738/QQUpdate.app/Contents/Resources/app/application.asar/
+2026-07-02 17:10:10.159 QQ[97982:5567928] +[IMKClient subclass]: chose IMKClient_Legacy
+2026-07-02 17:10:10.159 QQ[97982:5567928] +[IMKInputSession subclass]: chose IMKInputSession_Legacy
+
