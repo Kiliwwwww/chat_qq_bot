@@ -84,17 +84,18 @@ async def handle_settings(event: MessageEvent, args: Message = CommandArg()):
 @private_msg.handle()
 async def handle_private_msg(event: MessageEvent):
     """处理私聊消息"""
-    # 只处理私聊消息
+    # 只处理私聊消息，群聊放行
     if not isinstance(event, PrivateMessageEvent):
         await private_msg.skip()
 
-    # 检查白名单
+    # 非白名单用户放行
     if not db.user_exists(event.user_id):
         await private_msg.skip()
 
     if not ai_service:
         init_ai_service()
 
+    # AI 服务未初始化放行
     if not ai_service:
         await private_msg.skip()
 

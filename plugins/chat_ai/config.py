@@ -7,7 +7,7 @@ class Config(BaseModel):
     # API 配置
     ai_api_key: str = ""
     ai_base_url: str = "https://api.xiaomimimo.com/v1"
-    ai_model: str = "mimo-v2.5-pro"
+    ai_model: str = "mimo-v2.5"
     
     # 生成参数
     ai_max_tokens: int = 1024
