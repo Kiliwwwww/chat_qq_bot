@@ -1,6 +1,6 @@
 from pathlib import Path
 from nonebot import on_command, on_message, get_plugin_config, require
-from nonebot.adapters.onebot.v11 import MessageEvent, Message, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment, PrivateMessageEvent
 from nonebot.params import CommandArg
 from nonebot.exception import FinishedException
 from nonebot import logger
@@ -99,10 +99,20 @@ async def handle_private_msg(event: MessageEvent):
     if not ai_service:
         await private_msg.skip()
 
+    # 获取消息内容
+    message = event.get_message()
     user_message = event.get_plaintext().strip()
-
-    # 忽略空消息或命令
-    if not user_message or user_message.startswith("/"):
+    
+    # 检查是否包含图片
+    image_urls = []
+    for segment in message:
+        if segment.type == "image":
+            image_url = segment.data.get("url", "")
+            if image_url:
+                image_urls.append(image_url)
+    
+    # 忽略空消息或命令（没有文本也没有图片）
+    if (not user_message or user_message.startswith("/")) and not image_urls:
         await private_msg.skip()
 
     user_id = event.user_id
@@ -111,11 +121,25 @@ async def handle_private_msg(event: MessageEvent):
     if user_id not in user_histories:
         user_histories[user_id] = []
 
-    # 添加用户消息到历史
-    user_histories[user_id].append({
-        "role": "user",
-        "content": user_message,
-    })
+    # 构建用户消息内容
+    if image_urls:
+        # 有图片时，使用视觉API格式
+        user_content = []
+        if user_message:
+            user_content.append({"type": "text", "text": user_message})
+        for img_url in image_urls:
+            user_content.append({"type": "image_url", "image_url": {"url": img_url}})
+        
+        user_histories[user_id].append({
+            "role": "user",
+            "content": user_content,
+        })
+    else:
+        # 纯文本消息
+        user_histories[user_id].append({
+            "role": "user",
+            "content": user_message,
+        })
 
     try:
         # 调用 AI 服务

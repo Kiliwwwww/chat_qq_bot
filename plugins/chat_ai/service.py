@@ -1,6 +1,6 @@
 from pathlib import Path
 from openai import OpenAI
-from typing import Optional
+from typing import Optional, Union
 
 
 class AIService:
@@ -77,14 +77,14 @@ class AIService:
 
     def chat_with_history(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Union[str, list]]],
         system_prompt: Optional[str] = None,
     ) -> str:
         """
         带历史记录的聊天
 
         Args:
-            messages: 消息历史列表，格式为 [{"role": "user/assistant", "content": "..."}]
+            messages: 消息历史列表，格式为 [{"role": "user/assistant", "content": "..." 或 [...]}]
             system_prompt: 系统提示词
 
         Returns:
