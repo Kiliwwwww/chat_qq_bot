@@ -386,11 +386,12 @@ async def handle_group_msg(event: MessageEvent):
 
     # 获取发言人昵称（优先群名片，其次QQ昵称）
     sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
+    user_id = event.user_id
 
     # 将所有用户消息加入历史（不管AI是否回复）
     if image_urls:
         user_content = []
-        text_with_name = f"[{sender_name}] {user_message}" if user_message else f"[{sender_name}] 发送了一张图片"
+        text_with_name = f"[{sender_name}][{user_id}] {user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
         user_content.append({"type": "text", "text": text_with_name})
         for img_url in image_urls:
             try:
@@ -407,7 +408,7 @@ async def handle_group_msg(event: MessageEvent):
     else:
         group_histories[group_id].append({
             "role": "user",
-            "content": f"[{sender_name}] {user_message}",
+            "content": f"[{sender_name}][{user_id}] {user_message}",
         })
 
     # 限制历史记录长度
