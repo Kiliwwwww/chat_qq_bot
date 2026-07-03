@@ -37,6 +37,9 @@ def init_ai_service():
     try:
         config = get_plugin_config(Config)
         system_prompt = AIService.load_prompt_from_file(PROMPT_FILE) or config.ai_system_prompt
+        # 替换提示词中的管理员QQ号占位符
+        if system_prompt:
+            system_prompt = system_prompt.replace("{admin_qq}", str(config.admin_qq))
         ai_service = AIService(
             api_key=config.ai_api_key,
             base_url=config.ai_base_url,
