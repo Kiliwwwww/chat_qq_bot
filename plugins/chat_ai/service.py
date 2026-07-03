@@ -16,6 +16,7 @@ class AIService:
         temperature: float,
         top_p: float,
         system_prompt: str,
+        debug_log: bool = False,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -24,6 +25,7 @@ class AIService:
         self.temperature = temperature
         self.top_p = top_p
         self.system_prompt = system_prompt
+        self.debug_log = debug_log
 
         self.client = AsyncOpenAI(
             api_key=api_key,
@@ -110,6 +112,18 @@ class AIService:
                 "content": system_prompt or self.system_prompt,
             },
         ] + messages
+
+        # 调试日志：打印发送给AI的完整JSON
+        if self.debug_log:
+            import json
+            log_data = {
+                "model": self.model,
+                "messages": full_messages,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+            }
+            logger.info(f"[AI请求] {json.dumps(log_data, ensure_ascii=False, indent=2)}")
 
         response = await self.client.chat.completions.create(
             model=self.model,

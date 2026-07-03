@@ -20,6 +20,9 @@ class Config(BaseModel):
     # 群消息回复概率 (0.0~1.0)
     group_reply_chance: float = 0.3
     
+    # 调试日志开关
+    ai_debug_log: bool = False
+    
     # 系统提示词
     ai_system_prompt: str = (
         "You are MiMo, an AI assistant developed by Xiaomi. "

@@ -45,6 +45,7 @@ def init_ai_service():
             temperature=config.ai_temperature,
             top_p=config.ai_top_p,
             system_prompt=system_prompt,
+            debug_log=config.ai_debug_log,
         )
         logger.info("AI 服务初始化完成")
     except Exception as e:
@@ -65,6 +66,15 @@ async def download_image_as_base64(url: str) -> str:
         
         # 返回数据URL
         return f"data:{content_type};base64,{image_data}"
+
+
+def get_keywords_prompt() -> str:
+    """获取关键词映射提示词"""
+    keywords = db.get_all_keywords()
+    if not keywords:
+        return ""
+    kw_lines = "\n".join([f"- {kw}: {meaning}" for kw, meaning in keywords.items()])
+    return f"\n\n用户自定义关键词映射:\n{kw_lines}"
 
 
 def check_repeater(group_id: int, user_id: int, message: str) -> bool:
@@ -108,6 +118,7 @@ def update_recent_messages(group_id: int, user_id: int, message: str):
 reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
 settings_cmd = on_command("settings", aliases={"设置"}, priority=5, block=True)
 groupsettings_cmd = on_command("groupsettings", aliases={"群设置"}, priority=5, block=True)
+setkey_cmd = on_command("setkey", aliases={"设置关键词"}, priority=5, block=True)
 help_cmd = on_command("help", aliases={"帮助"}, priority=5, block=True)
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
@@ -124,8 +135,39 @@ async def handle_help(event: MessageEvent):
 /help 或 /帮助 - 显示此帮助
 /reset 或 /重置对话 - 重置当前对话历史
 /settings <QQ号> 或 /设置 - 管理用户白名单（管理员）
-/groupsettings <群号> 或 /群设置 - 管理群白名单（管理员）"""
+/groupsettings <群号> 或 /群设置 - 管理群白名单（管理员）
+/setkey <关键词> <含义> 或 /设置关键词 - 设置关键词映射（管理员）"""
     await help_cmd.finish(help_text)
+
+
+@setkey_cmd.handle()
+async def handle_setkey(event: MessageEvent, args: Message = CommandArg()):
+    """处理关键词设置命令（仅管理员可用）"""
+    config = get_plugin_config(Config)
+
+    # 管理员权限校验
+    if event.user_id != config.admin_qq:
+        await setkey_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    arg = args.extract_plain_text().strip()
+
+    if not arg:
+        # 显示所有关键词
+        keywords = db.get_all_keywords()
+        if keywords:
+            kw_list = "\n".join([f"{kw} -> {meaning}" for kw, meaning in keywords.items()])
+            await setkey_cmd.finish(f"当前关键词映射:\n{kw_list}")
+        else:
+            await setkey_cmd.finish("当前没有关键词映射，使用 /setkey <关键词> <含义> 添加")
+
+    # 解析参数：关键词 含义
+    parts = arg.split(maxsplit=1)
+    if len(parts) != 2:
+        await setkey_cmd.finish("格式错误，请使用: /setkey <关键词> <含义>")
+
+    keyword, meaning = parts
+    db.add_keyword(keyword, meaning)
+    await setkey_cmd.finish(f"已添加关键词映射: {keyword} -> {meaning}")
 
 
 @settings_cmd.handle()
@@ -266,9 +308,12 @@ async def handle_private_msg(event: MessageEvent):
         })
 
     try:
-        # 调用 AI 服务
+        # 调用 AI 服务（带关键词提示词）
+        keywords_prompt = get_keywords_prompt()
+        system_prompt = ai_service.system_prompt + keywords_prompt if keywords_prompt else None
         reply = await ai_service.chat_with_history(
             messages=user_histories[user_id],
+            system_prompt=system_prompt,
         )
 
         # 添加助手回复到历史
@@ -335,6 +380,40 @@ async def handle_group_msg(event: MessageEvent):
     # 更新最近消息记录
     update_recent_messages(group_id, event.user_id, user_message)
 
+    # 获取群对话历史
+    if group_id not in group_histories:
+        group_histories[group_id] = []
+
+    # 获取发言人昵称（优先群名片，其次QQ昵称）
+    sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
+
+    # 将所有用户消息加入历史（不管AI是否回复）
+    if image_urls:
+        user_content = []
+        text_with_name = f"[{sender_name}] {user_message}" if user_message else f"[{sender_name}] 发送了一张图片"
+        user_content.append({"type": "text", "text": text_with_name})
+        for img_url in image_urls:
+            try:
+                base64_url = await download_image_as_base64(img_url)
+                user_content.append({"type": "image_url", "image_url": {"url": base64_url}})
+            except Exception as e:
+                logger.error(f"图片下载失败: {e}")
+                continue
+        
+        group_histories[group_id].append({
+            "role": "user",
+            "content": user_content,
+        })
+    else:
+        group_histories[group_id].append({
+            "role": "user",
+            "content": f"[{sender_name}] {user_message}",
+        })
+
+    # 限制历史记录长度
+    if len(group_histories[group_id]) > 20:
+        group_histories[group_id] = group_histories[group_id][-20:]
+
     # 冷却检查：防止短时间内重复回复同一群
     current_time = time.time()
     if group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
@@ -353,38 +432,13 @@ async def handle_group_msg(event: MessageEvent):
     if not ai_service:
         await group_msg.skip()
 
-    # 获取群对话历史
-    if group_id not in group_histories:
-        group_histories[group_id] = []
-
-    # 构建用户消息内容
-    if image_urls:
-        user_content = []
-        if user_message:
-            user_content.append({"type": "text", "text": user_message})
-        for img_url in image_urls:
-            try:
-                # 下载图片并转换为base64
-                base64_url = await download_image_as_base64(img_url)
-                user_content.append({"type": "image_url", "image_url": {"url": base64_url}})
-            except Exception as e:
-                logger.error(f"图片下载失败: {e}")
-                # 如果下载失败，跳过该图片
-                continue
-        
-        group_histories[group_id].append({
-            "role": "user",
-            "content": user_content,
-        })
-    else:
-        group_histories[group_id].append({
-            "role": "user",
-            "content": user_message,
-        })
-
     try:
+        # 调用 AI 服务（带关键词提示词）
+        keywords_prompt = get_keywords_prompt()
+        system_prompt = ai_service.system_prompt + keywords_prompt if keywords_prompt else None
         reply = await ai_service.chat_with_history(
             messages=group_histories[group_id],
+            system_prompt=system_prompt,
         )
 
         group_histories[group_id].append({
