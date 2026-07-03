@@ -17,6 +17,10 @@ from nonebot_plugin_localstore import get_plugin_data_file
 
 # 提示词文件路径
 PROMPT_FILE = Path(__file__).parent.parent.parent / "data" / "md" / "system_prompt.md"
+PROMPT_KIND_FILE = Path(__file__).parent.parent.parent / "data" / "md" / "system_prompt_kind.md"
+
+# 当前提示词模式：default=默认（雌小鬼），kind=邻家大姐姐
+current_prompt_mode: str = "default"
 
 # 存储用户对话历史和AI服务实例
 user_histories: dict[int, list[dict[str, str]]] = {}
@@ -32,10 +36,12 @@ db = Database(get_plugin_data_file("chat_ai.db"))
 
 def init_ai_service():
     """初始化AI服务"""
-    global ai_service
+    global ai_service, current_prompt_mode
     try:
         config = get_plugin_config(Config)
-        system_prompt = AIService.load_prompt_from_file(PROMPT_FILE) or config.ai_system_prompt
+        # 根据当前模式选择提示词文件
+        prompt_file = PROMPT_KIND_FILE if current_prompt_mode == "kind" else PROMPT_FILE
+        system_prompt = AIService.load_prompt_from_file(prompt_file) or config.ai_system_prompt
         # 替换提示词中的管理员QQ号和昵称占位符
         if system_prompt:
             system_prompt = system_prompt.replace("{admin_qq}", str(config.admin_qq))
@@ -50,7 +56,7 @@ def init_ai_service():
             system_prompt=system_prompt,
             debug_log=config.ai_debug_log,
         )
-        logger.info("AI 服务初始化完成")
+        logger.info(f"AI 服务初始化完成，当前人格模式: {current_prompt_mode}")
     except Exception as e:
         logger.error(f"AI 服务初始化失败: {e}")
 
@@ -137,6 +143,8 @@ settings_cmd = on_command("settings", aliases={"设置"}, priority=5, block=True
 groupsettings_cmd = on_command("groupsettings", aliases={"群设置"}, priority=5, block=True)
 setkey_cmd = on_command("setkey", aliases={"设置关键词"}, priority=5, block=True)
 help_cmd = on_command("help", aliases={"帮助"}, priority=5, block=True)
+switch_kind_cmd = on_command("邻家大姐姐人格", priority=5, block=True)
+switch_default_cmd = on_command("雌小鬼人格", priority=5, block=True)
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
 private_msg = on_message(priority=10, block=True)
@@ -154,9 +162,41 @@ async def handle_help(event: MessageEvent):
 /settings <QQ号> 或 /设置 - 管理用户白名单（管理员）
 /groupsettings <群号> 或 /群设置 - 管理群白名单（管理员）
 /setkey <关键词> <含义> 或 /设置关键词 - 设置关键词映射（管理员）
+/邻家大姐姐人格 - 切换到邻家大姐姐人格
+/雌小鬼人格 - 切换回默认人格
 /weibo <UID> - 获取微博用户最新动态（私聊）
 /sendweibo <UID> <群号> - 发送微博图片到指定群（私聊）"""
     await help_cmd.finish(help_text)
+
+
+@switch_kind_cmd.handle()
+async def handle_switch_kind(event: MessageEvent):
+    """切换到邻家大姐姐人格"""
+    global ai_service, current_prompt_mode
+    
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await switch_kind_cmd.finish("权限不足，仅管理员可使用此命令")
+    
+    current_prompt_mode = "kind"
+    ai_service = None  # 重置AI服务，下次使用时会重新初始化
+    await switch_kind_cmd.finish("已切换到邻家大姐姐人格")
+
+
+@switch_default_cmd.handle()
+async def handle_switch_default(event: MessageEvent):
+    """切换回默认人格（雌小鬼）"""
+    global ai_service, current_prompt_mode
+    
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await switch_default_cmd.finish("权限不足，仅管理员可使用此命令")
+    
+    current_prompt_mode = "default"
+    ai_service = None  # 重置AI服务，下次使用时会重新初始化
+    await switch_default_cmd.finish("已切换回默认人格")
 
 
 @setkey_cmd.handle()
@@ -495,7 +535,12 @@ async def handle_group_msg(event: MessageEvent):
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
         logger.info(f"群消息已回复 群:{group_id} 消息:{user_message[:20]}...")
-        await group_msg.finish(reply)
+        
+        # 被@时回复原消息
+        if is_at_me:
+            await group_msg.finish(MessageSegment.reply(event.message_id) + reply)
+        else:
+            await group_msg.finish(reply)
 
     except FinishedException:
         raise
