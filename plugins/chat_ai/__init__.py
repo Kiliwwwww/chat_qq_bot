@@ -436,7 +436,11 @@ async def handle_group_msg(event: MessageEvent):
     try:
         # 调用 AI 服务（带关键词提示词）
         keywords_prompt = get_keywords_prompt()
-        system_prompt = ai_service.system_prompt + keywords_prompt if keywords_prompt else None
+        # 管理员艾特时启用女仆模式
+        admin_maid_prompt = ""
+        if is_at_me and event.user_id == config.admin_qq:
+            admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
+        system_prompt = ai_service.system_prompt + keywords_prompt + admin_maid_prompt if (keywords_prompt or admin_maid_prompt) else None
         reply = await ai_service.chat_with_history(
             messages=group_histories[group_id],
             system_prompt=system_prompt,
