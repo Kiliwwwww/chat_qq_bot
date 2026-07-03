@@ -1,8 +1,6 @@
 from pathlib import Path
 import random
 import time
-import base64
-import httpx
 from nonebot import on_command, on_message, get_plugin_config, require
 from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment, PrivateMessageEvent, GroupMessageEvent
 from nonebot.params import CommandArg
@@ -56,24 +54,8 @@ def init_ai_service():
         logger.error(f"AI 服务初始化失败: {e}")
 
 
-async def download_image_as_base64(url: str) -> str:
-    """下载图片并转换为base64数据URL"""
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        
-        # 获取内容类型
-        content_type = response.headers.get("content-type", "image/jpeg")
-        
-        # 转换为base64
-        image_data = base64.b64encode(response.content).decode("utf-8")
-        
-        # 返回数据URL
-        return f"data:{content_type};base64,{image_data}"
-
-
 def clean_history_images(messages: list[dict]) -> list[dict]:
-    """清理历史记录中的图片，只保留最新消息的图片"""
+    """清理历史记录中的图片，只保留最近3条消息的图片"""
     if not messages:
         return messages
     
@@ -82,9 +64,9 @@ def clean_history_images(messages: list[dict]) -> list[dict]:
     for i, msg in enumerate(messages):
         # 只处理用户消息
         if msg["role"] == "user" and isinstance(msg["content"], list):
-            # 最新消息保留图片，历史消息只保留文本
-            if i == len(messages) - 2:
-                cleaned.append(msg)  # 最新消息完整保留
+            # 最近3条消息保留图片，历史消息只保留文本
+            if i >= len(messages) - 6:
+                cleaned.append(msg)  # 最近6条消息完整保留
             else:
                 # 历史消息只保留文本部分
                 text_parts = [item for item in msg["content"] if item.get("type") == "text"]
@@ -320,12 +302,10 @@ async def handle_private_msg(event: MessageEvent):
             user_content.append({"type": "text", "text": user_message})
         for img_url in image_urls:
             try:
-                # 下载图片并转换为base64
-                base64_url = await download_image_as_base64(img_url)
-                user_content.append({"type": "image_url", "image_url": {"url": base64_url}})
+                # 使用图片外网地址
+                user_content.append({"type": "image_url", "image_url": {"url": img_url}})
             except Exception as e:
-                logger.error(f"图片下载失败: {e}")
-                # 如果下载失败，跳过该图片
+                logger.error(f"图片处理失败: {e}")
                 continue
         
         user_histories[user_id].append({
@@ -444,10 +424,10 @@ async def handle_group_msg(event: MessageEvent):
         user_content.append({"type": "text", "text": text_with_name})
         for img_url in image_urls:
             try:
-                base64_url = await download_image_as_base64(img_url)
-                user_content.append({"type": "image_url", "image_url": {"url": base64_url}})
+                # 使用图片外网地址
+                user_content.append({"type": "image_url", "image_url": {"url": img_url}})
             except Exception as e:
-                logger.error(f"图片下载失败: {e}")
+                logger.error(f"图片处理失败: {e}")
                 continue
         
         group_histories[group_id].append({
