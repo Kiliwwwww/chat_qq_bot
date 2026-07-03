@@ -68,6 +68,32 @@ async def download_image_as_base64(url: str) -> str:
         return f"data:{content_type};base64,{image_data}"
 
 
+def clean_history_images(messages: list[dict]) -> list[dict]:
+    """清理历史记录中的图片，只保留最新消息的图片"""
+    if not messages:
+        return messages
+    
+    # 创建副本，避免修改原始数据
+    cleaned = []
+    for i, msg in enumerate(messages):
+        # 只处理用户消息
+        if msg["role"] == "user" and isinstance(msg["content"], list):
+            # 最新消息保留图片，历史消息只保留文本
+            if i == len(messages) - 1:
+                cleaned.append(msg)  # 最新消息完整保留
+            else:
+                # 历史消息只保留文本部分
+                text_parts = [item for item in msg["content"] if item.get("type") == "text"]
+                if text_parts:
+                    cleaned.append({"role": "user", "content": text_parts})
+                else:
+                    # 如果没有文本部分，添加一个默认描述
+                    cleaned.append({"role": "user", "content": "[图片消息]"})
+        else:
+            cleaned.append(msg)
+    return cleaned
+
+
 def get_keywords_prompt() -> str:
     """获取关键词映射提示词"""
     keywords = db.get_all_keywords()
@@ -313,8 +339,10 @@ async def handle_private_msg(event: MessageEvent):
         # 调用 AI 服务（带关键词提示词）
         keywords_prompt = get_keywords_prompt()
         system_prompt = ai_service.system_prompt + keywords_prompt if keywords_prompt else None
+        # 清理历史记录中的图片，只保留最新消息的图片
+        cleaned_history = clean_history_images(user_histories[user_id])
         reply = await ai_service.chat_with_history(
-            messages=user_histories[user_id],
+            messages=cleaned_history,
             system_prompt=system_prompt,
         )
 
@@ -458,8 +486,10 @@ async def handle_group_msg(event: MessageEvent):
         if is_at_me and event.user_id == config.admin_qq:
             admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
         system_prompt = ai_service.system_prompt + keywords_prompt + admin_maid_prompt if (keywords_prompt or admin_maid_prompt) else None
+        # 清理历史记录中的图片，只保留最新消息的图片
+        cleaned_history = clean_history_images(group_histories[group_id])
         reply = await ai_service.chat_with_history(
-            messages=group_histories[group_id],
+            messages=cleaned_history,
             system_prompt=system_prompt,
         )
 
