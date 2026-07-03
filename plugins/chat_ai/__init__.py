@@ -79,7 +79,7 @@ def clean_history_images(messages: list[dict]) -> list[dict]:
         # 只处理用户消息
         if msg["role"] == "user" and isinstance(msg["content"], list):
             # 最新消息保留图片，历史消息只保留文本
-            if i == len(messages) - 1:
+            if i == len(messages) - 2:
                 cleaned.append(msg)  # 最新消息完整保留
             else:
                 # 历史消息只保留文本部分
