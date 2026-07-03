@@ -1,6 +1,7 @@
 from pathlib import Path
-from openai import OpenAI
+from openai import AsyncOpenAI
 from typing import Optional, Union
+from nonebot import logger
 
 
 class AIService:
@@ -24,7 +25,7 @@ class AIService:
         self.top_p = top_p
         self.system_prompt = system_prompt
 
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
         )
@@ -39,7 +40,7 @@ class AIService:
             pass
         return ""
 
-    def chat(
+    async def chat(
         self,
         user_message: str,
         system_prompt: Optional[str] = None,
@@ -65,7 +66,7 @@ class AIService:
             },
         ]
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             max_tokens=self.max_tokens,
@@ -73,9 +74,22 @@ class AIService:
             top_p=self.top_p,
         )
 
+        # 调试信息
+        logger.debug(f"API 响应类型: {type(response)}")
+        logger.debug(f"API 响应内容: {response}")
+        
+        if response is None:
+            raise ValueError("API 返回了 None 响应")
+        
+        if not response.choices:
+            raise ValueError(f"API 返回空 choices: {response}")
+        
+        logger.debug(f"choices 类型: {type(response.choices)}")
+        logger.debug(f"choices 内容: {response.choices}")
+        
         return response.choices[0].message.content
 
-    def chat_with_history(
+    async def chat_with_history(
         self,
         messages: list[dict[str, Union[str, list]]],
         system_prompt: Optional[str] = None,
@@ -97,7 +111,7 @@ class AIService:
             },
         ] + messages
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=self.model,
             messages=full_messages,
             max_tokens=self.max_tokens,
@@ -105,4 +119,23 @@ class AIService:
             top_p=self.top_p,
         )
 
+        # 调试信息
+        logger.debug(f"API 响应类型: {type(response)}")
+        logger.debug(f"API 响应内容: {response}")
+        
+        if response is None:
+            raise ValueError("API 返回了 None 响应")
+        
+        if not response.choices:
+            raise ValueError(f"API 返回空 choices: {response}")
+        
+        logger.debug(f"choices 类型: {type(response.choices)}")
+        logger.debug(f"choices 内容: {response.choices}")
+        
+        if response.choices[0] is None:
+            raise ValueError(f"choices[0] 为 None: {response.choices}")
+        
+        logger.debug(f"message 类型: {type(response.choices[0].message)}")
+        logger.debug(f"message 内容: {response.choices[0].message}")
+        
         return response.choices[0].message.content

@@ -267,7 +267,7 @@ async def handle_private_msg(event: MessageEvent):
 
     try:
         # 调用 AI 服务
-        reply = ai_service.chat_with_history(
+        reply = await ai_service.chat_with_history(
             messages=user_histories[user_id],
         )
 
@@ -287,6 +287,8 @@ async def handle_private_msg(event: MessageEvent):
         raise
     except Exception as e:
         logger.error(f"AI 调用失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         # 高风险拦截兜底回复
         if "high risk" in str(e).lower():
             await private_msg.finish("别发些乱七八糟的东西！")
@@ -381,7 +383,7 @@ async def handle_group_msg(event: MessageEvent):
         })
 
     try:
-        reply = ai_service.chat_with_history(
+        reply = await ai_service.chat_with_history(
             messages=group_histories[group_id],
         )
 
@@ -403,6 +405,8 @@ async def handle_group_msg(event: MessageEvent):
         raise
     except Exception as e:
         logger.error(f"群消息 AI 调用失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
         # 高风险内容拦截
