@@ -1,6 +1,8 @@
 from pathlib import Path
 import random
 import time
+import base64
+import httpx
 from nonebot import on_command, on_message, get_plugin_config, require
 from nonebot.adapters.onebot.v11 import MessageEvent, Message, MessageSegment, PrivateMessageEvent, GroupMessageEvent
 from nonebot.params import CommandArg
@@ -22,6 +24,7 @@ PROMPT_FILE = Path(__file__).parent.parent.parent / "data" / "md" / "system_prom
 user_histories: dict[int, list[dict[str, str]]] = {}
 group_histories: dict[int, list[dict[str, str]]] = {}
 group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
+group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 [(user_id, message)]
 ai_service: AIService = None
 
 # 初始化数据库
@@ -46,6 +49,59 @@ def init_ai_service():
         logger.info("AI 服务初始化完成")
     except Exception as e:
         logger.error(f"AI 服务初始化失败: {e}")
+
+
+async def download_image_as_base64(url: str) -> str:
+    """下载图片并转换为base64数据URL"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        
+        # 获取内容类型
+        content_type = response.headers.get("content-type", "image/jpeg")
+        
+        # 转换为base64
+        image_data = base64.b64encode(response.content).decode("utf-8")
+        
+        # 返回数据URL
+        return f"data:{content_type};base64,{image_data}"
+
+
+def check_repeater(group_id: int, user_id: int, message: str) -> bool:
+    """检测是否在复读，机器人跟读返回True"""
+    if not message or len(message) > 100:  # 忽略空消息和过长消息
+        return False
+    
+    if group_id not in group_recent_messages:
+        group_recent_messages[group_id] = []
+    
+    recent = group_recent_messages[group_id]
+    
+    # 检查最近2条消息是否相同（连续复读）
+    if len(recent) >= 2:
+        last1 = recent[-1]  # (user_id, message)
+        last2 = recent[-2]  # (user_id, message)
+        # 最近两条消息内容相同，且当前消息也相同
+        if last1[1] == message and last2[1] == message:
+            return True
+    
+    return False
+
+
+def update_recent_messages(group_id: int, user_id: int, message: str):
+    """更新群最近消息记录"""
+    if not message or len(message) > 100:
+        return
+    
+    if group_id not in group_recent_messages:
+        group_recent_messages[group_id] = []
+    
+    recent = group_recent_messages[group_id]
+    recent.append((user_id, message))
+    
+    # 只保留最近10条消息
+    if len(recent) > 10:
+        group_recent_messages[group_id] = recent[-10:]
 
 
 # 注册命令处理器
@@ -189,7 +245,14 @@ async def handle_private_msg(event: MessageEvent):
         if user_message:
             user_content.append({"type": "text", "text": user_message})
         for img_url in image_urls:
-            user_content.append({"type": "image_url", "image_url": {"url": img_url}})
+            try:
+                # 下载图片并转换为base64
+                base64_url = await download_image_as_base64(img_url)
+                user_content.append({"type": "image_url", "image_url": {"url": base64_url}})
+            except Exception as e:
+                logger.error(f"图片下载失败: {e}")
+                # 如果下载失败，跳过该图片
+                continue
         
         user_histories[user_id].append({
             "role": "user",
@@ -244,6 +307,32 @@ async def handle_group_msg(event: MessageEvent):
     if not db.group_exists(group_id):
         await group_msg.skip()
 
+    # 获取消息内容
+    message = event.get_message()
+    user_message = event.get_plaintext().strip()
+    
+    # 检查是否包含图片
+    image_urls = []
+    for segment in message:
+        if segment.type == "image":
+            image_url = segment.data.get("url", "")
+            if image_url:
+                image_urls.append(image_url)
+    
+    # 忽略空消息或命令
+    if (not user_message or user_message.startswith("/")) and not image_urls:
+        await group_msg.skip()
+
+    # 复读检测：如果群里有人在复读，机器人也跟着复读（不受冷却和概率限制）
+    if user_message and not image_urls and check_repeater(group_id, event.user_id, user_message):
+        update_recent_messages(group_id, event.user_id, user_message)
+        group_last_reply[group_id] = time.time()
+        logger.info(f"复读消息 群:{group_id} 消息:{user_message}")
+        await group_msg.finish(user_message)
+    
+    # 更新最近消息记录
+    update_recent_messages(group_id, event.user_id, user_message)
+
     # 冷却检查：防止短时间内重复回复同一群
     current_time = time.time()
     if group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
@@ -262,22 +351,6 @@ async def handle_group_msg(event: MessageEvent):
     if not ai_service:
         await group_msg.skip()
 
-    # 获取消息内容
-    message = event.get_message()
-    user_message = event.get_plaintext().strip()
-    
-    # 检查是否包含图片
-    image_urls = []
-    for segment in message:
-        if segment.type == "image":
-            image_url = segment.data.get("url", "")
-            if image_url:
-                image_urls.append(image_url)
-    
-    # 忽略空消息或命令
-    if (not user_message or user_message.startswith("/")) and not image_urls:
-        await group_msg.skip()
-
     # 获取群对话历史
     if group_id not in group_histories:
         group_histories[group_id] = []
@@ -288,7 +361,14 @@ async def handle_group_msg(event: MessageEvent):
         if user_message:
             user_content.append({"type": "text", "text": user_message})
         for img_url in image_urls:
-            user_content.append({"type": "image_url", "image_url": {"url": img_url}})
+            try:
+                # 下载图片并转换为base64
+                base64_url = await download_image_as_base64(img_url)
+                user_content.append({"type": "image_url", "image_url": {"url": base64_url}})
+            except Exception as e:
+                logger.error(f"图片下载失败: {e}")
+                # 如果下载失败，跳过该图片
+                continue
         
         group_histories[group_id].append({
             "role": "user",
@@ -325,10 +405,10 @@ async def handle_group_msg(event: MessageEvent):
         logger.error(f"群消息 AI 调用失败: {e}")
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
-        # 高风险拦截兜底回复
+        # 高风险内容拦截
         if "high risk" in str(e).lower():
             await group_msg.finish("别发些奇奇怪怪的东西！")
-        await group_msg.finish(f"AI 调用失败: {e}")
+        # 其他失败情况静默处理，不回复群消息
 
 
 @reset_cmd.handle()
