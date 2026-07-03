@@ -136,7 +136,9 @@ async def handle_help(event: MessageEvent):
 /reset 或 /重置对话 - 重置当前对话历史
 /settings <QQ号> 或 /设置 - 管理用户白名单（管理员）
 /groupsettings <群号> 或 /群设置 - 管理群白名单（管理员）
-/setkey <关键词> <含义> 或 /设置关键词 - 设置关键词映射（管理员）"""
+/setkey <关键词> <含义> 或 /设置关键词 - 设置关键词映射（管理员）
+/weibo <UID> - 获取微博用户最新动态（私聊）
+/sendweibo <UID> <群号> - 发送微博图片到指定群（私聊）"""
     await help_cmd.finish(help_text)
 
 
@@ -377,8 +379,8 @@ async def handle_group_msg(event: MessageEvent):
         logger.info(f"复读消息 群:{group_id} 消息:{user_message}")
         await group_msg.finish(user_message)
 
-    # 30%概率随机复读群友消息（文本或图片）
-    if random.random() < 0.3:
+    # 10%概率随机复读群友消息（文本或图片）
+    if random.random() < 0.1:
         update_recent_messages(group_id, event.user_id, user_message)
         group_last_reply[group_id] = time.time()
         logger.info(f"随机复读 群:{group_id} 消息:{user_message[:20] if user_message else '图片'}")
