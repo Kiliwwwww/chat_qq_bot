@@ -415,13 +415,13 @@ async def handle_group_msg(event: MessageEvent):
     if len(group_histories[group_id]) > 20:
         group_histories[group_id] = group_histories[group_id][-20:]
 
-    # 冷却检查：防止短时间内重复回复同一群
-    current_time = time.time()
-    if group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
-        await group_msg.skip()
-
-    # 判断是否被@：被@则立即回复，不受概率限制
+    # 判断是否被@：被@则立即回复，不受概率和冷却限制
     is_at_me = event.is_tome()
+
+    # 冷却检查：防止短时间内重复回复同一群（被@时跳过冷却检查）
+    current_time = time.time()
+    if not is_at_me and group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
+        await group_msg.skip()
 
     # 未被@时，进行概率检查
     if not is_at_me and random.random() > config.group_reply_chance:
