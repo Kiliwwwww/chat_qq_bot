@@ -17,6 +17,9 @@ class Config(BaseModel):
     # 管理员QQ号
     admin_qq: int = 1154798056
     
+    # 管理员昵称
+    admin_name: str = "宝宝葵"
+    
     # 群消息回复概率 (0.0~1.0)
     group_reply_chance: float = 0.3
     
