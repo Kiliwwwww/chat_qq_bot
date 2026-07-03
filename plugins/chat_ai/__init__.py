@@ -376,7 +376,22 @@ async def handle_group_msg(event: MessageEvent):
         group_last_reply[group_id] = time.time()
         logger.info(f"复读消息 群:{group_id} 消息:{user_message}")
         await group_msg.finish(user_message)
-    
+
+    # 30%概率随机复读群友消息（文本或图片）
+    if random.random() < 0.3:
+        update_recent_messages(group_id, event.user_id, user_message)
+        group_last_reply[group_id] = time.time()
+        logger.info(f"随机复读 群:{group_id} 消息:{user_message[:20] if user_message else '图片'}")
+        # 构建复读消息
+        repeat_msg = Message()
+        if user_message:
+            repeat_msg += MessageSegment.text(user_message)
+        for segment in message:
+            if segment.type == "image":
+                repeat_msg += MessageSegment.image(segment.data.get("file", ""))
+        if repeat_msg:
+            await group_msg.finish(repeat_msg)
+
     # 更新最近消息记录
     update_recent_messages(group_id, event.user_id, user_message)
 
