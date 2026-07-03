@@ -380,7 +380,7 @@ async def handle_group_msg(event: MessageEvent):
         await group_msg.finish(user_message)
 
     # 10%概率随机复读群友消息（文本或图片）
-    if random.random() < 0.1:
+    if random.random() < 0.03:
         update_recent_messages(group_id, event.user_id, user_message)
         group_last_reply[group_id] = time.time()
         logger.info(f"随机复读 群:{group_id} 消息:{user_message[:20] if user_message else '图片'}")
