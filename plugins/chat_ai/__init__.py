@@ -23,6 +23,7 @@ user_histories: dict[int, list[dict[str, str]]] = {}
 group_histories: dict[int, list[dict[str, str]]] = {}
 group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
 group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 [(user_id, message)]
+group_last_repeated: dict[int, str] = {}  # 群最后复读的消息内容
 ai_service: AIService = None
 
 # 初始化数据库
@@ -99,12 +100,16 @@ def check_repeater(group_id: int, user_id: int, message: str) -> bool:
     
     recent = group_recent_messages[group_id]
     
-    # 检查最近2条消息是否相同（连续复读）
+    # 检查机器人是否已经复读过这条消息
+    if group_id in group_last_repeated and group_last_repeated[group_id] == message:
+        return False
+    
+    # 检查最近2条消息是否相同（连续复读），且来自不同用户
     if len(recent) >= 2:
         last1 = recent[-1]  # (user_id, message)
         last2 = recent[-2]  # (user_id, message)
-        # 最近两条消息内容相同，且当前消息也相同
-        if last1[1] == message and last2[1] == message:
+        # 最近两条消息内容相同，且当前消息也相同，且来自不同用户
+        if last1[1] == message and last2[1] == message and last1[0] != last2[0]:
             return True
     
     return False
@@ -388,6 +393,7 @@ async def handle_group_msg(event: MessageEvent):
     if user_message and not image_urls and check_repeater(group_id, event.user_id, user_message):
         update_recent_messages(group_id, event.user_id, user_message)
         group_last_reply[group_id] = time.time()
+        group_last_repeated[group_id] = user_message  # 记录机器人的最后复读消息
         logger.info(f"复读消息 群:{group_id} 消息:{user_message}")
         await group_msg.finish(user_message)
 
