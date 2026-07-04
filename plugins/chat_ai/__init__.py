@@ -25,6 +25,9 @@ current_prompt_mode: str = "default"
 # 禁言状态：bot_mute_until 存储禁言到期时间戳
 bot_mute_until: float = 0
 
+# 需要自动贴表情的用户集合 {(group_id, user_id)}
+auto_emoji_users: set[tuple[int, int]] = set()
+
 # 存储用户对话历史和AI服务实例
 user_histories: dict[int, list[dict[str, str]]] = {}
 group_histories: dict[int, list[dict[str, str]]] = {}
@@ -151,6 +154,8 @@ help_cmd = on_command("help", aliases={"帮助"}, priority=5, block=True)
 switch_kind_cmd = on_command("邻家大姐姐人格", priority=5, block=True)
 switch_default_cmd = on_command("雌小鬼人格", priority=5, block=True)
 mute_cmd = on_command("闭嘴", priority=5, block=True)
+emoji_cmd = on_command("贴表情", priority=5, block=True)
+emoji_cancel_cmd = on_command("取消贴表情", priority=5, block=True)
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
 private_msg = on_message(priority=10, block=True)
@@ -170,6 +175,8 @@ async def handle_help(event: MessageEvent):
 /setkey <关键词> <含义> 或 /设置关键词 - 设置关键词映射（管理员）
 /邻家大姐姐人格 - 切换到邻家大姐姐人格
 /雌小鬼人格 - 切换回默认人格
+/贴表情 <QQ号> - 给指定用户消息贴随机表情（管理员）
+/取消贴表情 <QQ号> - 取消给指定用户贴的表情（管理员）
 /weibo <UID> - 获取微博用户最新动态（私聊）
 /sendweibo <UID> <群号> - 发送微博图片到指定群（私聊）"""
     await help_cmd.finish(help_text)
@@ -221,6 +228,58 @@ async def handle_mute(event: MessageEvent):
     bot_mute_until = time.time() + 300
     logger.info(f"管理员触发闭嘴，bot将静默5分钟")
     await mute_cmd.finish("好的，我闭嘴5分钟")
+
+
+@emoji_cmd.handle()
+async def handle_emoji(event: GroupMessageEvent, args: Message = CommandArg()):
+    """处理贴表情命令（仅管理员可用，仅群聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await emoji_cmd.finish("权限不足，仅管理员可使用此命令")
+    
+    # 解析QQ号
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await emoji_cmd.finish("请指定QQ号，格式：贴表情 <QQ号>")
+    
+    try:
+        target_qq = int(arg)
+    except ValueError:
+        await emoji_cmd.finish("请输入有效的QQ号")
+    
+    group_id = event.group_id
+    
+    # 添加到自动贴表情列表
+    auto_emoji_users.add((group_id, target_qq))
+    logger.info(f"管理员设置了自动给用户 {target_qq} 在群 {group_id} 贴表情")
+    await emoji_cmd.finish(f"已开启自动给该用户消息贴表情")
+
+
+@emoji_cancel_cmd.handle()
+async def handle_emoji_cancel(event: GroupMessageEvent, args: Message = CommandArg()):
+    """处理取消贴表情命令（仅管理员可用，仅群聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await emoji_cancel_cmd.finish("权限不足，仅管理员可使用此命令")
+    
+    # 解析QQ号
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await emoji_cancel_cmd.finish("请指定QQ号，格式：取消贴表情 <QQ号>")
+    
+    try:
+        target_qq = int(arg)
+    except ValueError:
+        await emoji_cancel_cmd.finish("请输入有效的QQ号")
+    
+    group_id = event.group_id
+    
+    # 从自动贴表情列表中移除
+    auto_emoji_users.discard((group_id, target_qq))
+    logger.info(f"管理员取消了用户 {target_qq} 在群 {group_id} 的自动贴表情")
+    await emoji_cancel_cmd.finish(f"已取消该用户的自动贴表情")
 
 
 @setkey_cmd.handle()
@@ -437,6 +496,19 @@ async def handle_group_msg(event: MessageEvent):
 
     config = get_plugin_config(Config)
     group_id = event.group_id
+
+    # 自动贴表情功能（不受群白名单限制）
+    if (group_id, event.user_id) in auto_emoji_users:
+        try:
+            from nonebot import get_bot
+            bot = get_bot()
+            # 随机表情ID列表
+            emoji_ids = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100]
+            random_emoji = random.choice(emoji_ids)
+            await bot.set_msg_emoji_like(message_id=event.message_id, emoji_id=random_emoji)
+            logger.info(f"自动给用户 {event.user_id} 在群 {group_id} 的消息贴了表情 {random_emoji}")
+        except Exception as e:
+            logger.error(f"自动贴表情失败: {e}")
 
     # 群白名单检查
     if not db.group_exists(group_id):
