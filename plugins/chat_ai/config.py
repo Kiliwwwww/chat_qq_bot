@@ -23,6 +23,9 @@ class Config(BaseModel):
     # 群消息回复概率 (0.0~1.0)
     group_reply_chance: float = 0.3
     
+    # 随机复读群友消息概率 (0.0~1.0)
+    random_repeat_chance: float = 0.03
+    
     # 调试日志开关
     ai_debug_log: bool = False
     
