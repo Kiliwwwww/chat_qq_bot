@@ -5,3 +5,4 @@ __pycache__/
 .DS_Store
 .venv/
 data/chat_ai/chat_ai.db
+log/
