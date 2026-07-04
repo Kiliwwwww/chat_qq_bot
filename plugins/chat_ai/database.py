@@ -41,6 +41,13 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 logger.info("数据库初始化完成")
         except Exception as e:
@@ -185,4 +192,31 @@ class Database:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"检查关键词失败: {e}")
+            return False
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        """获取设置值"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT value FROM settings WHERE key = ?", (key,)
+                )
+                row = cursor.fetchone()
+                return row["value"] if row else default
+        except Exception as e:
+            logger.error(f"获取设置失败: {e}")
+            return default
+
+    def set_setting(self, key: str, value: str) -> bool:
+        """保存设置值"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                    (key, value),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"保存设置失败: {e}")
             return False

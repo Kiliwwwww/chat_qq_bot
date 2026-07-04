@@ -22,6 +22,9 @@ PROMPT_KIND_FILE = Path(__file__).parent.parent.parent / "data" / "md" / "system
 # 当前提示词模式：default=默认（雌小鬼），kind=邻家大姐姐
 current_prompt_mode: str = "default"
 
+# 禁言状态：bot_mute_until 存储禁言到期时间戳
+bot_mute_until: float = 0
+
 # 存储用户对话历史和AI服务实例
 user_histories: dict[int, list[dict[str, str]]] = {}
 group_histories: dict[int, list[dict[str, str]]] = {}
@@ -39,6 +42,8 @@ def init_ai_service():
     global ai_service, current_prompt_mode
     try:
         config = get_plugin_config(Config)
+        # 从数据库读取人格模式
+        current_prompt_mode = db.get_setting("prompt_mode", "default")
         # 根据当前模式选择提示词文件
         prompt_file = PROMPT_KIND_FILE if current_prompt_mode == "kind" else PROMPT_FILE
         system_prompt = AIService.load_prompt_from_file(prompt_file) or config.ai_system_prompt
@@ -145,6 +150,7 @@ setkey_cmd = on_command("setkey", aliases={"设置关键词"}, priority=5, block
 help_cmd = on_command("help", aliases={"帮助"}, priority=5, block=True)
 switch_kind_cmd = on_command("邻家大姐姐人格", priority=5, block=True)
 switch_default_cmd = on_command("雌小鬼人格", priority=5, block=True)
+mute_cmd = on_command("闭嘴", priority=5, block=True)
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
 private_msg = on_message(priority=10, block=True)
@@ -180,6 +186,7 @@ async def handle_switch_kind(event: MessageEvent):
         await switch_kind_cmd.finish("权限不足，仅管理员可使用此命令")
     
     current_prompt_mode = "kind"
+    db.set_setting("prompt_mode", "kind")
     ai_service = None  # 重置AI服务，下次使用时会重新初始化
     await switch_kind_cmd.finish("已切换到邻家大姐姐人格")
 
@@ -195,8 +202,25 @@ async def handle_switch_default(event: MessageEvent):
         await switch_default_cmd.finish("权限不足，仅管理员可使用此命令")
     
     current_prompt_mode = "default"
+    db.set_setting("prompt_mode", "default")
     ai_service = None  # 重置AI服务，下次使用时会重新初始化
     await switch_default_cmd.finish("已切换回默认人格")
+
+
+@mute_cmd.handle()
+async def handle_mute(event: MessageEvent):
+    """处理闭嘴命令（仅管理员可用）"""
+    global bot_mute_until
+    
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await mute_cmd.finish("权限不足，仅管理员可使用此命令")
+    
+    # 设置禁言5分钟
+    bot_mute_until = time.time() + 300
+    logger.info(f"管理员触发闭嘴，bot将静默5分钟")
+    await mute_cmd.finish("好的，我闭嘴5分钟")
 
 
 @setkey_cmd.handle()
@@ -317,6 +341,10 @@ async def handle_private_msg(event: MessageEvent):
     if not ai_service:
         await private_msg.skip()
 
+    # 检查是否在禁言期间
+    if time.time() < bot_mute_until:
+        await private_msg.skip()
+
     # 获取消息内容
     message = event.get_message()
     user_message = event.get_plaintext().strip()
@@ -385,6 +413,7 @@ async def handle_private_msg(event: MessageEvent):
         if len(user_histories[user_id]) > 20:
             user_histories[user_id] = user_histories[user_id][-20:]
 
+        logger.info(f"私聊回复 用户:{user_id} 回复:{reply}")
         await private_msg.finish(reply)
 
     except FinishedException:
@@ -427,6 +456,10 @@ async def handle_group_msg(event: MessageEvent):
     
     # 忽略空消息或命令
     if (not user_message or user_message.startswith("/")) and not image_urls:
+        await group_msg.skip()
+
+    # 检查是否在禁言期间
+    if time.time() < bot_mute_until:
         await group_msg.skip()
 
     # 复读检测：如果群里有人在复读，机器人也跟着复读（不受冷却和概率限制）
@@ -534,7 +567,7 @@ async def handle_group_msg(event: MessageEvent):
 
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
-        logger.info(f"群消息已回复 群:{group_id} 消息:{user_message[:20]}...")
+        logger.info(f"群消息已回复 群:{group_id} 消息:{user_message[:20]}... 回复:{reply}")
         
         # 被@时回复原消息
         if is_at_me:
