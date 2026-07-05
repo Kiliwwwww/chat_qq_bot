@@ -26,6 +26,9 @@ class Config(BaseModel):
     # 随机复读群友消息概率 (0.0~1.0)
     random_repeat_chance: float = 0.03
     
+    # 全体贴表情概率 (0.0~1.0)
+    group_emoji_chance: float = 0.3
+    
     # 调试日志开关
     ai_debug_log: bool = False
     
