@@ -587,6 +587,12 @@ async def handle_group_msg(event: MessageEvent):
     if time.time() < bot_mute_until:
         await group_msg.skip()
 
+    # @机器人且包含"妈妈"时回复"叫妈妈"
+    if event.is_tome() and "妈妈" in user_message:
+        reply_msg = MessageSegment.reply(event.message_id) + "叫妈妈"
+        logger.info(f"妈妈触发 群:{group_id} 用户:{event.user_id}")
+        await group_msg.finish(reply_msg)
+
     # 复读检测：如果群里有人在复读，机器人也跟着复读（不受冷却和概率限制）
     if user_message and not image_urls and check_repeater(group_id, event.user_id, user_message):
         update_recent_messages(group_id, event.user_id, user_message)
