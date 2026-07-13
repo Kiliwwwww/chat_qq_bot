@@ -1,5 +1,5 @@
 from nonebot import on_command, get_plugin_config, on_message
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, GroupMessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot import logger
 import redis
@@ -70,7 +70,16 @@ def get_top_users(group_id: int, top_n: int = 5) -> list[tuple[int, int]]:
     return user_counts[:top_n]
 
 
-def format_ranking_message(top_users: list[tuple[int, int]], group_id: int) -> str:
+async def get_user_nickname(bot, group_id: int, user_id: int) -> str:
+    """获取用户在群里的昵称，优先群昵称，其次QQ昵称，最后用QQ号"""
+    try:
+        info = await bot.get_group_member_info(group_id=group_id, user_id=user_id)
+        return info.get("card") or info.get("nickname") or str(user_id)
+    except Exception:
+        return str(user_id)
+
+
+async def format_ranking_message(top_users: list[tuple[int, int]], group_id: int, bot) -> str:
     """格式化排行榜消息"""
     if not top_users:
         return "今日暂无发言数据"
@@ -81,29 +90,22 @@ def format_ranking_message(top_users: list[tuple[int, int]], group_id: int) -> s
     
     for i, (user_id, count) in enumerate(top_users):
         medal = medals[i] if i < len(medals) else f"{i+1}."
-        lines.append(f"{medal} [CQ:at,qq={user_id}] - {count} 条消息")
+        nickname = await get_user_nickname(bot, group_id, user_id)
+        lines.append(f"{medal} {nickname} - {count} 条消息")
     
     return "\n".join(lines)
 
 
 @ranking_cmd.handle()
-async def handle_ranking(event: GroupMessageEvent, args: Message = CommandArg()):
+async def handle_ranking(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     """处理排行榜命令"""
     # 检查Redis是否可用
     if redis_client is None:
         await ranking_cmd.finish("排行榜功能暂不可用（Redis未连接）")
     
-    # 检查是否是管理员
-    from nonebot import get_driver
-    driver = get_driver()
-    superusers = driver.config.superusers
-    
-    if str(event.user_id) not in superusers:
-        await ranking_cmd.finish("只有管理员才能查看排行榜哦~")
-    
     group_id = event.group_id
     top_users = get_top_users(group_id, 5)
-    message = format_ranking_message(top_users, group_id)
+    message = await format_ranking_message(top_users, group_id, bot)
     
     await ranking_cmd.finish(message)
 
