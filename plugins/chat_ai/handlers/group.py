@@ -1,0 +1,253 @@
+import random
+import time
+
+from nonebot import on_command, on_message, get_plugin_config, logger
+from nonebot.adapters.onebot.v11 import (
+    MessageEvent,
+    Message,
+    MessageSegment,
+    GroupMessageEvent,
+)
+from nonebot.exception import FinishedException
+
+from ..config import Config
+from .. import state
+from ..state import (
+    db,
+    group_histories,
+    group_last_reply,
+    group_last_repeated,
+    auto_emoji_users,
+    auto_emoji_groups,
+    init_ai_service,
+)
+from ..utils.helpers import (
+    clean_history_images,
+    get_keywords_prompt,
+    check_repeater,
+    update_recent_messages,
+)
+
+reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
+
+# 群消息处理器
+group_msg = on_message(priority=10, block=True)
+
+
+@reset_cmd.handle()
+async def handle_reset(event: MessageEvent):
+    """重置对话历史"""
+    user_id = event.user_id
+    reset_anything = False
+
+    # 重置用户私聊历史
+    from ..state import user_histories
+    if user_id in user_histories:
+        del user_histories[user_id]
+        reset_anything = True
+
+    # 如果是群消息，同时重置群对话历史
+    if isinstance(event, GroupMessageEvent):
+        group_id = event.group_id
+        if group_id in group_histories:
+            del group_histories[group_id]
+            reset_anything = True
+
+    if reset_anything:
+        await reset_cmd.finish("对话历史已重置")
+    else:
+        await reset_cmd.finish("没有对话历史需要重置")
+
+
+@group_msg.handle()
+async def handle_group_msg(event: MessageEvent):
+    """处理群消息"""
+    # 只处理群消息
+    if not isinstance(event, GroupMessageEvent):
+        await group_msg.skip()
+
+    config = get_plugin_config(Config)
+    group_id = event.group_id
+
+    # 自动贴表情功能（不受群白名单限制）
+    if (group_id, event.user_id) in auto_emoji_users:
+        try:
+            from nonebot import get_bot
+            bot = get_bot()
+            # 随机表情ID列表
+            emoji_ids = list(range(9, 101))
+            random_emoji = random.choice(emoji_ids)
+            await bot.set_msg_emoji_like(message_id=event.message_id, emoji_id=random_emoji)
+            logger.info(f"自动给用户 {event.user_id} 在群 {group_id} 的消息贴了表情 {random_emoji}")
+        except Exception as e:
+            logger.error(f"自动贴表情失败: {e}")
+
+    # 全体贴表情功能（按概率给群内所有人贴表情，不受群白名单限制）
+    if group_id in auto_emoji_groups:
+        config_emoji = get_plugin_config(Config)
+        if random.random() < config_emoji.group_emoji_chance:
+            try:
+                from nonebot import get_bot
+                bot = get_bot()
+                emoji_ids = list(range(9, 101))
+                random_emoji = random.choice(emoji_ids)
+                await bot.set_msg_emoji_like(message_id=event.message_id, emoji_id=random_emoji)
+                logger.info(f"全体贴表情：给用户 {event.user_id} 在群 {group_id} 的消息贴了表情 {random_emoji}")
+            except Exception as e:
+                logger.error(f"全体贴表情失败: {e}")
+
+    # 群白名单检查
+    if not db.group_exists(group_id):
+        await group_msg.skip()
+
+    # 获取消息内容
+    message = event.get_message()
+    user_message = event.get_plaintext().strip()
+
+    # 检查是否包含图片
+    image_urls = []
+    for segment in message:
+        if segment.type == "image":
+            image_url = segment.data.get("url", "")
+            if image_url:
+                image_urls.append(image_url)
+
+    # 忽略空消息或命令
+    if (not user_message or user_message.startswith("/")) and not image_urls:
+        await group_msg.skip()
+
+    # 检查是否在禁言期间
+    if time.time() < state.bot_mute_until:
+        await group_msg.skip()
+
+    # @机器人且包含"妈妈"时回复"叫妈妈"
+    if event.is_tome() and "妈妈" in user_message:
+        reply_msg = MessageSegment.reply(event.message_id) + "叫妈妈"
+        logger.info(f"妈妈触发 群:{group_id} 用户:{event.user_id}")
+        await group_msg.finish(reply_msg)
+
+    # 复读检测：如果群里有人在复读，机器人也跟着复读（不受冷却和概率限制）
+    if user_message and not image_urls and check_repeater(group_id, event.user_id, user_message):
+        update_recent_messages(group_id, event.user_id, user_message)
+        group_last_reply[group_id] = time.time()
+        group_last_repeated[group_id] = user_message  # 记录机器人的最后复读消息
+        logger.info(f"复读消息 群:{group_id} 消息:{user_message}")
+        await group_msg.finish(user_message)
+
+    # 随机复读群友消息（文本或图片）
+    if random.random() < config.random_repeat_chance:
+        update_recent_messages(group_id, event.user_id, user_message)
+        group_last_reply[group_id] = time.time()
+        logger.info(f"随机复读 群:{group_id} 消息:{user_message[:20] if user_message else '图片'}")
+        # 构建复读消息
+        repeat_msg = Message()
+        if user_message:
+            repeat_msg += MessageSegment.text(user_message)
+        for segment in message:
+            if segment.type == "image":
+                repeat_msg += MessageSegment.image(segment.data.get("file", ""))
+        if repeat_msg:
+            await group_msg.finish(repeat_msg)
+
+    # 更新最近消息记录
+    update_recent_messages(group_id, event.user_id, user_message)
+
+    # 获取群对话历史
+    if group_id not in group_histories:
+        group_histories[group_id] = []
+
+    # 获取发言人昵称（优先群名片，其次QQ昵称）
+    sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
+    user_id = event.user_id
+
+    # 将所有用户消息加入历史（不管AI是否回复）
+    if image_urls:
+        user_content = []
+        text_with_name = f"[{sender_name}][{user_id}] {user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
+        user_content.append({"type": "text", "text": text_with_name})
+        for img_url in image_urls:
+            try:
+                # 使用图片外网地址
+                user_content.append({"type": "image_url", "image_url": {"url": img_url}})
+            except Exception as e:
+                logger.error(f"图片处理失败: {e}")
+                continue
+
+        group_histories[group_id].append({
+            "role": "user",
+            "content": user_content,
+        })
+    else:
+        group_histories[group_id].append({
+            "role": "user",
+            "content": f"[{sender_name}][{user_id}] {user_message}",
+        })
+
+    # 限制历史记录长度
+    if len(group_histories[group_id]) > 20:
+        group_histories[group_id] = group_histories[group_id][-20:]
+
+    # 判断是否被@：被@则立即回复，不受概率和冷却限制
+    is_at_me = event.is_tome()
+
+    # 冷却检查：防止短时间内重复回复同一群（被@时跳过冷却检查）
+    current_time = time.time()
+    if not is_at_me and group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
+        await group_msg.skip()
+
+    # 未被@时，进行概率检查
+    if not is_at_me and random.random() > config.group_reply_chance:
+        await group_msg.skip()
+
+    if not state.ai_service:
+        init_ai_service()
+
+    if not state.ai_service:
+        await group_msg.skip()
+
+    try:
+        # 调用 AI 服务（带关键词提示词）
+        keywords_prompt = get_keywords_prompt()
+        # 管理员艾特时启用女仆模式
+        admin_maid_prompt = ""
+        if is_at_me and event.user_id == config.admin_qq:
+            admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
+        system_prompt = state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt if (keywords_prompt or admin_maid_prompt) else None
+        # 清理历史记录中的图片，只保留最新消息的图片
+        cleaned_history = clean_history_images(group_histories[group_id])
+        reply = await state.ai_service.chat_with_history(
+            messages=cleaned_history,
+            system_prompt=system_prompt,
+        )
+
+        group_histories[group_id].append({
+            "role": "assistant",
+            "content": reply,
+        })
+
+        # 限制历史记录长度
+        if len(group_histories[group_id]) > 20:
+            group_histories[group_id] = group_histories[group_id][-20:]
+
+        # 更新最后回复时间戳
+        group_last_reply[group_id] = time.time()
+        logger.info(f"群消息已回复 群:{group_id} 消息:{user_message[:20]}... 回复:{reply}")
+
+        # 被@时回复原消息
+        if is_at_me:
+            await group_msg.finish(MessageSegment.reply(event.message_id) + reply)
+        else:
+            await group_msg.finish(reply)
+
+    except FinishedException:
+        raise
+    except Exception as e:
+        logger.error(f"群消息 AI 调用失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # 更新最后回复时间戳
+        group_last_reply[group_id] = time.time()
+        # 高风险内容拦截
+        if "high risk" in str(e).lower():
+            await group_msg.finish("别发些奇奇怪怪的东西！")
+        # 其他失败情况静默处理，不回复群消息
