@@ -86,7 +86,7 @@ async def format_ranking_message(top_users: list[tuple[int, int]], group_id: int
     
     today = datetime.now().strftime("%Y-%m-%d")
     medals = ["🥇", "🥈", "🥉", "4.", "5."]
-    lines = [f"📊 群 {group_id} 今日发言排行榜（{today}）：", ""]
+    lines = [f"📊 群 {group_id} 今日b话排行榜（{today}）：", ""]
     
     for i, (user_id, count) in enumerate(top_users):
         medal = medals[i] if i < len(medals) else f"{i+1}."
