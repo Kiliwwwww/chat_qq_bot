@@ -61,6 +61,14 @@ python bot.py
 | `/reset` | `/重置对话` | 重置当前对话历史 |
 | `/settings <QQ号>` | `/设置` | 管理用户白名单（管理员） |
 | `/groupsettings <群号>` | `/群设置` | 管理群白名单（管理员） |
+| `/setkey <关键词> <含义>` | `/设置关键词` | 设置关键词映射（管理员） |
+| `/邻家大姐姐人格` | - | 切换到邻家大姐姐人格 |
+| `/雌小鬼人格` | - | 切换回默认人格 |
+| `/贴表情 <QQ号>` | - | 给指定用户消息贴随机表情（管理员） |
+| `/取消贴表情 <QQ号>` | - | 取消给指定用户贴的表情（管理员） |
+| `/全体贴表情` | - | 给群内所有人消息随机贴表情（管理员） |
+| `/取消全体贴表情` | - | 取消全体贴表情（管理员） |
+| `/闭嘴` | - | 让机器人静默5分钟（管理员） |
 
 ## 配置说明
 
@@ -75,7 +83,11 @@ python bot.py
 | `ai_temperature` | `1.0` | 生成温度 |
 | `ai_top_p` | `0.95` | Top P 采样 |
 | `admin_qq` | - | 管理员 QQ 号 |
+| `admin_name` | `宝宝葵` | 管理员昵称（用于提示词替换） |
 | `group_reply_chance` | `0.3` | 群聊回复概率 (0.0~1.0) |
+| `random_repeat_chance` | `0.03` | 随机复读群友消息概率 (0.0~1.0) |
+| `group_emoji_chance` | `0.3` | 全体贴表情概率 (0.0~1.0) |
+| `ai_debug_log` | `false` | 是否启用 AI 调试日志 |
 | `NICKNAME` | `[]` | 机器人昵称（建议留空） |
 
 ## 项目结构
@@ -88,14 +100,28 @@ chat_qq_bot/
 ├── requirements.txt        # 依赖列表
 ├── data/
 │   └── md/
-│       └── system_prompt.md  # AI 系统提示词
+│       ├── system_prompt.md      # AI 默认系统提示词
+│       └── system_prompt_kind.md # 邻家大姐姐人格提示词
 └── plugins/
     ├── echo.py             # 复读机插件
     └── chat_ai/
-        ├── __init__.py     # 主要逻辑
+        ├── __init__.py     # 插件初始化
         ├── config.py       # 配置模型
         ├── database.py     # 数据库操作
-        └── service.py      # AI 服务封装
+        ├── service.py      # AI 服务封装
+        ├── state.py        # 全局状态管理
+        ├── commands/       # 命令处理器
+        │   ├── __init__.py
+        │   ├── help.py     # 帮助命令
+        │   ├── personality.py  # 人格切换命令
+        │   └── admin.py    # 管理员命令
+        ├── handlers/       # 消息处理器
+        │   ├── __init__.py
+        │   ├── private.py  # 私聊消息处理
+        │   └── group.py    # 群消息处理
+        └── utils/          # 工具函数
+            ├── __init__.py
+            └── helpers.py  # 辅助函数
 ```
 
 ## 注意事项
@@ -103,3 +129,5 @@ chat_qq_bot/
 - `.env` 文件包含敏感信息，已被 `.gitignore` 忽略
 - `NICKNAME` 配置建议设置为空列表 `[]`，避免概率回复失效
 - 首次使用需要通过管理员命令添加群/用户白名单
+- 人格切换功能支持"雌小鬼"（默认）和"邻家大姐姐"两种人格
+- 表情功能需要机器人具有设置消息表情的权限
