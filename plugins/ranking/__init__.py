@@ -4,6 +4,7 @@ from nonebot.params import CommandArg
 from nonebot import logger
 import redis
 import json
+from datetime import datetime
 from typing import Optional
 
 from .config import Config
@@ -32,16 +33,26 @@ except Exception as e:
 ranking_cmd = on_command("排行榜", aliases={"ranking"}, priority=5, block=True)
 
 
+def get_today_str() -> str:
+    """获取今天的日期字符串"""
+    return datetime.now().strftime("%Y%m%d")
+
+
 def get_message_count_key(group_id: int) -> str:
-    """获取群消息计数的Redis key"""
-    return f"ranking:group:{group_id}"
+    """获取群消息计数的Redis key（包含日期）"""
+    today = get_today_str()
+    return f"ranking:group:{group_id}:{today}"
 
 
 def increment_message_count(group_id: int, user_id: int) -> int:
     """增加用户消息计数，返回当前计数"""
     key = get_message_count_key(group_id)
     field = str(user_id)
-    return redis_client.hincrby(key, field, 1)
+    # 增加计数
+    count = redis_client.hincrby(key, field, 1)
+    # 设置key过期时间为2天（172800秒），自动清理旧数据
+    redis_client.expire(key, 172800)
+    return count
 
 
 def get_top_users(group_id: int, top_n: int = 5) -> list[tuple[int, int]]:
@@ -62,10 +73,11 @@ def get_top_users(group_id: int, top_n: int = 5) -> list[tuple[int, int]]:
 def format_ranking_message(top_users: list[tuple[int, int]], group_id: int) -> str:
     """格式化排行榜消息"""
     if not top_users:
-        return "暂无发言数据"
+        return "今日暂无发言数据"
     
+    today = datetime.now().strftime("%Y-%m-%d")
     medals = ["🥇", "🥈", "🥉", "4.", "5."]
-    lines = [f"📊 群 {group_id} 发言排行榜：", ""]
+    lines = [f"📊 群 {group_id} 今日发言排行榜（{today}）：", ""]
     
     for i, (user_id, count) in enumerate(top_users):
         medal = medals[i] if i < len(medals) else f"{i+1}."
