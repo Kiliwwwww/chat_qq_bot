@@ -184,6 +184,7 @@ async def handle_help(event: MessageEvent):
 /取消贴表情 <QQ号> - 取消给指定用户贴的表情（管理员）
 /全体贴表情 - 给群内所有人消息随机贴表情（管理员）
 /取消全体贴表情 - 取消全体贴表情（管理员）
+/排行榜 或 /ranking - 查看群发言排行榜（管理员）
 /weibo <UID> - 获取微博用户最新动态（私聊）
 /sendweibo <UID> <群号> - 发送微博图片到指定群（私聊）"""
     await help_cmd.finish(help_text)
