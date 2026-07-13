@@ -2,6 +2,26 @@ from pathlib import Path
 from openai import AsyncOpenAI
 from typing import Optional, Union
 from nonebot import logger
+import logging
+from loguru import logger as loguru_logger
+
+# AI专用日志配置
+AI_LOG_FILE = Path(__file__).parent.parent.parent / "log" / "ai_log.log"
+AI_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+# 创建AI专用的loguru logger（独立于主logger）
+ai_logger = loguru_logger.opt(colors=False).bind(name="ai_service")
+# 移除默认的stderr handler，只保留文件handler
+ai_logger.remove()
+ai_logger.add(
+    AI_LOG_FILE,
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
+    level="DEBUG",
+    rotation="10 MB",
+    retention="30 days",
+    compression="zip",
+    encoding="utf-8",
+)
 
 
 class AIService:
@@ -26,6 +46,7 @@ class AIService:
         self.top_p = top_p
         self.system_prompt = system_prompt
         self.debug_log = debug_log
+        self.ai_logger = ai_logger.bind(model=model)
 
         self.client = AsyncOpenAI(
             api_key=api_key,
@@ -68,6 +89,17 @@ class AIService:
             },
         ]
 
+        import json
+        # 记录请求内容
+        request_log = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+        self.ai_logger.info(f"======== AI请求 ========\n{json.dumps(request_log, ensure_ascii=False, indent=2)}")
+
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -76,18 +108,18 @@ class AIService:
             top_p=self.top_p,
         )
 
-        # 调试信息
-        logger.debug(f"API 响应类型: {type(response)}")
-        logger.debug(f"API 响应内容: {response}")
+        # 记录响应内容
+        if response and response.choices:
+            reply_content = response.choices[0].message.content
+            self.ai_logger.info(f"======== AI响应 ========\n{reply_content}")
+        else:
+            self.ai_logger.error(f"======== AI响应异常 ========\n{response}")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")
         
         if not response.choices:
             raise ValueError(f"API 返回空 choices: {response}")
-        
-        logger.debug(f"choices 类型: {type(response.choices)}")
-        logger.debug(f"choices 内容: {response.choices}")
         
         return response.choices[0].message.content
 
@@ -113,17 +145,16 @@ class AIService:
             },
         ] + messages
 
-        # 调试日志：打印发送给AI的完整JSON
-        if self.debug_log:
-            import json
-            log_data = {
-                "model": self.model,
-                "messages": full_messages,
-                "max_tokens": self.max_tokens,
-                "temperature": self.temperature,
-                "top_p": self.top_p,
-            }
-            logger.info(f"[AI请求] {json.dumps(log_data, ensure_ascii=False, indent=2)}")
+        import json
+        # 记录请求内容
+        request_log = {
+            "model": self.model,
+            "messages": full_messages,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+        self.ai_logger.info(f"======== AI请求 ========\n{json.dumps(request_log, ensure_ascii=False, indent=2)}")
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -133,9 +164,12 @@ class AIService:
             top_p=self.top_p,
         )
 
-        # 调试信息
-        logger.debug(f"API 响应类型: {type(response)}")
-        logger.debug(f"API 响应内容: {response}")
+        # 记录响应内容
+        if response and response.choices and response.choices[0]:
+            reply_content = response.choices[0].message.content
+            self.ai_logger.info(f"======== AI响应 ========\n{reply_content}")
+        else:
+            self.ai_logger.error(f"======== AI响应异常 ========\n{response}")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")
@@ -143,13 +177,7 @@ class AIService:
         if not response.choices:
             raise ValueError(f"API 返回空 choices: {response}")
         
-        logger.debug(f"choices 类型: {type(response.choices)}")
-        logger.debug(f"choices 内容: {response.choices}")
-        
         if response.choices[0] is None:
             raise ValueError(f"choices[0] 为 None: {response.choices}")
-        
-        logger.debug(f"message 类型: {type(response.choices[0].message)}")
-        logger.debug(f"message 内容: {response.choices[0].message}")
         
         return response.choices[0].message.content

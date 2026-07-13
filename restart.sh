@@ -22,6 +22,11 @@ if [ -f log/run.log ]; then
     mv log/run.log "log/run_$(date +%Y%m%d_%H%M%S).log"
 fi
 
+# 备份AI日志
+if [ -f log/ai_log.log ]; then
+    mv log/ai_log.log "log/ai_log_$(date +%Y%m%d_%H%M%S).log"
+fi
+
 # 启动服务（后台运行，日志输出到log/run.log）
 nohup python3 bot.py > log/run.log 2>&1 &
 PID=$!
