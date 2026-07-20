@@ -33,7 +33,7 @@ def get_keywords_prompt() -> str:
     if not keywords:
         return ""
     kw_lines = "\n".join([f"- {kw['content']}" for kw in keywords])
-    return f"\n\n用户自定义提示词:\n{kw_lines}"
+    return f"\n\n## 用户自定义提示词:\n{kw_lines}"
 
 
 def check_repeater(group_id: int, user_id: int, message: str) -> bool:
