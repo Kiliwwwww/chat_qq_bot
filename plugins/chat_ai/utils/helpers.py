@@ -28,12 +28,12 @@ def clean_history_images(messages: list[dict]) -> list[dict]:
 
 
 def get_keywords_prompt() -> str:
-    """获取关键词映射提示词"""
+    """获取提示词列表"""
     keywords = db.get_all_keywords()
     if not keywords:
         return ""
-    kw_lines = "\n".join([f"- {kw}: {meaning}" for kw, meaning in keywords.items()])
-    return f"\n\n用户自定义关键词映射:\n{kw_lines}"
+    kw_lines = "\n".join([f"- {kw['content']}" for kw in keywords])
+    return f"\n\n用户自定义提示词:\n{kw_lines}"
 
 
 def check_repeater(group_id: int, user_id: int, message: str) -> bool:

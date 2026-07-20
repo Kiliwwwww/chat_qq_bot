@@ -118,7 +118,7 @@ async def handle_group_emoji_cancel(event: GroupMessageEvent):
 
 @setkey_cmd.handle()
 async def handle_setkey(event: MessageEvent, args: Message = CommandArg()):
-    """处理关键词设置命令（仅管理员可用）"""
+    """处理提示词设置命令（仅管理员可用）"""
     config = get_plugin_config(Config)
 
     # 管理员权限校验
@@ -128,22 +128,34 @@ async def handle_setkey(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
 
     if not arg:
-        # 显示所有关键词
+        # 显示所有提示词
         keywords = db.get_all_keywords()
         if keywords:
-            kw_list = "\n".join([f"{kw} -> {meaning}" for kw, meaning in keywords.items()])
-            await setkey_cmd.finish(f"当前关键词映射:\n{kw_list}")
+            kw_list = "\n".join([f"[{kw['id']}] {kw['content']}" for kw in keywords])
+            await setkey_cmd.finish(f"当前提示词列表:\n{kw_list}")
         else:
-            await setkey_cmd.finish("当前没有关键词映射，使用 /setkey <关键词> <含义> 添加")
+            await setkey_cmd.finish("当前没有提示词，使用 /setkey <一句话> 添加")
 
-    # 解析参数：关键词 含义
-    parts = arg.split(maxsplit=1)
-    if len(parts) != 2:
-        await setkey_cmd.finish("格式错误，请使用: /setkey <关键词> <含义>")
+    # 删除功能
+    if arg.startswith("del "):
+        try:
+            keyword_id = int(arg[4:].strip())
+        except ValueError:
+            await setkey_cmd.finish("格式错误，请使用: /setkey del <ID>")
 
-    keyword, meaning = parts
-    db.add_keyword(keyword, meaning)
-    await setkey_cmd.finish(f"已添加关键词映射: {keyword} -> {meaning}")
+        if not db.keyword_id_exists(keyword_id):
+            await setkey_cmd.finish(f"ID {keyword_id} 不存在")
+
+        db.remove_keyword(keyword_id)
+        await setkey_cmd.finish(f"已删除提示词 ID: {keyword_id}")
+
+    # 添加提示词
+    content = arg
+    if db.keyword_exists(content):
+        await setkey_cmd.finish("该提示词已存在")
+
+    db.add_keyword(content)
+    await setkey_cmd.finish(f"已添加提示词: {content}")
 
 
 @settings_cmd.handle()

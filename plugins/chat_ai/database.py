@@ -36,8 +36,8 @@ class Database:
                 """)
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS keywords (
-                        keyword TEXT PRIMARY KEY,
-                        meaning TEXT NOT NULL,
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        content TEXT NOT NULL UNIQUE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
@@ -147,51 +147,63 @@ class Database:
             logger.error(f"检查群失败: {e}")
             return False
 
-    def add_keyword(self, keyword: str, meaning: str) -> bool:
-        """添加或更新关键词映射"""
+    def add_keyword(self, content: str) -> bool:
+        """添加提示词"""
         try:
             with self._get_conn() as conn:
                 conn.execute(
-                    "INSERT OR REPLACE INTO keywords (keyword, meaning) VALUES (?, ?)",
-                    (keyword, meaning),
+                    "INSERT OR IGNORE INTO keywords (content) VALUES (?)",
+                    (content,),
                 )
                 conn.commit()
                 return True
         except Exception as e:
-            logger.error(f"添加关键词失败: {e}")
+            logger.error(f"添加提示词失败: {e}")
             return False
 
-    def remove_keyword(self, keyword: str) -> bool:
-        """删除关键词映射"""
+    def remove_keyword(self, keyword_id: int) -> bool:
+        """通过 ID 删除提示词"""
         try:
             with self._get_conn() as conn:
-                conn.execute("DELETE FROM keywords WHERE keyword = ?", (keyword,))
+                conn.execute("DELETE FROM keywords WHERE id = ?", (keyword_id,))
                 conn.commit()
                 return True
         except Exception as e:
-            logger.error(f"删除关键词失败: {e}")
+            logger.error(f"删除提示词失败: {e}")
             return False
 
-    def get_all_keywords(self) -> dict[str, str]:
-        """获取所有关键词映射"""
+    def get_all_keywords(self) -> list[dict]:
+        """获取所有提示词"""
         try:
             with self._get_conn() as conn:
-                cursor = conn.execute("SELECT keyword, meaning FROM keywords")
-                return {row["keyword"]: row["meaning"] for row in cursor.fetchall()}
+                cursor = conn.execute("SELECT id, content FROM keywords ORDER BY id")
+                return [{"id": row["id"], "content": row["content"]} for row in cursor.fetchall()]
         except Exception as e:
-            logger.error(f"获取关键词失败: {e}")
-            return {}
+            logger.error(f"获取提示词失败: {e}")
+            return []
 
-    def keyword_exists(self, keyword: str) -> bool:
-        """检查关键词是否存在"""
+    def keyword_exists(self, content: str) -> bool:
+        """检查提示词是否存在"""
         try:
             with self._get_conn() as conn:
                 cursor = conn.execute(
-                    "SELECT 1 FROM keywords WHERE keyword = ?", (keyword,)
+                    "SELECT 1 FROM keywords WHERE content = ?", (content,)
                 )
                 return cursor.fetchone() is not None
         except Exception as e:
-            logger.error(f"检查关键词失败: {e}")
+            logger.error(f"检查提示词失败: {e}")
+            return False
+
+    def keyword_id_exists(self, keyword_id: int) -> bool:
+        """检查提示词 ID 是否存在"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM keywords WHERE id = ?", (keyword_id,)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"检查提示词 ID 失败: {e}")
             return False
 
     def get_setting(self, key: str, default: str = "") -> str:
