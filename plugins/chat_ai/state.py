@@ -24,6 +24,9 @@ bot_mute_until: float = 0
 # 需要自动贴表情的用户集合 {(group_id, user_id)}
 auto_emoji_users: set[tuple[int, int]] = set()
 
+# 需要在所有群自动贴表情的用户集合 {user_id}
+auto_emoji_all_groups_users: set[int] = set()
+
 # 开启全体贴表情的群集合 {group_id}
 auto_emoji_groups: set[int] = set()
 

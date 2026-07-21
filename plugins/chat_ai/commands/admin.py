@@ -6,13 +6,15 @@ from nonebot.params import CommandArg
 
 from ..config import Config
 from .. import state
-from ..state import db, auto_emoji_users, auto_emoji_groups
+from ..state import db, auto_emoji_users, auto_emoji_groups, auto_emoji_all_groups_users
 
 mute_cmd = on_command("闭嘴", priority=5, block=True)
 emoji_cmd = on_command("贴表情", priority=5, block=True)
 emoji_cancel_cmd = on_command("取消贴表情", priority=5, block=True)
 group_emoji_cmd = on_command("全体贴表情", priority=5, block=True)
 group_emoji_cancel_cmd = on_command("取消全体贴表情", priority=5, block=True)
+emoji_all_cmd = on_command("贴表情all", priority=5, block=True)
+emoji_all_cancel_cmd = on_command("取消贴表情all", priority=5, block=True)
 setkey_cmd = on_command("setkey", aliases={"设置关键词"}, priority=5, block=True)
 settings_cmd = on_command("settings", aliases={"设置"}, priority=5, block=True)
 groupsettings_cmd = on_command("groupsettings", aliases={"群设置"}, priority=5, block=True)
@@ -101,7 +103,7 @@ async def handle_group_emoji(event: GroupMessageEvent):
 
 
 @group_emoji_cancel_cmd.handle()
-async def handle_group_emoji_cancel(event: GroupMessageEvent):
+async def handle_group_emoji_cancel(event: MessageEvent):
     """处理取消全体贴表情命令（仅管理员可用，仅群聊）"""
     # 管理员权限校验
     config = get_plugin_config(Config)
@@ -114,6 +116,54 @@ async def handle_group_emoji_cancel(event: GroupMessageEvent):
     auto_emoji_groups.discard(group_id)
     logger.info(f"管理员取消了群 {group_id} 的全体贴表情功能")
     await group_emoji_cancel_cmd.finish(f"已取消全体贴表情")
+
+
+@emoji_all_cmd.handle()
+async def handle_emoji_all(event: MessageEvent, args: Message = CommandArg()):
+    """处理全局贴表情命令（仅管理员可用，支持私聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await emoji_all_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    # 解析QQ号
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await emoji_all_cmd.finish("请指定QQ号，格式：贴表情all <QQ号>")
+
+    try:
+        target_qq = int(arg)
+    except ValueError:
+        await emoji_all_cmd.finish("请输入有效的QQ号")
+
+    # 添加到全局贴表情列表
+    auto_emoji_all_groups_users.add(target_qq)
+    logger.info(f"管理员设置了自动给用户 {target_qq} 在所有群贴表情")
+    await emoji_all_cmd.finish(f"已开启自动给该用户在所有群贴🐒表情")
+
+
+@emoji_all_cancel_cmd.handle()
+async def handle_emoji_all_cancel(event: MessageEvent, args: Message = CommandArg()):
+    """处理取消全局贴表情命令（仅管理员可用，支持私聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await emoji_all_cancel_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    # 解析QQ号
+    arg = args.extract_plain_text().strip()
+    if not arg:
+        await emoji_all_cancel_cmd.finish("请指定QQ号，格式：取消贴表情all <QQ号>")
+
+    try:
+        target_qq = int(arg)
+    except ValueError:
+        await emoji_all_cancel_cmd.finish("请输入有效的QQ号")
+
+    # 从全局贴表情列表中移除
+    auto_emoji_all_groups_users.discard(target_qq)
+    logger.info(f"管理员取消了用户 {target_qq} 在所有群的自动贴表情")
+    await emoji_all_cancel_cmd.finish(f"已取消该用户在所有群的自动贴表情")
 
 
 @setkey_cmd.handle()
