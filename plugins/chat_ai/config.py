@@ -29,6 +29,9 @@ class Config(BaseModel):
     # 全体贴表情概率 (0.0~1.0)
     group_emoji_chance: float = 0.3
     
+    # 全局贴表情的emoji_id
+    global_emoji_id: int = 46
+    
     # 调试日志开关
     ai_debug_log: bool = False
     

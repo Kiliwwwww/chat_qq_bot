@@ -19,6 +19,7 @@ from ..state import (
     group_last_repeated,
     auto_emoji_users,
     auto_emoji_groups,
+    auto_emoji_all_groups_users,
     init_ai_service,
 )
 from ..utils.helpers import (
@@ -81,6 +82,17 @@ async def handle_group_msg(event: MessageEvent):
             logger.info(f"自动给用户 {event.user_id} 在群 {group_id} 的消息贴了表情 {random_emoji}")
         except Exception as e:
             logger.error(f"自动贴表情失败: {e}")
+
+    # 全局贴表情功能（给指定用户在所有群贴表情）
+    if event.user_id in auto_emoji_all_groups_users:
+        try:
+            from nonebot import get_bot
+            bot = get_bot()
+            emoji_id = config.global_emoji_id
+            await bot.set_msg_emoji_like(message_id=event.message_id, emoji_id=emoji_id)
+            logger.info(f"全局贴表情：给用户 {event.user_id} 在群 {group_id} 的消息贴了表情 {emoji_id}")
+        except Exception as e:
+            logger.error(f"全局贴表情失败: {e}")
 
     # 全体贴表情功能（按概率给群内所有人贴表情，不受群白名单限制）
     if group_id in auto_emoji_groups:
