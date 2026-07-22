@@ -292,12 +292,16 @@ async def handle_welcome(event: GroupMessageEvent, args: Message = CommandArg())
 
     if not arg:
         # 显示当前群的欢迎语
-        if group_id in group_welcome_messages:
-            await welcome_cmd.finish(f"当前群欢迎语:\n{group_welcome_messages[group_id]}")
+        welcome_msg = db.get_welcome_message(group_id)
+        if welcome_msg:
+            await welcome_cmd.finish(f"当前群欢迎语:\n{welcome_msg}")
         else:
             await welcome_cmd.finish("当前群未设置欢迎语，使用 /欢迎语 <内容> 设置")
 
-    # 设置欢迎语
-    group_welcome_messages[group_id] = arg
-    logger.info(f"管理员设置了群 {group_id} 的欢迎语: {arg}")
-    await welcome_cmd.finish(f"已设置欢迎语: {arg}")
+    # 设置欢迎语（同时更新数据库和内存）
+    if db.set_welcome_message(group_id, arg):
+        group_welcome_messages[group_id] = arg
+        logger.info(f"管理员设置了群 {group_id} 的欢迎语: {arg}")
+        await welcome_cmd.finish(f"已设置欢迎语: {arg}")
+    else:
+        await welcome_cmd.finish("设置欢迎语失败")

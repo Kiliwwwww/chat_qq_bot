@@ -48,6 +48,13 @@ class Database:
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS welcome_messages (
+                        group_id INTEGER PRIMARY KEY,
+                        message TEXT NOT NULL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 logger.info("数据库初始化完成")
         except Exception as e:
@@ -232,3 +239,51 @@ class Database:
         except Exception as e:
             logger.error(f"保存设置失败: {e}")
             return False
+
+    def get_all_welcome_messages(self) -> dict[int, str]:
+        """获取所有群欢迎语"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT group_id, message FROM welcome_messages")
+                return {row["group_id"]: row["message"] for row in cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"获取欢迎语失败: {e}")
+            return {}
+
+    def set_welcome_message(self, group_id: int, message: str) -> bool:
+        """设置群欢迎语"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO welcome_messages (group_id, message, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                    (group_id, message),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"设置欢迎语失败: {e}")
+            return False
+
+    def remove_welcome_message(self, group_id: int) -> bool:
+        """删除群欢迎语"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM welcome_messages WHERE group_id = ?", (group_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"删除欢迎语失败: {e}")
+            return False
+
+    def get_welcome_message(self, group_id: int) -> Optional[str]:
+        """获取指定群的欢迎语"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT message FROM welcome_messages WHERE group_id = ?", (group_id,)
+                )
+                row = cursor.fetchone()
+                return row["message"] if row else None
+        except Exception as e:
+            logger.error(f"获取欢迎语失败: {e}")
+            return None
