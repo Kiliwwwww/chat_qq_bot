@@ -23,6 +23,10 @@ from ..state import (
     auto_emoji_groups,
     auto_emoji_all_groups_users,
     init_ai_service,
+    get_group_history,
+    set_group_history,
+    delete_group_history,
+    delete_user_history,
 )
 from ..utils.helpers import (
     clean_history_images,
@@ -47,17 +51,14 @@ async def handle_reset(event: MessageEvent):
     reset_anything = False
 
     # 重置用户私聊历史
-    from ..state import user_histories
-    if user_id in user_histories:
-        del user_histories[user_id]
-        reset_anything = True
+    await delete_user_history(user_id)
+    reset_anything = True
 
     # 如果是群消息，同时重置群对话历史
     if isinstance(event, GroupMessageEvent):
         group_id = event.group_id
-        if group_id in group_histories:
-            del group_histories[group_id]
-            reset_anything = True
+        await delete_group_history(group_id)
+        reset_anything = True
 
     if reset_anything:
         await reset_cmd.finish("对话历史已重置")
@@ -133,6 +134,44 @@ async def handle_group_msg(event: MessageEvent):
     if (not user_message or user_message.startswith("/")) and not image_urls:
         await group_msg.skip()
 
+    # 获取群对话历史（从 Redis）
+    history = await get_group_history(group_id)
+
+    # 获取发言人昵称（优先群名片，其次QQ昵称）
+    sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
+    user_id = event.user_id
+
+    # 将用户消息加入历史（不管是否触发AI回复）
+    if image_urls:
+        user_content = []
+        text_with_name = f"[{sender_name}][{user_id}] {user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
+        user_content.append({"type": "text", "text": text_with_name})
+        for img_url in image_urls:
+            try:
+                user_content.append({"type": "image_url", "image_url": {"url": img_url}})
+            except Exception as e:
+                logger.error(f"图片处理失败: {e}")
+                continue
+        history.append({
+            "role": "user",
+            "content": user_content,
+        })
+    else:
+        history.append({
+            "role": "user",
+            "content": f"[{sender_name}][{user_id}] {user_message}",
+        })
+
+    # 限制历史记录长度
+    if len(history) > config.ai_context_limit:
+        history = history[-config.ai_context_limit:]
+
+    # 立即保存到 Redis
+    await set_group_history(group_id, history)
+
+    # 更新最近消息记录（用于复读检测）
+    update_recent_messages(group_id, event.user_id, user_message)
+
     # 检查是否在禁言期间
     if time.time() < state.bot_mute_until:
         await group_msg.skip()
@@ -145,7 +184,6 @@ async def handle_group_msg(event: MessageEvent):
 
     # 复读检测：如果群里有人在复读，机器人也跟着复读（不受冷却和概率限制）
     if user_message and not image_urls and check_repeater(group_id, event.user_id, user_message):
-        update_recent_messages(group_id, event.user_id, user_message)
         group_last_reply[group_id] = time.time()
         group_last_repeated[group_id] = user_message  # 记录机器人的最后复读消息
         logger.info(f"复读消息 群:{group_id} 消息:{user_message}")
@@ -153,7 +191,6 @@ async def handle_group_msg(event: MessageEvent):
 
     # 随机复读群友消息（文本或图片）
     if random.random() < config.random_repeat_chance:
-        update_recent_messages(group_id, event.user_id, user_message)
         group_last_reply[group_id] = time.time()
         logger.info(f"随机复读 群:{group_id} 消息:{user_message[:20] if user_message else '图片'}")
         # 构建复读消息
@@ -165,44 +202,6 @@ async def handle_group_msg(event: MessageEvent):
                 repeat_msg += MessageSegment.image(segment.data.get("file", ""))
         if repeat_msg:
             await group_msg.finish(repeat_msg)
-
-    # 更新最近消息记录
-    update_recent_messages(group_id, event.user_id, user_message)
-
-    # 获取群对话历史
-    if group_id not in group_histories:
-        group_histories[group_id] = []
-
-    # 获取发言人昵称（优先群名片，其次QQ昵称）
-    sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
-    user_id = event.user_id
-
-    # 将所有用户消息加入历史（不管AI是否回复）
-    if image_urls:
-        user_content = []
-        text_with_name = f"[{sender_name}][{user_id}] {user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
-        user_content.append({"type": "text", "text": text_with_name})
-        for img_url in image_urls:
-            try:
-                # 使用图片外网地址
-                user_content.append({"type": "image_url", "image_url": {"url": img_url}})
-            except Exception as e:
-                logger.error(f"图片处理失败: {e}")
-                continue
-
-        group_histories[group_id].append({
-            "role": "user",
-            "content": user_content,
-        })
-    else:
-        group_histories[group_id].append({
-            "role": "user",
-            "content": f"[{sender_name}][{user_id}] {user_message}",
-        })
-
-    # 限制历史记录长度
-    if len(group_histories[group_id]) > 20:
-        group_histories[group_id] = group_histories[group_id][-20:]
 
     # 判断是否被@：被@则立即回复，不受概率和冷却限制
     is_at_me = event.is_tome()
@@ -231,20 +230,23 @@ async def handle_group_msg(event: MessageEvent):
             admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
         system_prompt = state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt if (keywords_prompt or admin_maid_prompt) else None
         # 清理历史记录中的图片，只保留最新消息的图片
-        cleaned_history = clean_history_images(group_histories[group_id])
+        cleaned_history = clean_history_images(history)
         reply = await state.ai_service.chat_with_history(
             messages=cleaned_history,
             system_prompt=system_prompt,
         )
 
-        group_histories[group_id].append({
+        history.append({
             "role": "assistant",
             "content": reply,
         })
 
         # 限制历史记录长度
-        if len(group_histories[group_id]) > 20:
-            group_histories[group_id] = group_histories[group_id][-20:]
+        if len(history) > config.ai_context_limit:
+            history = history[-config.ai_context_limit:]
+        
+        # 保存到 Redis
+        await set_group_history(group_id, history)
 
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()

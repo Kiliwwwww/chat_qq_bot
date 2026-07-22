@@ -98,7 +98,7 @@ class AIService:
             "temperature": self.temperature,
             "top_p": self.top_p,
         }
-        self.ai_logger.info(f"======== AI请求 ========\n{json.dumps(request_log, ensure_ascii=False, indent=2)}")
+        self.ai_logger.info(json.dumps(request_log, ensure_ascii=False))
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -107,13 +107,6 @@ class AIService:
             temperature=self.temperature,
             top_p=self.top_p,
         )
-
-        # 记录响应内容
-        if response and response.choices:
-            reply_content = response.choices[0].message.content
-            self.ai_logger.info(f"======== AI响应 ========\n{reply_content}")
-        else:
-            self.ai_logger.error(f"======== AI响应异常 ========\n{response}")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")
@@ -154,7 +147,7 @@ class AIService:
             "temperature": self.temperature,
             "top_p": self.top_p,
         }
-        self.ai_logger.info(f"======== AI请求 ========\n{json.dumps(request_log, ensure_ascii=False, indent=2)}")
+        self.ai_logger.info(json.dumps(request_log, ensure_ascii=False))
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -163,13 +156,6 @@ class AIService:
             temperature=self.temperature,
             top_p=self.top_p,
         )
-
-        # 记录响应内容
-        if response and response.choices and response.choices[0]:
-            reply_content = response.choices[0].message.content
-            self.ai_logger.info(f"======== AI响应 ========\n{reply_content}")
-        else:
-            self.ai_logger.error(f"======== AI响应异常 ========\n{response}")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")

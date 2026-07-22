@@ -14,6 +14,9 @@ class Config(BaseModel):
     ai_temperature: float = 1.0
     ai_top_p: float = 0.95
     
+    # 上下文历史记录条数
+    ai_context_limit: int = 50
+    
     # 管理员QQ号
     admin_qq: int = 1154798056
     
@@ -34,6 +37,13 @@ class Config(BaseModel):
     
     # 调试日志开关
     ai_debug_log: bool = False
+    
+    # Redis 配置
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str = ""
+    redis_key_prefix: str = "chat_ai:"
     
     # 系统提示词
     ai_system_prompt: str = (
