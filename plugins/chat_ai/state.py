@@ -36,6 +36,7 @@ group_histories: dict[int, list[dict[str, str]]] = {}
 group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
 group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 [(user_id, message)]
 group_last_repeated: dict[int, str] = {}  # 群最后复读的消息内容
+group_welcome_messages: dict[int, str] = {}  # 群欢迎语 {group_id: welcome_message}
 ai_service: AIService = None
 
 # 初始化数据库

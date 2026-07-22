@@ -1,12 +1,13 @@
 import random
 import time
 
-from nonebot import on_command, on_message, get_plugin_config, logger
+from nonebot import on_command, on_message, on_notice, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import (
     MessageEvent,
     Message,
     MessageSegment,
     GroupMessageEvent,
+    GroupIncreaseNoticeEvent,
 )
 from nonebot.exception import FinishedException
 
@@ -17,6 +18,7 @@ from ..state import (
     group_histories,
     group_last_reply,
     group_last_repeated,
+    group_welcome_messages,
     auto_emoji_users,
     auto_emoji_groups,
     auto_emoji_all_groups_users,
@@ -33,6 +35,9 @@ reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True
 
 # 群消息处理器
 group_msg = on_message(priority=10, block=True)
+
+# 群成员加入事件处理器
+member_join = on_notice()
 
 
 @reset_cmd.handle()
@@ -263,3 +268,18 @@ async def handle_group_msg(event: MessageEvent):
         if "high risk" in str(e).lower():
             await group_msg.finish("别发些奇奇怪怪的东西！")
         # 其他失败情况静默处理，不回复群消息
+
+
+@member_join.handle()
+async def handle_member_join(event: GroupIncreaseNoticeEvent):
+    """处理群成员加入事件"""
+    group_id = event.group_id
+    user_id = event.user_id
+
+    # 检查群是否设置了欢迎语
+    if group_id in group_welcome_messages:
+        welcome_msg = group_welcome_messages[group_id]
+        # @新成员并发送欢迎语
+        reply_msg = MessageSegment.at(user_id) + " " + welcome_msg
+        logger.info(f"群 {group_id} 有新成员 {user_id} 加入，发送欢迎语")
+        await member_join.finish(reply_msg)

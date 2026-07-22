@@ -11,6 +11,7 @@ from .admin import (
     setkey_cmd,
     settings_cmd,
     groupsettings_cmd,
+    welcome_cmd,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "setkey_cmd",
     "settings_cmd",
     "groupsettings_cmd",
+    "welcome_cmd",
 ]

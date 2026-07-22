@@ -16,8 +16,9 @@ from .commands import (
     setkey_cmd,
     settings_cmd,
     groupsettings_cmd,
+    welcome_cmd,
 )
-from .handlers import private_msg, group_msg, reset_cmd
+from .handlers import private_msg, group_msg, reset_cmd, member_join
 
 # 初始化配置
 config = get_plugin_config(Config)
@@ -37,7 +38,9 @@ __all__ = [
     "setkey_cmd",
     "settings_cmd",
     "groupsettings_cmd",
+    "welcome_cmd",
     "private_msg",
     "group_msg",
     "reset_cmd",
+    "member_join",
 ]

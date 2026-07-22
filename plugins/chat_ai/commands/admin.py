@@ -6,7 +6,7 @@ from nonebot.params import CommandArg
 
 from ..config import Config
 from .. import state
-from ..state import db, auto_emoji_users, auto_emoji_groups, auto_emoji_all_groups_users
+from ..state import db, auto_emoji_users, auto_emoji_groups, auto_emoji_all_groups_users, group_welcome_messages
 
 mute_cmd = on_command("闭嘴", priority=5, block=True)
 emoji_cmd = on_command("贴表情", priority=5, block=True)
@@ -18,6 +18,7 @@ emoji_all_cancel_cmd = on_command("取消贴表情all", priority=5, block=True)
 setkey_cmd = on_command("setkey", aliases={"设置关键词"}, priority=5, block=True)
 settings_cmd = on_command("settings", aliases={"设置"}, priority=5, block=True)
 groupsettings_cmd = on_command("groupsettings", aliases={"群设置"}, priority=5, block=True)
+welcome_cmd = on_command("欢迎语", priority=5, block=True)
 
 
 @mute_cmd.handle()
@@ -276,3 +277,27 @@ async def handle_groupsettings(event: MessageEvent, args: Message = CommandArg()
     else:
         db.add_group(group_id)
         await groupsettings_cmd.finish(f"已添加群 {group_id}")
+
+
+@welcome_cmd.handle()
+async def handle_welcome(event: GroupMessageEvent, args: Message = CommandArg()):
+    """处理欢迎语命令（仅管理员可用，仅群聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await welcome_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    group_id = event.group_id
+    arg = args.extract_plain_text().strip()
+
+    if not arg:
+        # 显示当前群的欢迎语
+        if group_id in group_welcome_messages:
+            await welcome_cmd.finish(f"当前群欢迎语:\n{group_welcome_messages[group_id]}")
+        else:
+            await welcome_cmd.finish("当前群未设置欢迎语，使用 /欢迎语 <内容> 设置")
+
+    # 设置欢迎语
+    group_welcome_messages[group_id] = arg
+    logger.info(f"管理员设置了群 {group_id} 的欢迎语: {arg}")
+    await welcome_cmd.finish(f"已设置欢迎语: {arg}")
