@@ -4,8 +4,10 @@ from typing import Optional, Union
 from nonebot import logger
 import logging
 import json
+import time
 from datetime import datetime
 from loguru import logger as loguru_logger
+import httpx
 
 # AI专用日志配置
 AI_LOG_FILE = Path(__file__).parent.parent.parent / "log" / "ai_log.log"
@@ -51,9 +53,18 @@ class AIService:
         self.debug_log = debug_log
         self.ai_logger = ai_logger.bind(model=model)
 
+        httpx_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                connect=10.0,   # 连接超时 10s
+                read=120.0,     # 读取超时 120s（大模型生成可能慢）
+                write=10.0,     # 写入超时
+                pool=10.0,      # 连接池超时
+            ),
+        )
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
+            http_client=httpx_client,
         )
 
     @staticmethod
@@ -102,13 +113,25 @@ class AIService:
         }
         self.ai_logger.info(json.dumps(request_log, ensure_ascii=False))
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-        )
+        request_start = time.time()
+        self.ai_logger.info(f"开始调用 API (chat)，model={self.model}")
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                timeout=120.0,
+            )
+        except Exception as e:
+            elapsed = time.time() - request_start
+            self.ai_logger.error(f"API 调用失败 (chat)，耗时 {elapsed:.2f}s: {e}")
+            self._save_error_to_file(f"API 调用失败 (chat)，耗时 {elapsed:.2f}s: {e}")
+            raise
+        elapsed = time.time() - request_start
+        self.ai_logger.info(f"API 调用成功 (chat)，耗时 {elapsed:.2f}s")
+        self._save_error_to_file(f"API 调用成功 (chat)，耗时 {elapsed:.2f}s")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")
@@ -153,13 +176,25 @@ class AIService:
         # 将请求内容写入专用文件
         self._save_request_to_file(full_messages)
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=full_messages,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            top_p=self.top_p,
-        )
+        request_start = time.time()
+        self.ai_logger.info(f"开始调用 API，model={self.model}")
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=full_messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                timeout=120.0,
+            )
+        except Exception as e:
+            elapsed = time.time() - request_start
+            self.ai_logger.error(f"API 调用失败，耗时 {elapsed:.2f}s: {e}")
+            self._save_error_to_file(f"API 调用失败，耗时 {elapsed:.2f}s: {e}")
+            raise
+        elapsed = time.time() - request_start
+        self.ai_logger.info(f"API 调用成功，耗时 {elapsed:.2f}s")
+        self._save_error_to_file(f"API 调用成功，耗时 {elapsed:.2f}s")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")
@@ -184,3 +219,12 @@ class AIService:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
             self.ai_logger.warning(f"写入请求日志文件失败: {e}")
+
+    def _save_error_to_file(self, message: str):
+        """将耗时/错误日志追加写入 ai_request.log"""
+        try:
+            timestamp = datetime.now().isoformat()
+            with open(AI_REQUEST_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"[{timestamp}] {message}\n")
+        except Exception:
+            pass

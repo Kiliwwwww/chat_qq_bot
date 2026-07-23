@@ -58,6 +58,9 @@ async def handle_private_msg(event: MessageEvent):
     # 获取用户历史记录（从 Redis）
     history = await get_user_history(user_id)
 
+    # 保存原始历史记录副本，用于 AI 调用失败时回滚
+    original_history = list(history)
+
     # 构建用户消息内容
     if image_urls:
         # 有图片时，使用视觉API格式
@@ -132,6 +135,8 @@ async def handle_private_msg(event: MessageEvent):
         logger.error(f"AI 调用失败: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        # AI 调用失败，回滚历史记录（移除本次用户消息，避免孤立消息污染上下文）
+        await set_user_history(user_id, original_history)
         # 高风险拦截兜底回复
         if "high risk" in str(e).lower():
             await private_msg.finish("别发些乱七八糟的东西！")

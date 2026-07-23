@@ -137,6 +137,9 @@ async def handle_group_msg(event: MessageEvent):
     # 获取群对话历史（从 Redis）
     history = await get_group_history(group_id)
 
+    # 保存原始历史记录副本，用于 AI 调用失败时回滚
+    original_history = list(history)
+
     # 获取发言人昵称（优先群名片，其次QQ昵称）
     sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
     user_id = event.user_id
@@ -273,6 +276,8 @@ async def handle_group_msg(event: MessageEvent):
         logger.error(f"群消息 AI 调用失败: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        # AI 调用失败，回滚历史记录（移除本次用户消息，避免孤立消息污染上下文）
+        await set_group_history(group_id, original_history)
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
         # 高风险内容拦截
