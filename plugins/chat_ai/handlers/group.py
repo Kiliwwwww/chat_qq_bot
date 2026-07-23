@@ -229,6 +229,15 @@ async def handle_group_msg(event: MessageEvent):
         if is_at_me and event.user_id == config.admin_qq:
             admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
         system_prompt = state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt if (keywords_prompt or admin_maid_prompt) else None
+
+        # RAGFlow 知识库检索
+        if state.ragflow_client and user_message:
+            rag_result = await state.ragflow_client.retrieve(user_message)
+            rag_context = state.ragflow_client.build_context_prompt(rag_result)
+            if rag_context:
+                base_prompt = system_prompt or state.ai_service.system_prompt
+                system_prompt = base_prompt + rag_context
+
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
         reply = await state.ai_service.chat_with_history(

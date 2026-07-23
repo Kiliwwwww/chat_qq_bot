@@ -6,6 +6,7 @@ from nonebot import logger
 
 from .config import Config
 from .service import AIService
+from .ragflow_client import RagFlowClient
 from .database import Database
 
 # 依赖 localstore 插件
@@ -38,6 +39,7 @@ group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
 group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 [(user_id, message)]
 group_last_repeated: dict[int, str] = {}  # 群最后复读的消息内容
 ai_service: AIService = None
+ragflow_client: RagFlowClient = None
 
 # Redis 客户端
 redis_client: aioredis.Redis = None
@@ -51,7 +53,7 @@ group_welcome_messages: dict[int, str] = db.get_all_welcome_messages()
 
 def init_ai_service():
     """初始化AI服务"""
-    global ai_service, current_prompt_mode, redis_client
+    global ai_service, ragflow_client, current_prompt_mode, redis_client
     try:
         config = get_plugin_config(Config)
         # 从数据库读取人格模式
@@ -73,6 +75,19 @@ def init_ai_service():
             system_prompt=system_prompt,
             debug_log=config.ai_debug_log,
         )
+        
+        # 初始化 RAGFlow 客户端
+        if config.ragflow_enabled and config.ragflow_api_key:
+            ragflow_client = RagFlowClient(
+                base_url=config.ragflow_base_url,
+                api_key=config.ragflow_api_key,
+                kb_ids=config.ragflow_kb_ids,
+                top_k=config.ragflow_top_k,
+            )
+            logger.info(f"RAGFlow 客户端初始化完成，知识库数量: {len(config.ragflow_kb_ids)}")
+        else:
+            ragflow_client = None
+            logger.info("RAGFlow 未启用或未配置 API Key，跳过初始化")
         
         # 构建 Redis URL
         redis_url = f"redis://"

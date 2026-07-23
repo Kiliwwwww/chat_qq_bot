@@ -94,6 +94,15 @@ async def handle_private_msg(event: MessageEvent):
         # 调用 AI 服务（带关键词提示词）
         keywords_prompt = get_keywords_prompt()
         system_prompt = state.ai_service.system_prompt + keywords_prompt if keywords_prompt else None
+
+        # RAGFlow 知识库检索
+        if state.ragflow_client and user_message:
+            rag_result = await state.ragflow_client.retrieve(user_message)
+            rag_context = state.ragflow_client.build_context_prompt(rag_result)
+            if rag_context:
+                base_prompt = system_prompt or state.ai_service.system_prompt
+                system_prompt = base_prompt + rag_context
+
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
         reply = await state.ai_service.chat_with_history(

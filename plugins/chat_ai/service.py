@@ -3,10 +3,13 @@ from openai import AsyncOpenAI
 from typing import Optional, Union
 from nonebot import logger
 import logging
+import json
+from datetime import datetime
 from loguru import logger as loguru_logger
 
 # AI专用日志配置
 AI_LOG_FILE = Path(__file__).parent.parent.parent / "log" / "ai_log.log"
+AI_REQUEST_LOG_FILE = Path(__file__).parent.parent.parent / "log" / "ai_request.log"
 AI_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 # 创建AI专用的loguru logger（独立于主logger）
@@ -89,7 +92,6 @@ class AIService:
             },
         ]
 
-        import json
         # 记录请求内容
         request_log = {
             "model": self.model,
@@ -138,7 +140,6 @@ class AIService:
             },
         ] + messages
 
-        import json
         # 记录请求内容
         request_log = {
             "model": self.model,
@@ -148,6 +149,9 @@ class AIService:
             "top_p": self.top_p,
         }
         self.ai_logger.info(json.dumps(request_log, ensure_ascii=False))
+
+        # 将请求内容写入专用文件
+        self._save_request_to_file(full_messages)
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -167,3 +171,16 @@ class AIService:
             raise ValueError(f"choices[0] 为 None: {response.choices}")
         
         return response.choices[0].message.content
+
+    def _save_request_to_file(self, messages: list[dict[str, Union[str, list]]]):
+        """将请求内容追加写入文件"""
+        try:
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "model": self.model,
+                "messages": messages,
+            }
+            with open(AI_REQUEST_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            self.ai_logger.warning(f"写入请求日志文件失败: {e}")

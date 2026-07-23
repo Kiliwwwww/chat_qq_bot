@@ -45,6 +45,13 @@ class Config(BaseModel):
     redis_password: str = ""
     redis_key_prefix: str = "chat_ai:"
     
+    # RAGFlow 配置
+    ragflow_enabled: bool = False
+    ragflow_base_url: str = "http://127.0.0.1"
+    ragflow_api_key: str = ""
+    ragflow_kb_ids: list[str] = []
+    ragflow_top_k: int = 5
+    
     # 系统提示词
     ai_system_prompt: str = (
         "You are MiMo, an AI assistant developed by Xiaomi. "
