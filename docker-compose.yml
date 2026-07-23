@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  qqbot:
+    build: .
+    container_name: qqbot
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./log:/app/log
+      - ./.env:/app/.env:ro
+    environment:
+      - redis_host=redis
+      - redis_port=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - qqbot-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: qqbot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qqbot-network
+
+volumes:
+  redis-data:
+
+networks:
+  qqbot-network:
+    driver: bridge
