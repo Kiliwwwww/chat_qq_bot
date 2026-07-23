@@ -114,10 +114,6 @@ async def handle_group_msg(event: MessageEvent):
             except Exception as e:
                 logger.error(f"全体贴表情失败: {e}")
 
-    # 群白名单检查
-    if not db.group_exists(group_id):
-        await group_msg.skip()
-
     # 获取消息内容
     message = event.get_message()
     user_message = event.get_plaintext().strip()
@@ -174,6 +170,10 @@ async def handle_group_msg(event: MessageEvent):
 
     # 更新最近消息记录（用于复读检测）
     update_recent_messages(group_id, event.user_id, user_message)
+
+    # 群白名单检查（仅控制AI回复，不影响消息存储）
+    if not db.group_exists(group_id):
+        await group_msg.skip()
 
     # 检查是否在禁言期间
     if time.time() < state.bot_mute_until:
