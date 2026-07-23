@@ -9,7 +9,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./log:/app/log
-      - ./.env:/app/.env:ro
+      - ./.env:/app/.env
 
     networks:
       - qqbot-network
