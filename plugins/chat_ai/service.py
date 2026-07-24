@@ -145,6 +145,7 @@ class AIService:
         self,
         messages: list[dict[str, Union[str, list]]],
         system_prompt: Optional[str] = None,
+        rag_message: Optional[dict] = None,
     ) -> str:
         """
         带历史记录的聊天
@@ -152,6 +153,7 @@ class AIService:
         Args:
             messages: 消息历史列表，格式为 [{"role": "user/assistant", "content": "..." 或 [...]}]
             system_prompt: 系统提示词
+            rag_message: 知识库 system message
 
         Returns:
             AI 回复内容
@@ -161,7 +163,13 @@ class AIService:
                 "role": "system",
                 "content": system_prompt or self.system_prompt,
             },
-        ] + messages
+        ]
+        
+        # 知识库作为独立的 system message
+        if rag_message:
+            full_messages.append(rag_message)
+        
+        full_messages += messages
 
         # 记录请求内容
         request_log = {

@@ -85,7 +85,7 @@ class RagFlowClient:
             chunks = [
                 RagChunk(
                     content=chunk.get("content", ""),
-                    document_name=chunk.get("document_name", ""),
+                    document_name=chunk.get("document_keyword", ""),
                     chunk_id=chunk.get("chunk_id", ""),
                     similarity=chunk.get("similarity", 0.0),
                 )
@@ -105,19 +105,19 @@ class RagFlowClient:
             logger.error(f"RAGFlow 检索异常: {e}")
             return RagResult()
 
-    def build_context_prompt(self, result: RagResult, max_length: int = 2000) -> str:
+    def build_context_message(self, result: RagResult, max_length: int = 2000) -> dict | None:
         """
-        将检索结果构建为可注入 system prompt 的上下文文本
+        将检索结果构建为独立的 system message
 
         Args:
             result: RAG 检索结果
             max_length: 上下文最大字符数
 
         Returns:
-            格式化的上下文字符串，无内容时返回空字符串
+            格式化的 system message dict，无内容时返回 None
         """
         if not result.chunks:
-            return ""
+            return None
 
         parts: list[str] = []
         current_length = 0
@@ -126,24 +126,28 @@ class RagFlowClient:
             text = chunk.content.strip()
             if not text:
                 continue
-            # 截断单个 chunk 避免过长
-            if len(text) > 500:
-                text = text[:500] + "..."
-            entry = f"[{i}] {text}"
+            if len(text) > 1000:
+                text = text[:1000] + "..."
+            
+            doc_name = chunk.document_name.strip() if chunk.document_name else "未知文档"
+            entry = f"[{i}]文件名称： {doc_name}\n{text}"
+            
             if current_length + len(entry) > max_length:
                 break
             parts.append(entry)
             current_length += len(entry)
 
         if not parts:
-            return ""
+            return None
 
-        return (
-            "\n\n## 参考知识库资料:\n"
+        content = (
+            "## 参考知识库资料\n"
             "以下是与用户问题相关的知识库内容，请结合这些资料回答用户问题。"
             "如果资料与问题无关，可以忽略。\n\n"
             + "\n\n".join(parts)
         )
+
+        return {"role": "system", "content": content}
 
     async def close(self):
         """关闭 HTTP 客户端"""
