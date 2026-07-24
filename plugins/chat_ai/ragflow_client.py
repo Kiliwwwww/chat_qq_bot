@@ -126,8 +126,8 @@ class RagFlowClient:
             text = chunk.content.strip()
             if not text:
                 continue
-            if len(text) > 1000:
-                text = text[:1000] + "..."
+            # if len(text) > 1000:
+            #     text = text[:1000] + "..."
             
             doc_name = chunk.document_name.strip() if chunk.document_name else "未知文档"
             entry = f"[{i}]文件名称： {doc_name}\n{text}"
