@@ -62,6 +62,17 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_services (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        api_key TEXT NOT NULL,
+                        base_url TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        is_active INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 self._init_default_ad_keywords(conn)
                 logger.info("数据库初始化完成")
@@ -372,4 +383,103 @@ class Database:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"检查广告关键词失败: {e}")
+            return False
+
+    # ==================== AI 服务管理 ====================
+    
+    def add_ai_service(self, name: str, api_key: str, base_url: str, model: str) -> bool:
+        """添加 AI 服务配置"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO ai_services (name, api_key, base_url, model) VALUES (?, ?, ?, ?)",
+                    (name, api_key, base_url, model),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"添加 AI 服务失败: {e}")
+            return False
+
+    def remove_ai_service(self, service_id: int) -> bool:
+        """删除 AI 服务配置"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM ai_services WHERE id = ?", (service_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"删除 AI 服务失败: {e}")
+            return False
+
+    def get_all_ai_services(self) -> list[dict]:
+        """获取所有 AI 服务配置"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT id, name, api_key, base_url, model, is_active FROM ai_services ORDER BY id"
+                )
+                return [
+                    {
+                        "id": row["id"],
+                        "name": row["name"],
+                        "api_key": row["api_key"],
+                        "base_url": row["base_url"],
+                        "model": row["model"],
+                        "is_active": bool(row["is_active"]),
+                    }
+                    for row in cursor.fetchall()
+                ]
+        except Exception as e:
+            logger.error(f"获取 AI 服务列表失败: {e}")
+            return []
+
+    def get_active_ai_service(self) -> Optional[dict]:
+        """获取当前激活的 AI 服务"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT id, name, api_key, base_url, model FROM ai_services WHERE is_active = 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "id": row["id"],
+                        "name": row["name"],
+                        "api_key": row["api_key"],
+                        "base_url": row["base_url"],
+                        "model": row["model"],
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"获取激活 AI 服务失败: {e}")
+            return None
+
+    def set_active_ai_service(self, service_id: int) -> bool:
+        """设置激活的 AI 服务"""
+        try:
+            with self._get_conn() as conn:
+                # 先取消所有激活状态
+                conn.execute("UPDATE ai_services SET is_active = 0")
+                # 设置指定服务为激活
+                conn.execute(
+                    "UPDATE ai_services SET is_active = 1 WHERE id = ?",
+                    (service_id,),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"设置激活 AI 服务失败: {e}")
+            return False
+
+    def ai_service_exists(self, service_id: int) -> bool:
+        """检查 AI 服务是否存在"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM ai_services WHERE id = ?", (service_id,)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"检查 AI 服务失败: {e}")
             return False

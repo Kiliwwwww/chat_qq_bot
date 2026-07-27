@@ -27,5 +27,9 @@ async def handle_help(event: MessageEvent):
 /欢迎语 - 查看当前群欢迎语（管理员）
 /排行榜 或 /ranking - 查看群发言排行榜（管理员）
 /weibo <UID> - 获取微博用户最新动态（私聊）
-/sendweibo <UID> <群号> - 发送微博图片到指定群（私聊）"""
+/sendweibo <UID> <群号> - 发送微博图片到指定群（私聊）
+/添加ai服务 <名称> <api_key> <base_url> <model> - 添加AI服务（管理员）
+/ai服务 - 查看所有AI服务列表
+/切换ai服务 <id> - 切换到指定AI服务（管理员）
+/删除ai服务 <id> - 删除指定AI服务（管理员）"""
     await help_cmd.finish(help_text)

@@ -69,10 +69,25 @@ def init_ai_service():
         if system_prompt:
             system_prompt = system_prompt.replace("{admin_qq}", str(config.admin_qq))
             system_prompt = system_prompt.replace("{admin_name}", config.admin_name)
+        
+        # 优先从数据库获取激活的 AI 服务配置
+        active_service = db.get_active_ai_service()
+        if active_service:
+            api_key = active_service["api_key"]
+            base_url = active_service["base_url"]
+            model = active_service["model"]
+            logger.info(f"使用数据库中的 AI 服务: {active_service['name']}")
+        else:
+            # 回退到 .env 配置
+            api_key = config.ai_api_key
+            base_url = config.ai_base_url
+            model = config.ai_model
+            logger.info("使用 .env 中的 AI 服务配置")
+        
         ai_service = AIService(
-            api_key=config.ai_api_key,
-            base_url=config.ai_base_url,
-            model=config.ai_model,
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
             max_tokens=config.ai_max_tokens,
             temperature=config.ai_temperature,
             top_p=config.ai_top_p,

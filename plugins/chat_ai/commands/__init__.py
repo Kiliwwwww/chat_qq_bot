@@ -1,5 +1,11 @@
 from .help import help_cmd
 from .personality import switch_kind_cmd, switch_default_cmd
+from .ai_service_cmd import (
+    add_ai_service_cmd,
+    ai_service_list_cmd,
+    switch_ai_service_cmd,
+    delete_ai_service_cmd,
+)
 from .admin import (
     mute_cmd,
     emoji_cmd,
@@ -22,6 +28,10 @@ __all__ = [
     "help_cmd",
     "switch_kind_cmd",
     "switch_default_cmd",
+    "add_ai_service_cmd",
+    "ai_service_list_cmd",
+    "switch_ai_service_cmd",
+    "delete_ai_service_cmd",
     "mute_cmd",
     "emoji_cmd",
     "emoji_cancel_cmd",
