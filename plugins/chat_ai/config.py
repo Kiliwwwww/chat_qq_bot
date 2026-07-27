@@ -24,7 +24,7 @@ class Config(BaseModel):
     admin_name: str = "宝宝葵"
     
     # 群消息回复概率 (0.0~1.0)
-    group_reply_chance: float = 0.3
+    group_reply_chance: float = 0.05
     
     # 随机复读群友消息概率 (0.0~1.0)
     random_repeat_chance: float = 0.03

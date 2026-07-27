@@ -55,10 +55,49 @@ class Database:
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS ad_keywords (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        keyword TEXT NOT NULL UNIQUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
+                self._init_default_ad_keywords(conn)
                 logger.info("数据库初始化完成")
         except Exception as e:
             logger.error(f"数据库初始化失败: {e}")
+
+    def _init_default_ad_keywords(self, conn: sqlite3.Connection) -> None:
+        """初始化默认广告关键词（仅在表为空时插入）"""
+        try:
+            cursor = conn.execute("SELECT COUNT(*) FROM ad_keywords")
+            count = cursor.fetchone()[0]
+            if count > 0:
+                return
+
+            default_keywords = [
+                "加微信", "加好友", "加V", "加vx", "加wx",
+                "扫码", "二维码", "长按识别",
+                "兼职", "日结", "日入", "日赚", "躺赚",
+                "代理", "加盟", "招商", "招代理",
+                "优惠", "促销", "特价", "秒杀", "抢购",
+                "刷单", "好评返现", "返利",
+                "免费领", "免费送", "0元",
+                "进群", "拉群", "加群",
+                "网贷", "贷款", "借钱", "下款",
+                "博彩", "彩票", "赌", "开奖",
+                "数字货币", "虚拟币", "比特币", "USDT",
+                "色情", "约炮", "小姐姐",
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO ad_keywords (keyword) VALUES (?)",
+                [(kw,) for kw in default_keywords]
+            )
+            conn.commit()
+            logger.info(f"已初始化 {len(default_keywords)} 个默认广告关键词")
+        except Exception as e:
+            logger.error(f"初始化默认广告关键词失败: {e}")
 
     def get_all_users(self) -> set[int]:
         """获取所有白名单用户"""
@@ -287,3 +326,50 @@ class Database:
         except Exception as e:
             logger.error(f"获取欢迎语失败: {e}")
             return None
+
+    def add_ad_keyword(self, keyword: str) -> bool:
+        """添加广告关键词"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO ad_keywords (keyword) VALUES (?)",
+                    (keyword,),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"添加广告关键词失败: {e}")
+            return False
+
+    def remove_ad_keyword(self, keyword_id: int) -> bool:
+        """通过 ID 删除广告关键词"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM ad_keywords WHERE id = ?", (keyword_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"删除广告关键词失败: {e}")
+            return False
+
+    def get_all_ad_keywords(self) -> list[dict]:
+        """获取所有广告关键词"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT id, keyword FROM ad_keywords ORDER BY id")
+                return [{"id": row["id"], "keyword": row["keyword"]} for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"获取广告关键词失败: {e}")
+            return []
+
+    def ad_keyword_exists(self, keyword: str) -> bool:
+        """检查广告关键词是否存在"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM ad_keywords WHERE keyword = ?", (keyword,)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"检查广告关键词失败: {e}")
+            return False

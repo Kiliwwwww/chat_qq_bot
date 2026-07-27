@@ -6,7 +6,7 @@ from nonebot.params import CommandArg
 
 from ..config import Config
 from .. import state
-from ..state import db, auto_emoji_users, auto_emoji_groups, auto_emoji_all_groups_users, group_welcome_messages
+from ..state import db, auto_emoji_users, auto_emoji_groups, auto_emoji_all_groups_users, group_welcome_messages, ad_recall_groups
 
 mute_cmd = on_command("闭嘴", priority=5, block=True)
 emoji_cmd = on_command("贴表情", priority=5, block=True)
@@ -19,6 +19,10 @@ setkey_cmd = on_command("setkey", aliases={"设置关键词"}, priority=5, block
 settings_cmd = on_command("settings", aliases={"设置"}, priority=5, block=True)
 groupsettings_cmd = on_command("groupsettings", aliases={"群设置"}, priority=5, block=True)
 welcome_cmd = on_command("欢迎语", priority=5, block=True)
+ad_recall_on_cmd = on_command("开启群撤回", priority=5, block=True)
+ad_recall_off_cmd = on_command("关闭群撤回", priority=5, block=True)
+ad_keyword_cmd = on_command("广告词", priority=5, block=True)
+ad_status_cmd = on_command("撤回状态", priority=5, block=True)
 
 
 @mute_cmd.handle()
@@ -305,3 +309,101 @@ async def handle_welcome(event: GroupMessageEvent, args: Message = CommandArg())
         await welcome_cmd.finish(f"已设置欢迎语: {arg}")
     else:
         await welcome_cmd.finish("设置欢迎语失败")
+
+
+@ad_recall_on_cmd.handle()
+async def handle_ad_recall_on(event: GroupMessageEvent):
+    """处理开启群撤回命令（仅管理员可用，仅群聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await ad_recall_on_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    group_id = event.group_id
+
+    # 添加到开启广告撤回的群集合
+    ad_recall_groups.add(group_id)
+    logger.info(f"管理员开启了群 {group_id} 的广告撤回功能")
+    await ad_recall_on_cmd.finish("已开启群撤回，将自动撤回广告消息")
+
+
+@ad_recall_off_cmd.handle()
+async def handle_ad_recall_off(event: GroupMessageEvent):
+    """处理关闭群撤回命令（仅管理员可用，仅群聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await ad_recall_off_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    group_id = event.group_id
+
+    # 从开启广告撤回的群集合中移除
+    ad_recall_groups.discard(group_id)
+    logger.info(f"管理员关闭了群 {group_id} 的广告撤回功能")
+    await ad_recall_off_cmd.finish("已关闭群撤回")
+
+
+@ad_keyword_cmd.handle()
+async def handle_ad_keyword(event: MessageEvent, args: Message = CommandArg()):
+    """处理广告词命令（仅管理员可用）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await ad_keyword_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    arg = args.extract_plain_text().strip()
+
+    if not arg:
+        # 显示所有广告关键词
+        keywords = db.get_all_ad_keywords()
+        if keywords:
+            kw_list = "\n".join([f"[{kw['id']}] {kw['keyword']}" for kw in keywords])
+            await ad_keyword_cmd.finish(f"当前广告关键词列表:\n{kw_list}")
+        else:
+            await ad_keyword_cmd.finish("当前没有广告关键词，使用 /广告词 <关键词> 添加")
+
+    # 删除功能
+    if arg.startswith("del "):
+        try:
+            keyword_id = int(arg[4:].strip())
+        except ValueError:
+            await ad_keyword_cmd.finish("格式错误，请使用: /广告词 del <ID>")
+
+        if db.remove_ad_keyword(keyword_id):
+            await ad_keyword_cmd.finish(f"已删除广告关键词 ID: {keyword_id}")
+        else:
+            await ad_keyword_cmd.finish("删除失败")
+
+    # 添加广告关键词
+    if db.ad_keyword_exists(arg):
+        await ad_keyword_cmd.finish("该广告关键词已存在")
+
+    if db.add_ad_keyword(arg):
+        await ad_keyword_cmd.finish(f"已添加广告关键词: {arg}")
+    else:
+        await ad_keyword_cmd.finish("添加失败")
+
+
+@ad_status_cmd.handle()
+async def handle_ad_status(event: GroupMessageEvent):
+    """处理撤回状态命令（仅管理员可用，仅群聊）"""
+    # 管理员权限校验
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        await ad_status_cmd.finish("权限不足，仅管理员可使用此命令")
+
+    group_id = event.group_id
+
+    # 检查群是否开启了广告撤回
+    is_enabled = group_id in ad_recall_groups
+
+    # 获取广告关键词数量
+    keywords = db.get_all_ad_keywords()
+    keyword_count = len(keywords)
+
+    status = "已开启" if is_enabled else "已关闭"
+    await ad_status_cmd.finish(
+        f"群撤回状态: {status}\n"
+        f"广告关键词数量: {keyword_count}\n"
+        f"当前开启撤回的群: {ad_recall_groups}"
+    )

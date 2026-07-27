@@ -17,6 +17,10 @@ from .commands import (
     settings_cmd,
     groupsettings_cmd,
     welcome_cmd,
+    ad_recall_on_cmd,
+    ad_recall_off_cmd,
+    ad_keyword_cmd,
+    ad_status_cmd,
 )
 from .handlers import private_msg, group_msg, reset_cmd, member_join
 
@@ -39,6 +43,10 @@ __all__ = [
     "settings_cmd",
     "groupsettings_cmd",
     "welcome_cmd",
+    "ad_recall_on_cmd",
+    "ad_recall_off_cmd",
+    "ad_keyword_cmd",
+    "ad_status_cmd",
     "private_msg",
     "group_msg",
     "reset_cmd",

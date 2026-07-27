@@ -12,6 +12,10 @@ from .admin import (
     settings_cmd,
     groupsettings_cmd,
     welcome_cmd,
+    ad_recall_on_cmd,
+    ad_recall_off_cmd,
+    ad_keyword_cmd,
+    ad_status_cmd,
 )
 
 __all__ = [
@@ -29,4 +33,8 @@ __all__ = [
     "settings_cmd",
     "groupsettings_cmd",
     "welcome_cmd",
+    "ad_recall_on_cmd",
+    "ad_recall_off_cmd",
+    "ad_keyword_cmd",
+    "ad_status_cmd",
 ]

@@ -1,5 +1,6 @@
 import random
 import time
+import json
 
 from nonebot import on_command, on_message, on_notice, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import (
@@ -22,11 +23,13 @@ from ..state import (
     auto_emoji_users,
     auto_emoji_groups,
     auto_emoji_all_groups_users,
+    ad_recall_groups,
     init_ai_service,
     get_group_history,
     set_group_history,
     delete_group_history,
     delete_user_history,
+    AD_DETECTION_PROMPT_FILE,
 )
 from ..utils.helpers import (
     clean_history_images,
@@ -64,6 +67,96 @@ async def handle_reset(event: MessageEvent):
         await reset_cmd.finish("对话历史已重置")
     else:
         await reset_cmd.finish("没有对话历史需要重置")
+
+
+def check_ad_keywords(message: str) -> bool:
+    """检查消息是否包含广告关键词"""
+    keywords = db.get_all_ad_keywords()
+    if not keywords:
+        return False
+    for kw in keywords:
+        if kw["keyword"] in message:
+            return True
+    return False
+
+
+async def check_ad_by_ai(message: str) -> bool:
+    """使用大模型判断消息是否为广告"""
+    try:
+        if not state.ai_service:
+            init_ai_service()
+        if not state.ai_service:
+            return False
+
+        # 加载广告检测提示词
+        prompt = ""
+        if AD_DETECTION_PROMPT_FILE.exists():
+            prompt = AD_DETECTION_PROMPT_FILE.read_text(encoding="utf-8").strip()
+
+        if not prompt:
+            return False
+
+        # 调用大模型判断
+        full_prompt = prompt + message
+        response = await state.ai_service.chat(
+            user_message=full_prompt,
+            system_prompt="你是一个广告内容检测助手，请严格按照要求的JSON格式返回结果。",
+        )
+
+        # 解析返回的JSON
+        response = response.strip()
+        # 尝试提取JSON部分
+        if "{" in response and "}" in response:
+            json_str = response[response.index("{"):response.rindex("}") + 1]
+            result = json.loads(json_str)
+            return result.get("is_ad", False)
+
+        return False
+    except Exception as e:
+        logger.error(f"AI广告检测失败: {e}")
+        return False
+
+
+async def handle_ad_recall(bot, event: GroupMessageEvent):
+    """处理广告撤回逻辑"""
+    group_id = event.group_id
+    user_message = event.get_plaintext().strip()
+
+    # 检查群是否开启了广告撤回
+    if group_id not in ad_recall_groups:
+        return False
+
+    logger.info(f"广告检测: 群:{group_id} 用户:{event.user_id} 消息长度:{len(user_message)} 内容:{user_message[:50]}")
+
+    # 低于5个字不处理
+    if len(user_message) < 5:
+        logger.info(f"广告检测: 消息低于5个字，跳过")
+        return False
+
+    is_ad = False
+
+    # 首先检查广告关键词
+    if check_ad_keywords(user_message):
+        is_ad = True
+        logger.info(f"广告关键词命中 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
+
+    # 超过50个字且未命中关键词，使用大模型判断
+    elif len(user_message) > 50:
+        logger.info(f"广告检测: 消息超过50个字，调用AI判断")
+        is_ad = await check_ad_by_ai(user_message)
+        if is_ad:
+            logger.info(f"AI判定为广告 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
+
+    # 如果是广告，撤回消息
+    if is_ad:
+        try:
+            await bot.delete_msg(message_id=event.message_id)
+            logger.info(f"已撤回广告消息 群:{group_id} 用户:{event.user_id} message_id:{event.message_id}")
+            return True
+        except Exception as e:
+            logger.error(f"撤回消息失败: {e}")
+
+    return False
 
 
 @group_msg.handle()
@@ -125,6 +218,12 @@ async def handle_group_msg(event: MessageEvent):
             image_url = segment.data.get("url", "")
             if image_url:
                 image_urls.append(image_url)
+
+    # 广告检测和撤回（在忽略空消息之前执行）
+    from nonebot import get_bot
+    bot = get_bot()
+    if await handle_ad_recall(bot, event):
+        await group_msg.finish()
 
     # 忽略空消息或命令
     if (not user_message or user_message.startswith("/")) and not image_urls:
