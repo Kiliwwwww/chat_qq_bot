@@ -1,6 +1,7 @@
 import random
 import time
 import json
+import asyncio
 
 from nonebot import on_command, on_message, on_notice, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import (
@@ -134,18 +135,32 @@ async def handle_ad_recall(bot, event: GroupMessageEvent):
         return False
 
     is_ad = False
+    need_ai_check = False
 
     # 首先检查广告关键词
     if check_ad_keywords(user_message):
-        is_ad = True
+        need_ai_check = True
         logger.info(f"广告关键词命中 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
 
-    # 超过50个字且未命中关键词，使用大模型判断
+    # 超过50个字且未命中关键词，也需要AI判断
     elif len(user_message) > 50:
+        need_ai_check = True
         logger.info(f"广告检测: 消息超过50个字，调用AI判断")
-        is_ad = await check_ad_by_ai(user_message)
-        if is_ad:
-            logger.info(f"AI判定为广告 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
+
+    # 需要AI判断时，调用大模型（带30秒超时）
+    if need_ai_check:
+        try:
+            is_ad = await asyncio.wait_for(check_ad_by_ai(user_message), timeout=30)
+            if is_ad:
+                logger.info(f"AI判定为广告 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
+            else:
+                logger.info(f"AI判定为非广告 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
+        except asyncio.TimeoutError:
+            logger.warning(f"AI广告检测超时(30秒)，默认判定为广告 群:{group_id} 用户:{event.user_id} 消息:{user_message[:30]}")
+            is_ad = True
+        except Exception as e:
+            logger.error(f"AI广告检测异常: {e}，默认判定为广告 群:{group_id} 用户:{event.user_id}")
+            is_ad = True
 
     # 如果是广告，撤回消息
     if is_ad:
