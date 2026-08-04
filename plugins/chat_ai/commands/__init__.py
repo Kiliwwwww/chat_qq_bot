@@ -8,6 +8,7 @@ from .ai_service_cmd import (
 )
 from .admin import (
     mute_cmd,
+    ban_cmd,
     emoji_cmd,
     emoji_cancel_cmd,
     group_emoji_cmd,
@@ -33,6 +34,7 @@ __all__ = [
     "switch_ai_service_cmd",
     "delete_ai_service_cmd",
     "mute_cmd",
+    "ban_cmd",
     "emoji_cmd",
     "emoji_cancel_cmd",
     "group_emoji_cmd",

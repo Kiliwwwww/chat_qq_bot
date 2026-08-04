@@ -21,9 +21,6 @@ AD_DETECTION_PROMPT_FILE = Path(__file__).parent.parent.parent / "data" / "md" /
 # 当前提示词模式：default=默认（雌小鬼），kind=邻家大姐姐
 current_prompt_mode: str = "default"
 
-# 开启广告撤回的群集合 {group_id}
-ad_recall_groups: set[int] = set()
-
 # 禁言状态：bot_mute_until 存储禁言到期时间戳
 bot_mute_until: float = 0
 
@@ -53,6 +50,9 @@ db = Database(get_plugin_data_file("chat_ai.db"))
 
 # 从数据库加载群欢迎语
 group_welcome_messages: dict[int, str] = db.get_all_welcome_messages()
+
+# 从数据库加载开启广告撤回的群集合
+ad_recall_groups: set[int] = db.get_all_ad_recall_groups()
 
 
 def init_ai_service():

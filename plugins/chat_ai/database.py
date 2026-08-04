@@ -73,6 +73,12 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS ad_recall_groups (
+                        group_id INTEGER PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 self._init_default_ad_keywords(conn)
                 logger.info("数据库初始化完成")
@@ -383,6 +389,55 @@ class Database:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"检查广告关键词失败: {e}")
+            return False
+
+    # ==================== 广告撤回群管理 ====================
+
+    def get_all_ad_recall_groups(self) -> set[int]:
+        """获取所有开启广告撤回的群"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT group_id FROM ad_recall_groups")
+                return {row["group_id"] for row in cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"获取广告撤回群列表失败: {e}")
+            return set()
+
+    def add_ad_recall_group(self, group_id: int) -> bool:
+        """添加群到广告撤回列表"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO ad_recall_groups (group_id) VALUES (?)",
+                    (group_id,),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"添加广告撤回群失败: {e}")
+            return False
+
+    def remove_ad_recall_group(self, group_id: int) -> bool:
+        """从广告撤回列表移除群"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM ad_recall_groups WHERE group_id = ?", (group_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"移除广告撤回群失败: {e}")
+            return False
+
+    def ad_recall_group_exists(self, group_id: int) -> bool:
+        """检查群是否开启广告撤回"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM ad_recall_groups WHERE group_id = ?", (group_id,)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"检查广告撤回群失败: {e}")
             return False
 
     # ==================== AI 服务管理 ====================

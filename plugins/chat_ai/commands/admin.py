@@ -3,12 +3,15 @@ import time
 from nonebot import on_command, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
+from nonebot import get_bot
+from nonebot.exception import FinishedException
 
 from ..config import Config
 from .. import state
 from ..state import db, auto_emoji_users, auto_emoji_groups, auto_emoji_all_groups_users, group_welcome_messages, ad_recall_groups
 
 mute_cmd = on_command("闭嘴", priority=5, block=True)
+ban_cmd = on_command("禁言", priority=5, block=True)
 emoji_cmd = on_command("贴表情", priority=5, block=True)
 emoji_cancel_cmd = on_command("取消贴表情", priority=5, block=True)
 group_emoji_cmd = on_command("全体贴表情", priority=5, block=True)
@@ -321,8 +324,9 @@ async def handle_ad_recall_on(event: GroupMessageEvent):
 
     group_id = event.group_id
 
-    # 添加到开启广告撤回的群集合
+    # 添加到开启广告撤回的群集合（同时更新内存和数据库）
     ad_recall_groups.add(group_id)
+    db.add_ad_recall_group(group_id)
     logger.info(f"管理员开启了群 {group_id} 的广告撤回功能")
     await ad_recall_on_cmd.finish("已开启群撤回，将自动撤回广告消息")
 
@@ -337,8 +341,9 @@ async def handle_ad_recall_off(event: GroupMessageEvent):
 
     group_id = event.group_id
 
-    # 从开启广告撤回的群集合中移除
+    # 从开启广告撤回的群集合中移除（同时更新内存和数据库）
     ad_recall_groups.discard(group_id)
+    db.remove_ad_recall_group(group_id)
     logger.info(f"管理员关闭了群 {group_id} 的广告撤回功能")
     await ad_recall_off_cmd.finish("已关闭群撤回")
 
@@ -407,3 +412,95 @@ async def handle_ad_status(event: GroupMessageEvent):
         f"广告关键词数量: {keyword_count}\n"
         f"当前开启撤回的群: {ad_recall_groups}"
     )
+
+
+@ban_cmd.handle()
+async def handle_ban(event: GroupMessageEvent, args: Message = CommandArg()):
+    """处理禁言命令（bot管理员或群管理员可用，仅群聊）"""
+    config = get_plugin_config(Config)
+    user_id = event.user_id
+    group_id = event.group_id
+
+    # 权限检查：bot管理员或群管理员
+    is_bot_admin = user_id == config.admin_qq
+    is_group_admin = False
+
+    if not is_bot_admin:
+        # 检查是否为群管理员
+        try:
+            bot = get_bot()
+            member_info = await bot.get_group_member_info(group_id=group_id, user_id=user_id)
+            # role: owner/admin/member
+            is_group_admin = member_info.get("role") in ("owner", "admin")
+        except Exception as e:
+            logger.error(f"获取群成员信息失败: {e}")
+
+    if not is_bot_admin and not is_group_admin:
+        await ban_cmd.finish("权限不足，仅bot管理员或群管理员可使用此命令")
+
+    # 解析参数 - 支持两种方式：
+    # 1. 禁言 123456 1
+    # 2. 禁言 @123456 1
+    target_qq = None
+    duration = 5
+
+    # 先尝试从 at 消息中提取 QQ 号
+    for seg in args:
+        if seg.type == "at":
+            try:
+                target_qq = int(seg.data["qq"])
+            except (ValueError, KeyError):
+                pass
+            break
+
+    # 如果没有 at，尝试从纯文本解析
+    if target_qq is None:
+        arg_text = args.extract_plain_text().strip()
+        if not arg_text:
+            await ban_cmd.finish("格式: 禁言 <QQ号/@某人> [分钟数]\n示例: 禁言 123456 5 或 禁言 @123456 5")
+
+        parts = arg_text.split()
+        if len(parts) < 1:
+            await ban_cmd.finish("格式: 禁言 <QQ号/@某人> [分钟数]")
+
+        try:
+            target_qq = int(parts[0])
+        except ValueError:
+            await ban_cmd.finish("请输入有效的QQ号")
+
+        # 解析分钟数
+        if len(parts) >= 2:
+            try:
+                duration = int(parts[1])
+                if duration < 1:
+                    await ban_cmd.finish("禁言时间必须大于0分钟")
+            except ValueError:
+                await ban_cmd.finish("请输入有效的分钟数")
+    else:
+        # 从 at 提取后，解析剩余文本中的分钟数
+        arg_text = args.extract_plain_text().strip()
+        if arg_text:
+            parts = arg_text.split()
+            if len(parts) >= 1:
+                try:
+                    duration = int(parts[0])
+                    if duration < 1:
+                        await ban_cmd.finish("禁言时间必须大于0分钟")
+                except ValueError:
+                    await ban_cmd.finish("请输入有效的分钟数")
+
+    # 执行禁言（单位：秒）
+    try:
+        bot = get_bot()
+        await bot.set_group_ban(
+            group_id=group_id,
+            user_id=target_qq,
+            duration=duration * 60
+        )
+        logger.info(f"用户 {user_id} 在群 {group_id} 禁言了用户 {target_qq}，时长 {duration} 分钟")
+        await ban_cmd.finish(f"已禁言用户 {target_qq}，时长 {duration} 分钟")
+    except FinishedException:
+        raise
+    except Exception as e:
+        logger.error(f"禁言失败: {e}")
+        await ban_cmd.finish(f"禁言失败: {str(e)}")
