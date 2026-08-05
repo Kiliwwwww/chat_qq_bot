@@ -109,7 +109,7 @@ async def handle_weibo(event: MessageEvent, args: Message = CommandArg()):
 
     # 检查用户是否在白名单中
     if not user_exists(event.user_id):
-        await weibo_cmd.finish("权限不足，您不在白名单中")
+        return
 
     # 提取UID参数
     uid_str = args.extract_plain_text().strip()
@@ -227,7 +227,7 @@ async def handle_sendweibo(event: MessageEvent, args: Message = CommandArg()):
 
     # 检查用户是否在白名单中
     if not user_exists(event.user_id):
-        await sendweibo_cmd.finish("权限不足，您不在白名单中")
+        return
 
     # 提取参数：uid 群号
     arg_str = args.extract_plain_text().strip()

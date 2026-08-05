@@ -1,11 +1,13 @@
 from nonebot import on_command, get_plugin_config, on_message
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, GroupMessageEvent, Message
+from nonebot.adapters.onebot.v11 import Bot, MessageEvent, GroupMessageEvent, Message, MessageSegment
 from nonebot.params import CommandArg
 from nonebot import logger
 import redis
 import json
 from datetime import datetime
 from typing import Optional
+from io import BytesIO
+import asyncio
 
 from .config import Config
 
@@ -79,13 +81,14 @@ async def get_user_nickname(bot, group_id: int, user_id: int) -> str:
         return str(user_id)
 
 
-async def format_ranking_message(top_users: list[tuple[int, int]], group_id: int, bot) -> str:
+async def format_ranking_message(top_users: list[tuple[int, int]], group_id: int, bot) -> Message:
     """格式化排行榜消息"""
     if not top_users:
-        return "今日暂无发言数据"
+        return Message("今日暂无发言数据")
     
     today = datetime.now().strftime("%Y-%m-%d")
     medals = ["🥇(b话大王)", "🥈", "🥉", "4.", "5."]
+    
     lines = [f"📊 群 {group_id} 今日b话排行榜（{today}）：", ""]
     
     for i, (user_id, count) in enumerate(top_users):
@@ -93,7 +96,7 @@ async def format_ranking_message(top_users: list[tuple[int, int]], group_id: int
         nickname = await get_user_nickname(bot, group_id, user_id)
         lines.append(f"{medal} {nickname} - {count} 条消息")
     
-    return "\n".join(lines)
+    return Message("\n".join(lines))
 
 
 @ranking_cmd.handle()

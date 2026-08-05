@@ -15,7 +15,7 @@ async def handle_switch_kind(event: MessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await switch_kind_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     state.current_prompt_mode = "kind"
     db.set_setting("prompt_mode", "kind")
@@ -29,7 +29,7 @@ async def handle_switch_default(event: MessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await switch_default_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     state.current_prompt_mode = "default"
     db.set_setting("prompt_mode", "default")

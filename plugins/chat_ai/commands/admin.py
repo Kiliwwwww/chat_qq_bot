@@ -34,7 +34,7 @@ async def handle_mute(event: MessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await mute_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     # 设置禁言5分钟
     state.bot_mute_until = time.time() + 300
@@ -48,7 +48,7 @@ async def handle_emoji(event: GroupMessageEvent, args: Message = CommandArg()):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await emoji_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     # 解析QQ号
     arg = args.extract_plain_text().strip()
@@ -74,7 +74,7 @@ async def handle_emoji_cancel(event: GroupMessageEvent, args: Message = CommandA
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await emoji_cancel_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     # 解析QQ号
     arg = args.extract_plain_text().strip()
@@ -100,7 +100,7 @@ async def handle_group_emoji(event: GroupMessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await group_emoji_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     group_id = event.group_id
 
@@ -116,7 +116,7 @@ async def handle_group_emoji_cancel(event: MessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await group_emoji_cancel_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     group_id = event.group_id
 
@@ -132,7 +132,7 @@ async def handle_emoji_all(event: MessageEvent, args: Message = CommandArg()):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await emoji_all_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     # 解析QQ号
     arg = args.extract_plain_text().strip()
@@ -156,7 +156,7 @@ async def handle_emoji_all_cancel(event: MessageEvent, args: Message = CommandAr
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await emoji_all_cancel_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     # 解析QQ号
     arg = args.extract_plain_text().strip()
@@ -181,7 +181,7 @@ async def handle_setkey(event: MessageEvent, args: Message = CommandArg()):
 
     # 管理员权限校验
     if event.user_id != config.admin_qq:
-        await setkey_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     arg = args.extract_plain_text().strip()
 
@@ -223,7 +223,7 @@ async def handle_settings(event: MessageEvent, args: Message = CommandArg()):
 
     # 管理员权限校验
     if event.user_id != config.admin_qq:
-        await settings_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     arg = args.extract_plain_text().strip()
 
@@ -258,7 +258,7 @@ async def handle_groupsettings(event: MessageEvent, args: Message = CommandArg()
 
     # 管理员权限校验
     if event.user_id != config.admin_qq:
-        await groupsettings_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     arg = args.extract_plain_text().strip()
 
@@ -292,7 +292,7 @@ async def handle_welcome(event: GroupMessageEvent, args: Message = CommandArg())
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await welcome_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     group_id = event.group_id
     arg = args.extract_plain_text().strip()
@@ -320,7 +320,7 @@ async def handle_ad_recall_on(event: GroupMessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await ad_recall_on_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     group_id = event.group_id
 
@@ -337,7 +337,7 @@ async def handle_ad_recall_off(event: GroupMessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await ad_recall_off_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     group_id = event.group_id
 
@@ -354,7 +354,7 @@ async def handle_ad_keyword(event: MessageEvent, args: Message = CommandArg()):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await ad_keyword_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     arg = args.extract_plain_text().strip()
 
@@ -395,7 +395,7 @@ async def handle_ad_status(event: GroupMessageEvent):
     # 管理员权限校验
     config = get_plugin_config(Config)
     if event.user_id != config.admin_qq:
-        await ad_status_cmd.finish("权限不足，仅管理员可使用此命令")
+        return
 
     group_id = event.group_id
 
@@ -436,7 +436,7 @@ async def handle_ban(event: GroupMessageEvent, args: Message = CommandArg()):
             logger.error(f"获取群成员信息失败: {e}")
 
     if not is_bot_admin and not is_group_admin:
-        await ban_cmd.finish("权限不足，仅bot管理员或群管理员可使用此命令")
+        return
 
     # 解析参数 - 支持两种方式：
     # 1. 禁言 123456 1
