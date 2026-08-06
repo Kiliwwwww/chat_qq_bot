@@ -70,6 +70,7 @@ def format_shop() -> str:
         lines.append(f"  {i}. {item.get('name', good['item_id'])} - {good['price']} 灵石")
         lines.append(f"     💬 {item.get('desc', '')}")
     lines.append("\n💡 使用「商城购买 <编号>」购买丹药")
+    lines.append("💡 材料/丹药/装备可卖给商城换灵石：「商城出售 <物品> <数量>」")
     return "\n".join(lines)
 
 
@@ -93,6 +94,47 @@ def buy_shop_item(group_id: int, user_id: int, index: int) -> dict:
     db.update_player(group_id, user_id, {"coin": player.get("coin", 0) - price})
     db.add_item(group_id, user_id, good["item_id"], 1)
     return {"ok": True, "text": f"🛒 购得【{item.get('name', '')}】×1，花费 {price} 灵石！\n💊 发送「服用 {item.get('name', '')}」使用"}
+
+
+def get_item_buyback_price(item_id: str) -> int:
+    """查询物品卖给商城的单价，无法出售返回 0"""
+    if item_id in constants.SHOP_BUYBACK:
+        return constants.SHOP_BUYBACK[item_id]
+    if item_id.startswith("equip:"):
+        parts = item_id.split(":")
+        if len(parts) == 3:
+            return constants.EQUIP_BUYBACK.get(parts[2], 0)
+    return 0
+
+
+def sell_to_shop(group_id: int, user_id: int, item_id: str, quantity: int = 1) -> dict:
+    """将物品卖给商城换取灵石"""
+    if quantity <= 0:
+        return {"ok": False, "text": "数量必须为正数"}
+
+    player = db.get_player(group_id, user_id)
+    if not player:
+        return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    unit_price = get_item_buyback_price(item_id)
+    if unit_price <= 0:
+        return {"ok": False, "text": "该物品商城不收，无法出售"}
+
+    # 装备每次只能卖一件
+    if item_id.startswith("equip:") and quantity != 1:
+        return {"ok": False, "text": "装备每次只能出售一件"}
+
+    have = db.get_item_quantity(group_id, user_id, item_id)
+    if have < quantity:
+        item_name = constants.ITEMS.get(item_id, {}).get("name", item_id)
+        return {"ok": False, "text": f"{item_name}数量不足（当前 {have}）"}
+
+    total = unit_price * quantity
+    db.remove_item(group_id, user_id, item_id, quantity)
+    db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + total})
+
+    item_name = constants.ITEMS.get(item_id, {}).get("name", item_id)
+    return {"ok": True, "text": f"💰 出售【{item_name}】×{quantity} 成功，获得 {total} 灵石！"}
 
 
 # ==================== 玩家交易 ====================

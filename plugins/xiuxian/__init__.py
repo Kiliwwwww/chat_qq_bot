@@ -23,6 +23,8 @@ from .commands import (  # noqa: F401  导入以注册指令
     status_cmd,
     help_cmd,
     change_physique_cmd,
+    rebirth_cmd,
+    suicide_cmd,
     game_on_cmd,
     game_off_cmd,
     biguan_cmd,
@@ -43,6 +45,7 @@ from .commands import (  # noqa: F401  导入以注册指令
     use_pill_cmd,
     shop_cmd,
     shop_buy_cmd,
+    shop_sell_cmd,
     market_cmd,
     market_sell_cmd,
     market_buy_cmd,
@@ -51,6 +54,7 @@ from .commands import (  # noqa: F401  导入以注册指令
     capture_cmd,
     furnace_cmd,
     escape_cmd,
+    release_cmd,
     ranking_cmd,
 )
 
@@ -98,6 +102,8 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "status_cmd",
     "help_cmd",
     "change_physique_cmd",
+    "rebirth_cmd",
+    "suicide_cmd",
     "game_on_cmd",
     "game_off_cmd",
     "biguan_cmd",
@@ -118,6 +124,7 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "use_pill_cmd",
     "shop_cmd",
     "shop_buy_cmd",
+    "shop_sell_cmd",
     "market_cmd",
     "market_sell_cmd",
     "market_buy_cmd",
@@ -126,5 +133,6 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "capture_cmd",
     "furnace_cmd",
     "escape_cmd",
+    "release_cmd",
     "ranking_cmd",
 ]

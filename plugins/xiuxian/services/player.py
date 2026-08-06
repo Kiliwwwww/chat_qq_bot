@@ -10,7 +10,7 @@ import random
 from nonebot import logger
 
 from .. import constants
-from ..state import db
+from ..state import config, db
 from . import rng
 
 
@@ -50,11 +50,9 @@ def create_character(group_id: int, user_id: int, name: str, talent: str) -> tup
         spirit_root = "空"
         spirit_quality = "废品"
         fortune = constants.TRASH_FORTUNE
-        physique = ""
+        # 废材流主角必定觉醒一种随机特殊体质（逆袭设定）
+        physique = rng.weighted_choice(constants.PHYSIQUES)["id"]
         base_stats = build_base_stats(spirit_root, trash=True)
-        phys_text = ""
-        if random.random() < 0.05:
-            physique = rng.weighted_choice(constants.PHYSIQUES)["id"]
     else:
         spirit_root = rng.weighted_choice_dict(constants.SPIRIT_ROOT_WEIGHTS)
         spirit_quality = rng.weighted_choice_dict(constants.QUALITY_WEIGHTS)
@@ -99,8 +97,6 @@ def change_physique(group_id: int, user_id: int, target_name: str = "") -> dict:
 
     target_name 为空时随机重铸；指定名称时直接更换为目标体质（费用更高）。
     """
-    from ..state import config
-
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
@@ -155,9 +151,80 @@ def format_player_profile(group_id: int, player: dict, gongfa_text: str = "") ->
         f"💰 灵石：{player.get('coin', 0)}",
         f"🏃 天命：{'随机天命' if player.get('talent') != 'trash' else '废材流主角'}",
     ]
+    if player.get("rebirth_count"):
+        lines.append(f"🌀 转世：{player.get('rebirth_count')} 次（修炼速率永久 +{int(player.get('rebirth_count', 0) * config.rebirth_rate_bonus * 100)}%）")
     if player.get("physique"):
         phys = constants.PHYSIQUE_BY_ID.get(player["physique"], {})
         lines.append(f"✨ 体质：{phys.get('name', player['physique'])} - {phys.get('desc', '')}")
     if gongfa_text:
         lines.append(gongfa_text)
     return "\n".join(lines)
+
+
+def rebirth(group_id: int, user_id: int) -> dict:
+    """转世重生：重置角色数据，保留灵根/品质/体质/天命，获得永久气运与修炼加成。"""
+    player = db.get_player(group_id, user_id)
+    if not player:
+        return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    # 转世门槛
+    if player.get("realm", 0) < config.rebirth_min_realm:
+        required_name = constants.REALMS[config.rebirth_min_realm]["name"]
+        return {"ok": False, "text": f"转世重生需要至少达到【{required_name}】境界（当前{constants.REALMS[player['realm']]['name']}）"}
+
+    # 清除关联数据（功法/背包/灵宠/炉鼎/挂机/冷却）
+    if not db.reset_player_related(group_id, user_id):
+        return {"ok": False, "text": "转世失败，请稍后再试"}
+
+    rebirth_count = player.get("rebirth_count", 0) + 1
+    new_fortune = player.get("fortune", 1000) + config.rebirth_fortune_bonus
+
+    # 重置基础属性（废材流保留低属性起步）
+    base_stats = build_base_stats(player["spirit_root"], trash=(player.get("talent") == "trash"))
+
+    # 重新领悟初始功法
+    starter = pick_starter_gongfa(player["spirit_root"])
+    db.learn_gongfa(group_id, user_id, starter["id"])
+
+    db.update_player(group_id, user_id, {
+        "realm": 0,
+        "realm_progress": 0,
+        "attack": base_stats["attack"],
+        "defense": base_stats["defense"],
+        "hp": base_stats["hp"],
+        "coin": config.rebirth_coin,
+        "alchemy_level": 1,
+        "alchemy_exp": 0,
+        "forge_level": 1,
+        "forge_exp": 0,
+        "bottleneck_until": 0,
+        "weapon": "",
+        "armor": "",
+        "treasure": "",
+        "fortune": new_fortune,
+        "rebirth_count": rebirth_count,
+    })
+    logger.info(f"玩家转世重生 group={group_id} user={user_id} 第 {rebirth_count} 世")
+
+    text = (
+        f"🌀 【转世重生】你已历经 {rebirth_count} 世轮回！\n"
+        f"保留灵根【{constants.SPIRIT_ROOTS[player['spirit_root']]['name']}】（{player['spirit_quality']}）"
+        f"{'与特殊体质【' + constants.PHYSIQUE_BY_ID[player['physique']]['name'] + '】' if player.get('physique') else ''}\n"
+        f"🍀 气运 +{config.rebirth_fortune_bonus}（现 {new_fortune}）\n"
+        f"📈 修炼速率永久 +{int(config.rebirth_rate_bonus * 100)}%（累计 +{int(rebirth_count * config.rebirth_rate_bonus * 100)}%）\n"
+        f"所有修为、功法、背包、灵宠、炉鼎均已归零，重新踏上仙途吧！"
+    )
+    return {"ok": True, "text": text}
+
+
+def suicide(group_id: int, user_id: int) -> dict:
+    """自杀：彻底删除角色全部数据，不保留任何内容。"""
+    player = db.get_player(group_id, user_id)
+    if not player:
+        return {"ok": False, "text": "你还没有修仙角色，无法自杀"}
+
+    if not db.delete_player(group_id, user_id):
+        return {"ok": False, "text": "自杀失败，请稍后再试"}
+
+    logger.info(f"玩家自杀清空数据 group={group_id} user={user_id}")
+    return {"ok": True, "text": "💀 你已兵解自杀，魂飞魄散！\n所有角色数据已被彻底清空，不再留有任何痕迹。\n若想东山再起，发送「我要修仙」重新开始。"}

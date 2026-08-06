@@ -11,7 +11,7 @@ from .. import constants
 from ..state import config, db, get_cache
 from . import rng
 
-_ESCAPE_COOLDOWN = 600  # 挣脱尝试冷却（秒）
+_ESCAPE_COOLDOWN = 120  # 挣脱尝试冷却（秒）
 
 
 def capture(group_id: int, attacker_id: int, target_id: int) -> dict:
@@ -74,15 +74,17 @@ def list_furnaces(group_id: int, user_id: int) -> str:
 
 
 def release_furnace(group_id: int, owner_id: int, index: int) -> dict:
-    """释放炉鼎"""
+    """放走炉鼎"""
     furnaces = db.get_furnaces_by_owner(group_id, owner_id)
     if not furnaces:
         return {"ok": False, "text": "你没有炉鼎"}
     if index < 1 or index > len(furnaces):
-        return {"ok": False, "text": "炉鼎编号不存在"}
+        return {"ok": False, "text": f"炉鼎编号不存在（1~{len(furnaces)}）"}
     f = furnaces[index - 1]
     db.remove_furnace(group_id, owner_id, f["target_id"])
-    return {"ok": True, "text": f"你已释放炉鼎（编号 {index}）"}
+    target = db.get_player(group_id, f["target_id"])
+    target_name = target["name"] if target else str(f["target_id"])
+    return {"ok": True, "text": f"🕊️ 你已放走炉鼎「{target_name}」，对方恢复了自由！"}
 
 
 async def escape(group_id: int, user_id: int) -> dict:
@@ -112,7 +114,7 @@ async def escape(group_id: int, user_id: int) -> dict:
 
     if not rng.luck_roll(success_chance, fortune):
         await cache.set(key, time.time(), expire=_ESCAPE_COOLDOWN)
-        return {"ok": False, "text": "挣脱失败！被强大的禁制压制，下次再试（10 分钟冷却）"}
+        return {"ok": False, "text": f"挣脱失败！被强大的禁制压制，下次再试（{int(_ESCAPE_COOLDOWN / 60)} 分钟冷却）"}
 
     # 挣脱成功，触发气运反制
     owner_id = furnace["owner_id"]

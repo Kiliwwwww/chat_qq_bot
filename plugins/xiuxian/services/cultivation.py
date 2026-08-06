@@ -45,11 +45,16 @@ def calculate_rate(group_id: int, player: dict, location: str) -> float:
         if p:
             physique_bonus = p.get("rate", 0.0)
 
-    # 灵宠加成
+    # 转世重生的永久修炼加成
+    rebirth_bonus = player.get("rebirth_count", 0) * config.rebirth_rate_bonus
+
+    # 灵宠加成（万灵圣体收益翻倍）
     pet_bonus = sum(
         constants.PET_TYPE_BY_ID.get(p["pet_type"], {}).get("rate", 0.0) * p.get("level", 1)
         for p in db.get_pets(group_id, player["user_id"])
     )
+    if player.get("physique") == "wanling_st":
+        pet_bonus *= 2
 
     # 炉鼎加成（紫金炉体加速翻倍且上限+1；玄阴鼎炉被抓时主人受益翻倍）
     furnaces = db.get_furnaces_by_owner(group_id, player["user_id"])
@@ -71,7 +76,7 @@ def calculate_rate(group_id: int, player: dict, location: str) -> float:
         * quality_mult
         * location_mult
         * world_mult
-        * (1 + gongfa_bonus + physique_bonus + pet_bonus + furnace_bonus)
+        * (1 + gongfa_bonus + physique_bonus + rebirth_bonus + pet_bonus + furnace_bonus)
     )
     return max(1.0, rate)
 
@@ -146,6 +151,7 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
         "hours": round(elapsed_hours, 2),
         "rate": round(rate, 1),
         "progress": 0.0,
+        "coins": 0,
         "risk_failed": False,
         "risk_text": "",
         "enlighten": False,
@@ -160,8 +166,9 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
         result["risk_failed"] = True
         result["risk_text"] = f"⚠️ 修炼途中遭遇{random.choice(['妖兽突袭', '灵气暴乱', '心魔入侵'])}，损失部分修为！"
 
-    # 顿悟判定（气运越高越容易触发）
-    if rng.luck_roll(constants.ENLIGHTEN_CHANCE, player.get("fortune", 1000)):
+    # 顿悟判定（气运越高越容易触发，道韵弥漫事件额外加成）
+    enlighten_chance = constants.ENLIGHTEN_CHANCE + world.enlighten_bonus(group_id)
+    if rng.luck_roll(enlighten_chance, player.get("fortune", 1000)):
         bonus = constants.ENLIGHTEN_PROGRESS * (1 + rng.fortune_factor(player.get("fortune", 1000)) * 2)
         progress += bonus
         result["enlighten"] = True
@@ -176,6 +183,12 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
     db.update_player(group_id, user_id, {"realm_progress": current})
     result["progress"] = progress
     result["total_progress"] = current
+
+    # 灵石收益：每小时 = 基础 5 + 修炼速率 * 0.1
+    coins = int(elapsed_hours * (constants.COIN_PER_HOUR_BASE + rate * constants.COIN_PER_RATE))
+    if coins > 0:
+        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + coins})
+        result["coins"] = coins
 
     # 功法熟练度成长
     gongfa_exp = elapsed_hours * 15 * (1 + constants.QUALITIES.get(player.get("spirit_quality", "废品"), 0.05))
@@ -199,6 +212,8 @@ def format_settle_result(group_id: int, result: dict) -> str:
         f"📈 修炼速率：{result['rate']} 修为/小时",
         f"✨ 获得修为：{int(result['progress'])}",
     ]
+    if result.get("coins"):
+        lines.append(f"💰 获得灵石：{result['coins']}")
     if result.get("risk_text"):
         lines.append(result["risk_text"])
     if result.get("gongfa_levelup"):

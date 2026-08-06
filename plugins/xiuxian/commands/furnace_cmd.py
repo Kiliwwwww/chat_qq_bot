@@ -1,16 +1,16 @@
 """炉鼎指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message
 from nonebot.params import CommandArg
 
 from ..state import db
 from ..services import furnace as furnace_svc
-from .helpers import require_game
+from .helpers import require_game, xiuxian_command
 
-capture_cmd = on_command("抓捕", priority=5, block=True)
-furnace_cmd = on_command("炉鼎", aliases={"我的炉鼎"}, priority=5, block=True)
-escape_cmd = on_command("挣脱", aliases={"挣脱束缚"}, priority=5, block=True)
+capture_cmd = xiuxian_command("抓捕", priority=5, block=True)
+furnace_cmd = xiuxian_command("炉鼎", aliases={"我的炉鼎"}, priority=5, block=True)
+escape_cmd = xiuxian_command("挣脱", aliases={"挣脱束缚"}, priority=5, block=True)
+release_cmd = xiuxian_command("放走", aliases={"释放"}, priority=5, block=True)
 
 
 def _extract_at_target(args: Message) -> int:
@@ -75,3 +75,14 @@ async def handle_escape(bot: Bot, event, args: Message = CommandArg()):
 
     result = await furnace_svc.escape(group_id, event.user_id)
     await escape_cmd.finish(result["text"])
+
+
+@release_cmd.handle()
+async def handle_release(bot: Bot, event, args: Message = CommandArg()):
+    group_id = await require_game(release_cmd, event)
+
+    arg = args.extract_plain_text().strip()
+    if not arg.isdigit():
+        await release_cmd.finish("请指定炉鼎编号，如：放走 1（发送「炉鼎」查看编号）")
+    result = furnace_svc.release_furnace(group_id, event.user_id, int(arg))
+    await release_cmd.finish(result["text"])

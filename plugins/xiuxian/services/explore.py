@@ -50,6 +50,14 @@ EXPLORE_POOL = {
 # 气运修正的正面结果
 _POSITIVE_KEYS = ["coin", "lingcao", "yaodan", "lingquan", "progress", "pet", "equip"]
 
+# 各地点探索的基础灵石收益（每次探索必定获得）
+_LOCATION_BASE_COINS = {
+    "洞府": 30,
+    "灵脉": 60,
+    "妖兽森林": 80,
+    "秘境": 150,
+}
+
 
 def _grant_pet(group_id: int, user_id: int) -> str:
     """随机获得一只灵宠，返回宠物描述"""
@@ -109,6 +117,12 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
     # 应用产出
     fortune = player.get("fortune", 1000)
 
+    # 基础灵石收益（每次探索必定获得）
+    base_coins = _LOCATION_BASE_COINS.get(location, 0)
+    if base_coins > 0:
+        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + base_coins})
+        result["gains"].append(f"+{base_coins} 灵石")
+
     if outcome.get("coins"):
         db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + outcome["coins"]})
         result["gains"].append(f"+{outcome['coins']} 灵石")
@@ -139,11 +153,13 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
         equip_text = _grant_equip(group_id, user_id)
         result["text"] += f"\n🎁 {equip_text}"
 
-    # 高气运额外触发隐藏机缘
-    if rng.luck_roll(0.15, fortune):
-        bonus_coins = random.randint(30, 120)
-        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + bonus_coins})
-        result["text"] += f"\n🌟 天道垂青！额外获得 {bonus_coins} 灵石"
+    # 高气运额外触发隐藏机缘（仙缘降临事件提升触发率与奖励）
+    from . import world
+    luck_mult = world.explore_luck_multiplier(group_id)
+    if rng.luck_roll(0.15 * luck_mult, fortune):
+        bonus_coins = random.randint(30, 120) * luck_mult
+        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + int(bonus_coins)})
+        result["text"] += f"\n🌟 天道垂青！额外获得 {int(bonus_coins)} 灵石"
 
     return result
 

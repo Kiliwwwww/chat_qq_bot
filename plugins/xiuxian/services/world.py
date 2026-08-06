@@ -22,6 +22,11 @@ _EVENT_WEIGHTS = {
     "yaoshou_baodong": 25,
     "shanggu_mijing": 20,
     "tiandi_yixiang": 25,
+    "tianjiang_lingyu": 25,
+    "daoyun_miman": 20,
+    "wanshou_caozong": 15,
+    "xianyuan_jianglin": 20,
+    "mochao_xiongyong": 10,
 }
 
 
@@ -93,6 +98,18 @@ def forest_risk_bonus(group_id: int) -> float:
     """妖兽森林在当前世界状态下的额外风险"""
     event = get_current_event(group_id)
     return event.get("risk", 0.0)
+
+
+def enlighten_bonus(group_id: int) -> float:
+    """世界事件对顿悟概率的加成"""
+    event = get_current_event(group_id)
+    return event.get("enlighten", 0.0)
+
+
+def explore_luck_multiplier(group_id: int) -> float:
+    """世界事件对探索奇遇的倍率"""
+    event = get_current_event(group_id)
+    return event.get("explore_luck", 1.0)
 
 
 # ==================== 世界推进 ====================

@@ -1,17 +1,16 @@
 """坊市指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from ..services import market as market_svc
-from .helpers import require_game
+from .helpers import require_game, xiuxian_command
 
-market_cmd = on_command("坊市", aliases={"市场"}, priority=5, block=True)
-market_sell_cmd = on_command("坊市出售", aliases={"出售"}, priority=5, block=True)
-market_buy_cmd = on_command("坊市购买", priority=5, block=True)
-market_buy_merchant_cmd = on_command("坊市购商", aliases={"购商"}, priority=5, block=True)
-market_cancel_cmd = on_command("坊市撤销", aliases={"撤销挂单"}, priority=5, block=True)
+market_cmd = xiuxian_command("坊市", aliases={"市场"}, priority=5, block=True)
+market_sell_cmd = xiuxian_command("坊市出售", aliases={"出售"}, priority=5, block=True)
+market_buy_cmd = xiuxian_command("坊市购买", priority=5, block=True)
+market_buy_merchant_cmd = xiuxian_command("坊市购商", aliases={"购商"}, priority=5, block=True)
+market_cancel_cmd = xiuxian_command("坊市撤销", aliases={"撤销挂单"}, priority=5, block=True)
 
 
 @market_cmd.handle()

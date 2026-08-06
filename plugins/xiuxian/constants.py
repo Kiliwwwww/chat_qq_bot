@@ -15,23 +15,27 @@ SPIRIT_ROOTS = {
     "雷": {"name": "雷灵根", "attr": {"attack": 1.3, "defense": 1.0, "hp": 0.9}, "desc": "高爆发、高暴击"},
     "魔": {"name": "魔灵根", "attr": {"attack": 1.4, "defense": 1.0, "hp": 0.8}, "desc": "高风险高收益"},
     "空": {"name": "空灵根", "attr": {"attack": 1.0, "defense": 1.0, "hp": 1.0}, "desc": "万法皆通"},
+    "风": {"name": "风灵根", "attr": {"attack": 1.25, "defense": 0.9, "hp": 1.0}, "desc": "身法灵动，攻速加成"},
+    "冰": {"name": "冰灵根", "attr": {"attack": 1.1, "defense": 1.1, "hp": 1.0}, "desc": "极寒之力，控制防御"},
+    "暗": {"name": "暗灵根", "attr": {"attack": 1.25, "defense": 1.0, "hp": 0.85}, "desc": "隐匿暗杀，高爆发"},
+    "光": {"name": "光灵根", "attr": {"attack": 1.0, "defense": 1.05, "hp": 1.15}, "desc": "圣光之力，辅助恢复"},
 }
 
 # 随机天命时的灵根抽取权重（空灵根概率最低）
 SPIRIT_ROOT_WEIGHTS = {
-    "金": 16, "木": 14, "水": 14, "火": 14, "土": 14, "雷": 12, "魔": 10, "空": 6,
+    "金": 16, "木": 14, "水": 14, "火": 14, "土": 14, "雷": 12, "魔": 10, "空": 6, "风": 12, "冰": 10, "暗": 8, "光": 6,
 }
 
 # ==================== 灵根品质系统 ====================
 
 # 品质：修炼效率倍率
 QUALITIES = {
-    "废品": 0.05,
-    "下品": 0.10,
-    "中品": 0.30,
-    "上品": 0.50,
-    "极品": 0.80,
-    "仙品": 1.00,
+    "废品": 0.20,
+    "下品": 0.50,
+    "中品": 0.80,
+    "上品": 1.00,
+    "极品": 1.50,
+    "仙品": 2.00,
 }
 
 # 品质名称顺序（用于排序展示）
@@ -62,7 +66,7 @@ REALMS = [
 REALM_POWER_MULT = {i: 2 ** i for i in range(10)}
 
 # 基础修炼速率（修为/小时，乘法修正前）
-BASE_CULTIVATION_RATE = 100
+BASE_CULTIVATION_RATE = 1000
 
 # ==================== 功法系统 ====================
 
@@ -72,30 +76,53 @@ GONGFAS = {
     "金": [
         {"id": "gengjin_jj", "name": "庚金剑诀", "attr": "attack", "bonus": 0.12, "desc": "金系杀伐剑诀，攻击加成"},
         {"id": "bumie_js", "name": "不灭金身", "attr": "defense", "bonus": 0.12, "desc": "金系防御功法，防御加成"},
+        {"id": "taiji_jjj", "name": "太乙金精诀", "attr": "attack", "bonus": 0.14, "desc": "金系炼体功法，攻击加成"},
     ],
     "木": [
         {"id": "changchun_gong", "name": "长春功", "attr": "hp", "bonus": 0.12, "desc": "木系疗伤功法，气血加成"},
         {"id": "qingmu_zs", "name": "青木再生诀", "attr": "cultivation", "bonus": 0.12, "desc": "木系生机功法，修炼加成"},
+        {"id": "jiuzhuan_hc", "name": "九转回春术", "attr": "hp", "bonus": 0.14, "desc": "木系回春功法，气血大幅加成"},
     ],
     "水": [
         {"id": "xuanwu_zs", "name": "玄武真水诀", "attr": "defense", "bonus": 0.12, "desc": "水系防御功法，防御加成"},
         {"id": "bingxin_jue", "name": "冰心诀", "attr": "cultivation", "bonus": 0.12, "desc": "水系心法，修炼加成"},
+        {"id": "tianhe_zhishui", "name": "天河真水诀", "attr": "attack", "bonus": 0.12, "desc": "水系攻伐功法，攻击加成"},
     ],
     "火": [
         {"id": "fentian_jue", "name": "焚天诀", "attr": "attack", "bonus": 0.14, "desc": "火系爆发功法，攻击加成"},
         {"id": "lihuo_jue", "name": "离火焚天诀", "attr": "attack", "bonus": 0.12, "desc": "火系炼器功法，攻击加成"},
+        {"id": "sanmei_zhenhuo", "name": "三昧真火诀", "attr": "cultivation", "bonus": 0.14, "desc": "火系真火功法，修炼加成"},
     ],
     "土": [
         {"id": "houtu_jue", "name": "厚土诀", "attr": "defense", "bonus": 0.12, "desc": "土系防御功法，防御加成"},
         {"id": "dadi_jgt", "name": "大地金刚体", "attr": "hp", "bonus": 0.14, "desc": "土系肉身功法，气血加成"},
+        {"id": "houtu_zhong", "name": "厚土重岳诀", "attr": "attack", "bonus": 0.12, "desc": "土系重岳功法，攻击加成"},
     ],
     "雷": [
         {"id": "jiuxiao_sl", "name": "九霄神雷诀", "attr": "attack", "bonus": 0.16, "desc": "雷系爆发功法，攻击加成"},
         {"id": "tianlei_zf", "name": "天雷正法", "attr": "cultivation", "bonus": 0.12, "desc": "雷系镇邪功法，修炼加成"},
+        {"id": "wulei_zhenfa", "name": "五雷正法", "attr": "defense", "bonus": 0.12, "desc": "雷系护体功法，防御加成"},
     ],
     "魔": [
         {"id": "shitian_mg", "name": "噬天魔功", "attr": "cultivation", "bonus": 0.20, "desc": "魔系速成功法，修炼加成"},
         {"id": "xuemai_da", "name": "血魔大法", "attr": "attack", "bonus": 0.15, "desc": "魔系血炼功法，攻击加成"},
+        {"id": "modao_zhuzhou", "name": "魔道咒印", "attr": "defense", "bonus": 0.12, "desc": "魔系咒印功法，防御加成"},
+    ],
+    "风": [
+        {"id": "fenglun_jj", "name": "风轮剑诀", "attr": "attack", "bonus": 0.14, "desc": "风系灵动剑法，攻击加成"},
+        {"id": "yufeng_shu", "name": "御风术", "attr": "cultivation", "bonus": 0.12, "desc": "风系身法功法，修炼加成"},
+    ],
+    "冰": [
+        {"id": "hanbing_jue", "name": "寒冰诀", "attr": "attack", "bonus": 0.12, "desc": "冰系寒冰功法，攻击加成"},
+        {"id": "xuanyin_bt", "name": "玄冰罩体", "attr": "defense", "bonus": 0.14, "desc": "冰系护体功法，防御加成"},
+    ],
+    "暗": [
+        {"id": "yinsha_dun", "name": "隐煞遁法", "attr": "attack", "bonus": 0.16, "desc": "暗系隐匿功法，攻击加成"},
+        {"id": "mingyan_gong", "name": "冥炎功", "attr": "cultivation", "bonus": 0.14, "desc": "暗系冥火功法，修炼加成"},
+    ],
+    "光": [
+        {"id": "shengguang_jue", "name": "圣光诀", "attr": "hp", "bonus": 0.14, "desc": "光系圣光功法，气血加成"},
+        {"id": "guangyao_hufa", "name": "光耀护法", "attr": "defense", "bonus": 0.12, "desc": "光系护体功法，防御加成"},
     ],
 }
 
@@ -137,6 +164,12 @@ PHYSIQUES = [
     {"id": "jiuyin_lt", "name": "九阴灵体", "rate": 0.10, "weight": 15, "desc": "炉鼎反抗之力增强，挣脱成功率提升"},
     {"id": "zijin_luti", "name": "紫金炉体", "rate": 0.10, "weight": 10, "desc": "炉鼎大师，每个炉鼎修炼加速翻倍，且可多抓一个"},
     {"id": "xuanyin_dinglu", "name": "玄阴鼎炉", "rate": 0.10, "weight": 8, "desc": "天生炉鼎之资，被抓后主人受益翻倍，挣脱困难但觉醒更强"},
+    {"id": "tongtian_ti", "name": "通天神体", "rate": 0.20, "weight": 12, "desc": "天地亲和，修炼速度大增"},
+    {"id": "hundun_ti", "name": "混沌体", "rate": 0.10, "weight": 8, "desc": "混沌初开之体，全属性大幅提升"},
+    {"id": "jianxin_tm", "name": "剑心通明", "rate": 0.10, "weight": 10, "desc": "剑道通神，攻击大幅提升"},
+    {"id": "jiuqiao_lt", "name": "九窍玲珑心", "rate": 0.10, "weight": 12, "desc": "七窍玲珑，炼丹炼器天赋异禀"},
+    {"id": "wanling_st", "name": "万灵圣体", "rate": 0.10, "weight": 10, "desc": "万灵亲和，灵宠收益翻倍"},
+    {"id": "yinyang_wx", "name": "阴阳五行体", "rate": 0.12, "weight": 10, "desc": "阴阳调和五行，修炼均衡加成"},
 ]
 
 PHYSIQUE_BY_ID = {p["id"]: p for p in PHYSIQUES}
@@ -220,7 +253,8 @@ FORGE_COST = {"materials": {"lingcao": 2, "yaodan": 2, "lingquan": 1}, "cost": 1
 
 # ==================== 世界事件系统 ====================
 
-# 世界事件：id 为事件标识，rate 为修炼速度倍率，breakthrough 为突破成功率加成，forest 为妖兽森林收益倍率
+# 世界事件：id 为事件标识，rate 为修炼速度倍率，breakthrough 为突破成功率加成，
+# forest 为妖兽森林收益倍率，risk 为妖兽森林额外风险，enlighten 为顿悟概率加成，explore_luck 为探索奇遇倍率
 WORLD_EVENTS = {
     "lingqi_chaoxi": {
         "name": "灵气潮汐",
@@ -241,6 +275,34 @@ WORLD_EVENTS = {
     "tiandi_yixiang": {
         "name": "天地异象",
         "desc": "天地异象频生，可能触发隐藏任务、特殊NPC、神秘传承",
+    },
+    "tianjiang_lingyu": {
+        "name": "天降灵雨",
+        "rate": 1.3,
+        "desc": "灵雨滋润大地，全服修炼速度提升30%",
+    },
+    "daoyun_miman": {
+        "name": "道韵弥漫",
+        "rate": 1.1,
+        "breakthrough": 0.05,
+        "enlighten": 0.05,
+        "desc": "道韵弥漫天地，修炼提升10%，突破成功率提升5%，更易顿悟",
+    },
+    "wanshou_caozong": {
+        "name": "万兽朝宗",
+        "forest": 1.8,
+        "desc": "万兽朝宗，妖兽森林收益提升80%",
+    },
+    "xianyuan_jianglin": {
+        "name": "仙缘降临",
+        "explore_luck": 2.0,
+        "desc": "仙缘遍地，探索更容易触发奇遇与稀有奖励",
+    },
+    "mochao_xiongyong": {
+        "name": "魔潮汹涌",
+        "forest": 2.0,
+        "risk": 0.15,
+        "desc": "魔潮汹涌，妖兽森林收益翻倍但遇险概率大增",
     },
 }
 
@@ -276,12 +338,35 @@ SHOP_GOODS = [
     {"item_id": "huiling_dan", "price": 100},
 ]
 
+# 商城回购价格（玩家将材料/丹药卖给商城换灵石）
+SHOP_BUYBACK = {
+    "lingcao": 30,
+    "yaodan": 60,
+    "lingquan": 80,
+    "jusan_san": 50,
+    "xiulian_dan": 100,
+    "ningshen_dan": 250,
+    "peiyuan_dan": 750,
+    "yunlun_dan": 200,
+    "tianji_dan": 750,
+    "pojing_dan": 150,
+    "huiling_dan": 50,
+    "jingyuan_dan": 75,
+}
+
+# 装备按品质回购（武器/法袍/法宝统一价格）
+EQUIP_BUYBACK = {"普通": 100, "优秀": 300, "极品": 800, "灵器": 2000, "仙器": 5000}
+
 # ==================== 修炼/战斗基础数值 ====================
 
 # 基础属性
 BASE_ATTACK = 10
 BASE_DEFENSE = 10
 BASE_HP = 100
+
+# 闭关灵石收益：每小时灵石 = COIN_PER_HOUR_BASE + 修炼速率 * COIN_PER_RATE
+COIN_PER_HOUR_BASE = 5
+COIN_PER_RATE = 0.1
 
 # 闭关时顿悟触发概率基数（受气运加成）
 ENLIGHTEN_CHANCE = 0.05

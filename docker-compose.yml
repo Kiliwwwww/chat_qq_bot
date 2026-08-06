@@ -12,6 +12,7 @@ services:
       - ./data:/app/data
       - ./log:/app/log
       - ./.env:/app/.env
+      - ./plugins:/app/plugins
 
     networks:
       - qqbot-network

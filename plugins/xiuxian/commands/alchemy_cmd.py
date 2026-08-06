@@ -1,19 +1,18 @@
 """炼丹、炼器、背包与装备指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from .. import constants
 from ..services import alchemy as alch_svc
 from ..services import inventory as inv_svc
-from .helpers import require_game
+from .helpers import require_game, xiuxian_command
 
-lian_dan_cmd = on_command("炼丹", priority=5, block=True)
-lian_qi_cmd = on_command("炼器", priority=5, block=True)
-inventory_cmd = on_command("背包", aliases={"我的背包"}, priority=5, block=True)
-equip_cmd = on_command("装备", priority=5, block=True)
-unequip_cmd = on_command("卸下", aliases={"卸装备"}, priority=5, block=True)
+lian_dan_cmd = xiuxian_command("炼丹", priority=5, block=True)
+lian_qi_cmd = xiuxian_command("炼器", priority=5, block=True)
+inventory_cmd = xiuxian_command("背包", aliases={"我的背包"}, priority=5, block=True)
+equip_cmd = xiuxian_command("装备", priority=5, block=True)
+unequip_cmd = xiuxian_command("卸下", aliases={"卸装备"}, priority=5, block=True)
 
 
 def _resolve_pill_key(name: str) -> str:

@@ -1,13 +1,12 @@
 """修仙排行榜指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from ..services import ranking as rank_svc
-from .helpers import require_game
+from .helpers import require_game, xiuxian_command
 
-ranking_cmd = on_command("修仙排行榜", aliases={"修仙排行"}, priority=5, block=True)
+ranking_cmd = xiuxian_command("修仙排行榜", aliases={"修仙排行"}, priority=5, block=True)
 
 # 中文别名映射
 _CATEGORY_ALIASES = {

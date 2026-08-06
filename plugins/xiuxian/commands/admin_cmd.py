@@ -1,16 +1,16 @@
 """修仙功能开关指令（仅管理员，每个群独立生效）。"""
 
-from nonebot import on_command, logger
+from nonebot import logger
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from ..state import config, db
-from .helpers import require_group
+from .helpers import require_group, xiuxian_command
 
 # 开启修仙
-game_on_cmd = on_command("开启修仙", aliases={"开启修仙功能"}, priority=5, block=True)
+game_on_cmd = xiuxian_command("开启修仙", aliases={"开启修仙功能"}, priority=5, block=True)
 # 关闭修仙
-game_off_cmd = on_command("关闭修仙", aliases={"关闭修仙功能"}, priority=5, block=True)
+game_off_cmd = xiuxian_command("关闭修仙", aliases={"关闭修仙功能"}, priority=5, block=True)
 
 
 @game_on_cmd.handle()

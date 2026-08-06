@@ -27,7 +27,7 @@ class Config(BaseModel):
     secret_realm_duration: int = 60
 
     # 探索冷却时间（秒）
-    explore_cooldown: int = 600
+    explore_cooldown: int = 120
 
     # 突破失败损失修为比例
     breakthrough_fail_penalty: float = 0.2
@@ -43,3 +43,15 @@ class Config(BaseModel):
 
     # 更换体质的基础灵石费用（按境界翻倍，指定目标体质为基础费用的 3 倍）
     change_physique_cost: int = 5000
+
+    # 转世重生：达到该境界索引才可转世（2=金丹）
+    rebirth_min_realm: int = 2
+
+    # 每次转世获得的气运加成
+    rebirth_fortune_bonus: int = 500
+
+    # 每次转世获得的永久修炼速率加成（每次 +5%）
+    rebirth_rate_bonus: float = 0.05
+
+    # 转世后回到的初始灵石
+    rebirth_coin: int = 100

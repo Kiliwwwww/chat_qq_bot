@@ -1,28 +1,31 @@
 """角色创建与状态指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from .. import constants
-from ..state import db
+from ..state import config, db
 from ..services import player as player_svc
 from ..services import stats as stats_svc
 from ..services import gongfa as gongfa_svc
-from .helpers import get_nickname, require_game
+from .helpers import get_nickname, require_game, xiuxian_command
 
 # 修仙入口
-xiuxian_cmd = on_command("我要修仙", aliases={"修仙"}, priority=5, block=True)
+xiuxian_cmd = xiuxian_command("我要修仙", aliases={"修仙"}, priority=5, block=True)
 # 随机天命
-random_fate_cmd = on_command("随机天命", priority=5, block=True)
+random_fate_cmd = xiuxian_command("随机天命", priority=5, block=True)
 # 废材流主角
-trash_fate_cmd = on_command("废材流主角", aliases={"废柴流"}, priority=5, block=True)
+trash_fate_cmd = xiuxian_command("废材流主角", aliases={"废柴流"}, priority=5, block=True)
 # 状态面板
-status_cmd = on_command("我的状态", aliases={"面板", "状态"}, priority=5, block=True)
+status_cmd = xiuxian_command("我的状态", aliases={"面板", "状态"}, priority=5, block=True)
 # 更换体质
-change_physique_cmd = on_command("更换体质", aliases={"换体质", "体质重铸"}, priority=5, block=True)
+change_physique_cmd = xiuxian_command("更换体质", aliases={"换体质", "体质重铸"}, priority=5, block=True)
+# 转世重生
+rebirth_cmd = xiuxian_command("转世重生", aliases={"转世"}, priority=5, block=True)
+# 自杀（清空全部数据）
+suicide_cmd = xiuxian_command("自杀", aliases={"兵解"}, priority=5, block=True)
 # 帮助
-help_cmd = on_command("修仙帮助", aliases={"修仙说明"}, priority=5, block=True)
+help_cmd = xiuxian_command("修仙帮助", aliases={"修仙说明"}, priority=5, block=True)
 
 
 @xiuxian_cmd.handle()
@@ -124,6 +127,49 @@ async def handle_change_physique(bot: Bot, event, args: Message = CommandArg()):
     await change_physique_cmd.finish(result["text"])
 
 
+@rebirth_cmd.handle()
+async def handle_rebirth(bot: Bot, event, args: Message = CommandArg()):
+    group_id = await require_game(rebirth_cmd, event)
+
+    player = db.get_player(group_id, event.user_id)
+    if not player:
+        await rebirth_cmd.finish("你还没有修仙角色，发送「我要修仙」开启仙途")
+
+    # 确认参数：必须带「确认」才能执行，防止误触清空数据
+    arg = args.extract_plain_text().strip()
+    if not arg or "确认" not in arg:
+        await rebirth_cmd.finish(
+            "🌀 【转世重生】将清空你的修为、功法、背包、灵宠与炉鼎！\n"
+            "保留灵根、品质、体质与天命，并获得永久气运+修炼加成。\n"
+            f"⚠️ 至少需要达到【{constants.REALMS[config.rebirth_min_realm]['name']}】境界。\n"
+            "确认转世请发送：转世重生 确认"
+        )
+
+    result = player_svc.rebirth(group_id, event.user_id)
+    await rebirth_cmd.finish(result["text"])
+
+
+@suicide_cmd.handle()
+async def handle_suicide(bot: Bot, event, args: Message = CommandArg()):
+    group_id = await require_game(suicide_cmd, event)
+
+    player = db.get_player(group_id, event.user_id)
+    if not player:
+        await suicide_cmd.finish("你还没有修仙角色，无法自杀")
+
+    # 二次确认，防止误触彻底清空
+    arg = args.extract_plain_text().strip()
+    if not arg or "确认" not in arg:
+        await suicide_cmd.finish(
+            "💀 【自杀】将彻底清空你的所有数据！\n"
+            "包括：境界、修为、灵石、功法、背包、灵宠、炉鼎、体质、灵根——一切归零，无法找回！\n"
+            "确认自杀请发送：自杀 确认"
+        )
+
+    result = player_svc.suicide(group_id, event.user_id)
+    await suicide_cmd.finish(result["text"])
+
+
 @help_cmd.handle()
 async def handle_help(bot: Bot, event, args: Message = CommandArg()):
     group_id = await require_game(help_cmd, event)
@@ -137,16 +183,18 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "  · 废材流主角    → 空灵根+废品，但气运极高，逆天改命\n"
         "  · 我的状态      → 查看角色面板\n"
         "  · 更换体质      → 花费灵石重铸特殊体质（指定名称费用更高）\n"
+        "  · 转世重生      → 重开数据（需金丹以上），保留灵根/体质，获得永久气运+修炼加成\n"
+        "  · 自杀          → 彻底清空全部数据，从头再来（需二次确认）\n"
         "━━━━━━━━━━━━━━━\n"
         "🧘 修炼突破\n"
-        "  · 闭关 洞府     → 开始挂机（可选：灵脉/妖兽森林/秘境）\n"
-        "  · 出关          → 结算挂机收益\n"
+        "  · 闭关 洞府     → 开始挂机（可选：灵脉/妖兽森林/秘境），挂机可获得修为+灵石\n"
+        "  · 出关          → 结算挂机收益（修为、灵石、功法熟练度）\n"
         "  · 突破          → 修为满后冲击下一境界\n"
         "  · 突破 用破境丹 → 服用破境丹再突破，成功率更高\n"
         "  · 世界          → 查看当前世界事件/天气/秘境状态\n"
         "━━━━━━━━━━━━━━━\n"
         "🗺️ 探索获取资源\n"
-        "  · 探索 洞府     → 探索地点获得资源（有冷却）\n"
+        "  · 探索 洞府     → 探索地点获得资源+灵石（有冷却）\n"
         "  · 探索 妖兽森林 → 高收益，可能遇险\n"
         "  · 探索 秘境     → 仅上古秘境开启时可进\n"
         "━━━━━━━━━━━━━━━\n"
@@ -165,6 +213,7 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "💊 丹药商城\n"
         "  · 商城          → 常驻商城，长期出售各种丹药\n"
         "  · 商城购买 1    → 购买丹药\n"
+        "  · 商城出售 灵草 5 → 把材料/丹药/装备卖给商城换灵石\n"
         "  · 服用 修炼丹   → 服用丹药增加修为/气运（聚气散/凝神丹/培元丹/蕴神丹/天机丹等）\n"
         "━━━━━━━━━━━━━━━\n"
         "🐾 灵宠\n"
@@ -180,7 +229,8 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "━━━━━━━━━━━━━━━\n"
         "🔥 炉鼎互动\n"
         "  · 抓捕 @玩家    → 抓捕闭关的低境界玩家（高境界才可）\n"
-        "  · 炉鼎          → 查看自己的炉鼎\n"
+        "  · 炉鼎          → 查看自己拥有的炉鼎\n"
+        "  · 放走 1        → 放走炉鼎（对方恢复自由）\n"
         "  · 挣脱          → 被俘后尝试反抗（高气运可触发天命觉醒）\n"
         "━━━━━━━━━━━━━━━\n"
         "📊 排行榜\n"

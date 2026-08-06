@@ -66,6 +66,7 @@ class Database:
                         weapon TEXT DEFAULT '',
                         armor TEXT DEFAULT '',
                         treasure TEXT DEFAULT '',
+                        rebirth_count INTEGER DEFAULT 0,
                         created_at REAL NOT NULL,
                         PRIMARY KEY (group_id, user_id)
                     );
@@ -175,9 +176,19 @@ class Database:
                     CREATE INDEX IF NOT EXISTS idx_furnace_group ON furnaces(group_id);
                     """
                 )
+                self._migrate_db(conn)
             logger.info("修仙数据库初始化完成")
         except Exception as e:
             logger.error(f"修仙数据库初始化失败: {e}")
+
+    def _migrate_db(self, conn: sqlite3.Connection) -> None:
+        """轻量迁移：为旧库补充新增字段"""
+        try:
+            columns = {r["name"] for r in conn.execute("PRAGMA table_info(players)").fetchall()}
+            if "rebirth_count" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN rebirth_count INTEGER DEFAULT 0")
+        except Exception as e:
+            logger.error(f"数据库迁移失败: {e}")
 
     def _to_dict(self, row: Optional[sqlite3.Row]) -> Optional[dict]:
         return dict(row) if row else None
@@ -238,7 +249,7 @@ class Database:
                 "name", "realm", "realm_progress", "spirit_root", "spirit_quality",
                 "fortune", "physique", "talent", "attack", "defense", "hp", "coin",
                 "alchemy_level", "alchemy_exp", "forge_level", "forge_exp",
-                "bottleneck_until", "weapon", "armor", "treasure",
+                "bottleneck_until", "weapon", "armor", "treasure", "rebirth_count",
             }
             updates = {k: v for k, v in fields.items() if k in allowed}
             if not updates:
@@ -261,16 +272,30 @@ class Database:
         try:
             with self._get_conn() as conn:
                 conn.execute("DELETE FROM players WHERE group_id = ? AND user_id = ?", (group_id, user_id))
-                conn.execute("DELETE FROM cultivation WHERE group_id = ? AND user_id = ?", (group_id, user_id))
-                conn.execute("DELETE FROM gongfas WHERE group_id = ? AND user_id = ?", (group_id, user_id))
-                conn.execute("DELETE FROM inventory WHERE group_id = ? AND user_id = ?", (group_id, user_id))
-                conn.execute("DELETE FROM pets WHERE group_id = ? AND user_id = ?", (group_id, user_id))
-                conn.execute("DELETE FROM furnaces WHERE group_id = ? AND (owner_id = ? OR target_id = ?)", (group_id, user_id, user_id))
-                conn.execute("DELETE FROM explore_cooldown WHERE group_id = ? AND user_id = ?", (group_id, user_id))
-                conn.commit()
+                self._clear_player_related(conn, group_id, user_id)
             return True
         except Exception as e:
             logger.error(f"删除玩家失败 group={group_id} user={user_id}: {e}")
+            return False
+
+    def _clear_player_related(self, conn: sqlite3.Connection, group_id: int, user_id: int) -> None:
+        """清除玩家关联数据（功法/背包/灵宠/炉鼎/挂机/冷却/挂单），保留玩家主记录"""
+        conn.execute("DELETE FROM cultivation WHERE group_id = ? AND user_id = ?", (group_id, user_id))
+        conn.execute("DELETE FROM gongfas WHERE group_id = ? AND user_id = ?", (group_id, user_id))
+        conn.execute("DELETE FROM inventory WHERE group_id = ? AND user_id = ?", (group_id, user_id))
+        conn.execute("DELETE FROM pets WHERE group_id = ? AND user_id = ?", (group_id, user_id))
+        conn.execute("DELETE FROM furnaces WHERE group_id = ? AND (owner_id = ? OR target_id = ?)", (group_id, user_id, user_id))
+        conn.execute("DELETE FROM explore_cooldown WHERE group_id = ? AND user_id = ?", (group_id, user_id))
+        conn.execute("DELETE FROM market_orders WHERE group_id = ? AND seller_id = ?", (group_id, user_id))
+
+    def reset_player_related(self, group_id: int, user_id: int) -> bool:
+        """转世重生：清除玩家关联数据（保留玩家主记录）"""
+        try:
+            with self._get_conn() as conn:
+                self._clear_player_related(conn, group_id, user_id)
+            return True
+        except Exception as e:
+            logger.error(f"重置玩家数据失败 group={group_id} user={user_id}: {e}")
             return False
 
     def get_all_player_groups(self) -> list[int]:

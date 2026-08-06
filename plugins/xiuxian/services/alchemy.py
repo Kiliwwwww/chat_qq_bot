@@ -41,9 +41,11 @@ def alchemy(group_id: int, user_id: int, pill_key: str) -> dict:
         db.remove_item(group_id, user_id, mat_id, qty)
     db.update_player(group_id, user_id, {"coin": player.get("coin", 0) - recipe["cost"]})
 
-    # 成功率
+    # 成功率（九窍玲珑心炼丹天赋异禀）
     level = player.get("alchemy_level", 1)
     base = 0.55 + level * 0.03 + _quality_bonus(player.get("spirit_quality", ""))
+    if player.get("physique") == "jiuqiao_lt":
+        base += 0.05
     fortune = player.get("fortune", 1000)
     success = rng.luck_roll(base, fortune)
 
@@ -93,6 +95,8 @@ def forge(group_id: int, user_id: int) -> dict:
 
     level = player.get("forge_level", 1)
     base = 0.6 + level * 0.03 + _quality_bonus(player.get("spirit_quality", ""))
+    if player.get("physique") == "jiuqiao_lt":
+        base += 0.05
     fortune = player.get("fortune", 1000)
     success = rng.luck_roll(base, fortune)
 

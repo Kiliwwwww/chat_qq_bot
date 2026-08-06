@@ -1,13 +1,12 @@
 """世界状态指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from ..services import world as world_svc
-from .helpers import require_game
+from .helpers import require_game, xiuxian_command
 
-world_cmd = on_command("世界", aliases={"世界状态"}, priority=5, block=True)
+world_cmd = xiuxian_command("世界", aliases={"世界状态"}, priority=5, block=True)
 
 
 @world_cmd.handle()

@@ -1,8 +1,36 @@
 """命令层公共工具。"""
 
+from nonebot import on_command
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageEvent
+from nonebot.rule import Rule
 
 from ..state import db
+
+
+def strict_command_rule(*names: str) -> Rule:
+    """严格命令匹配规则。
+
+    仅当消息纯文本**完全等于**命令名，或为「命令名 + 空格 + 参数」时才匹配，
+    避免用户消息中偶然包含关键词（如「我想看下修仙帮助」）被误判为命令。
+    """
+    async def _check(event: MessageEvent) -> bool:
+        text = event.get_plaintext().strip()
+        for name in names:
+            if text == name or text.startswith(name + " "):
+                return True
+        return False
+    return Rule(_check)
+
+
+def xiuxian_command(cmd: str, aliases=None, **kwargs):
+    """注册修仙指令：自动附加严格匹配规则，命令必须整串匹配才生效。"""
+    names = [cmd] + list(aliases or [])
+    return on_command(
+        cmd,
+        aliases=aliases,
+        rule=strict_command_rule(*names),
+        **kwargs,
+    )
 
 
 def require_group(event: MessageEvent) -> int:

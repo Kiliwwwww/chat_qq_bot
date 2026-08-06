@@ -1,6 +1,5 @@
 """修炼、突破、探索与功法指令。"""
 
-from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
@@ -10,22 +9,22 @@ from ..services import cultivation as cult_svc
 from ..services import breakthrough as btk_svc
 from ..services import explore as explore_svc
 from ..services import gongfa as gongfa_svc
-from .helpers import require_game
+from .helpers import require_game, xiuxian_command
 
 # 闭关
-biguan_cmd = on_command("闭关", priority=5, block=True)
+biguan_cmd = xiuxian_command("闭关", priority=5, block=True)
 # 出关
-chuguan_cmd = on_command("出关", priority=5, block=True)
+chuguan_cmd = xiuxian_command("出关", priority=5, block=True)
 # 突破
-tupo_cmd = on_command("突破", priority=5, block=True)
+tupo_cmd = xiuxian_command("突破", priority=5, block=True)
 # 探索
-tansuo_cmd = on_command("探索", priority=5, block=True)
+tansuo_cmd = xiuxian_command("探索", priority=5, block=True)
 # 功法
-gongfa_cmd = on_command("功法", aliases={"我的功法"}, priority=5, block=True)
+gongfa_cmd = xiuxian_command("功法", aliases={"我的功法"}, priority=5, block=True)
 # 学习功法
-learn_gongfa_cmd = on_command("学习功法", aliases={"学功法"}, priority=5, block=True)
+learn_gongfa_cmd = xiuxian_command("学习功法", aliases={"学功法"}, priority=5, block=True)
 # 功法图鉴
-catalog_cmd = on_command("功法图鉴", priority=5, block=True)
+catalog_cmd = xiuxian_command("功法图鉴", priority=5, block=True)
 
 
 @biguan_cmd.handle()

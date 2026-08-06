@@ -7,6 +7,8 @@ from .player_cmd import (
     status_cmd,
     help_cmd,
     change_physique_cmd,
+    rebirth_cmd,
+    suicide_cmd,
 )
 from .admin_cmd import game_on_cmd, game_off_cmd
 from .cultivation_cmd import (
@@ -27,7 +29,7 @@ from .alchemy_cmd import (
     unequip_cmd,
 )
 from .pet_cmd import pet_cmd, feed_cmd
-from .pill_cmd import use_pill_cmd, shop_cmd, shop_buy_cmd
+from .pill_cmd import use_pill_cmd, shop_cmd, shop_buy_cmd, shop_sell_cmd
 from .market_cmd import (
     market_cmd,
     market_sell_cmd,
@@ -35,7 +37,7 @@ from .market_cmd import (
     market_buy_merchant_cmd,
     market_cancel_cmd,
 )
-from .furnace_cmd import capture_cmd, furnace_cmd, escape_cmd
+from .furnace_cmd import capture_cmd, furnace_cmd, escape_cmd, release_cmd
 from .ranking_cmd import ranking_cmd
 
 __all__ = [
@@ -45,6 +47,8 @@ __all__ = [
     "status_cmd",
     "help_cmd",
     "change_physique_cmd",
+    "rebirth_cmd",
+    "suicide_cmd",
     "game_on_cmd",
     "game_off_cmd",
     "biguan_cmd",
@@ -65,6 +69,7 @@ __all__ = [
     "use_pill_cmd",
     "shop_cmd",
     "shop_buy_cmd",
+    "shop_sell_cmd",
     "market_cmd",
     "market_sell_cmd",
     "market_buy_cmd",
@@ -73,5 +78,6 @@ __all__ = [
     "capture_cmd",
     "furnace_cmd",
     "escape_cmd",
+    "release_cmd",
     "ranking_cmd",
 ]
