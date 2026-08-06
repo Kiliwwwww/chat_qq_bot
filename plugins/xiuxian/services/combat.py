@@ -10,7 +10,7 @@ import time
 
 from .. import constants
 from ..state import config, db
-from . import rng, stats
+from . import debuff, rng, stats
 
 # 归西后复活所需时间（秒）
 DEAD_REVIVE_SECONDS = 60
@@ -164,11 +164,11 @@ def pk(group_id: int, attacker_id: int, target_id: int) -> dict:
     # 胜率：战力差距越大胜率越高（1/(1+ratio)，碾压时趋近 97%），再受双方气运影响
     ratio = tgt_power / max(1, att_power_boosted)
     win_chance = 1 / (1 + ratio)  # 对等 50%，两倍 33%，十倍 91%
-    win_chance += rng.fortune_factor(attacker.get("fortune", 1000)) * 0.3
-    win_chance -= rng.fortune_factor(target.get("fortune", 1000)) * 0.3
+    win_chance += rng.fortune_factor(debuff.effective_fortune(attacker)) * 0.3
+    win_chance -= rng.fortune_factor(debuff.effective_fortune(target)) * 0.3
     win_chance = min(0.97, max(0.03, win_chance))
 
-    won = rng.luck_roll(win_chance, attacker.get("fortune", 1000))
+    won = rng.luck_roll(win_chance, debuff.effective_fortune(attacker))
 
     # 设置冷却
     db.set_pk_cooldown(group_id, attacker_id, target_id, time.time() + PK_COOLDOWN_SECONDS)
@@ -178,10 +178,18 @@ def pk(group_id: int, attacker_id: int, target_id: int) -> dict:
         result = take_damage(group_id, target_id, int(get_max_hp(target) * PK_DAMAGE_RATIO))
         loser = target
         loser_id = target_id
+        loser_group = group_id
     else:
         result = take_damage(group_id, attacker_id, int(get_max_hp(attacker) * PK_DAMAGE_RATIO))
         loser = attacker
         loser_id = attacker_id
+        loser_group = group_id
+
+    # 落败者可能霉运缠身
+    daomei_text = ""
+    if rng.luck_roll(constants.DEBUFF_TRIGGER["pk_fail_daomei"], loser.get("fortune", 1000)):
+        d = debuff.add_debuff(loser_group, loser_id, "daomei")
+        daomei_text = f"\n😵 {loser.get('name') or loser_id} 落败后霉运缠身，气运大跌！"
 
     # 狂暴丹：PK 后额外扣除自身血量并消耗加成
     boost_text = ""
@@ -262,6 +270,8 @@ def pk(group_id: int, attacker_id: int, target_id: int) -> dict:
     )
     if boost_text:
         text += boost_text
+    if daomei_text:
+        text += daomei_text
     text += f"\n📈 战后气血：你 {att_hp}，对方 {tgt_hp}"
 
     return {"ok": True, "text": text, "won": won}

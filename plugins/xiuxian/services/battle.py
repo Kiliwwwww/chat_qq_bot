@@ -3,9 +3,11 @@
 玩家发送「报名大乱斗」报名，凑满 5 名玩家后自动开赛。
 通过多轮战力对决（带气运加成），最终幸存 2 名玩家，各奖励 1000 灵石。
 被淘汰的玩家气血耗尽，进入归西状态（60 秒后复活）。
+每名玩家每天最多参与 5 次。
 """
 
 import random
+from datetime import datetime
 
 from ..state import db
 from . import combat, rng, stats
@@ -15,6 +17,13 @@ BATTLE_SIZE = 5
 
 # 胜者奖励（灵石）
 BATTLE_REWARD = 1000
+
+# 每名玩家每天可参与大乱斗的次数上限
+BATTLE_DAILY_LIMIT = 5
+
+
+def _today() -> str:
+    return datetime.now().strftime("%Y%m%d")
 
 
 def signup(group_id: int, user_id: int) -> dict:
@@ -28,6 +37,11 @@ def signup(group_id: int, user_id: int) -> dict:
 
     if db.is_battle_signed(group_id, user_id):
         return {"ok": False, "text": "你已经报名大乱斗了"}
+
+    # 每日次数限制
+    daily_count = db.get_battle_daily_count(group_id, user_id, _today())
+    if daily_count >= BATTLE_DAILY_LIMIT:
+        return {"ok": False, "text": f"今天的大乱斗次数已用完（{BATTLE_DAILY_LIMIT}/{BATTLE_DAILY_LIMIT}），明天再来吧！"}
 
     if not db.add_battle_signup(group_id, user_id):
         return {"ok": False, "text": "报名失败，请稍后再试"}
@@ -62,6 +76,8 @@ def run_battle_royale(group_id: int, signups: list[dict]) -> dict:
         p = db.get_player(group_id, s["user_id"])
         if p:
             fighters.append(p)
+            # 累计今日参与次数
+            db.add_battle_daily(group_id, s["user_id"], _today())
 
     if len(fighters) < 2:
         return {"ok": True, "text": "大乱斗参加人数不足，本次取消"}

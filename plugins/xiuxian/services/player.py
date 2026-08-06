@@ -162,6 +162,11 @@ def format_player_profile(group_id: int, player: dict, gongfa_text: str = "") ->
         lines.append(f"🩸 血量：{cur_hp}/{max_hp}")
     if player.get("pk_boost", 0):
         lines.append(f"💥 狂暴之力：下次 PK 战力 +{int(player['pk_boost'] * 100)}%")
+    # 负面状态
+    from . import debuff
+    debuff_text = debuff.format_debuffs(player)
+    if debuff_text:
+        lines.append(debuff_text)
     if player.get("rebirth_count"):
         lines.append(f"🌀 转世：{player.get('rebirth_count')} 次（修炼速率永久 +{int(player.get('rebirth_count', 0) * config.rebirth_rate_bonus * 100)}%）")
     if player.get("physique"):

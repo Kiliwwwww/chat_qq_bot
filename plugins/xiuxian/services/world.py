@@ -68,6 +68,28 @@ def is_secret_realm_open(group_id: int) -> bool:
     return False
 
 
+def is_location_open(group_id: int, location: str) -> bool:
+    """地点是否开放。
+
+    普通地点（洞府/灵脉/妖兽森林）常开；限时地点需对应的世界事件激活。
+    """
+    event_id = constants.LOCATION_EVENTS.get(location)
+    if not event_id:
+        return True
+    if location == "秘境":
+        return is_secret_realm_open(group_id)
+    state = ensure_world(group_id)
+    return state.get("current_event") == event_id and is_event_active(group_id)
+
+
+def location_open_event(location: str) -> str:
+    """返回限时地点对应的开启事件名称（常开地点返回空串）"""
+    event_id = constants.LOCATION_EVENTS.get(location)
+    if not event_id:
+        return ""
+    return constants.WORLD_EVENTS.get(event_id, {}).get("name", "")
+
+
 def is_merchant_active(group_id: int) -> bool:
     """神秘商人是否在场"""
     state = ensure_world(group_id)
@@ -313,4 +335,11 @@ def format_world_status(group_id: int) -> str:
         lines.append("✨ 当前事件：暂无（天地平静）")
     lines.append(f"🏪 神秘商人：{'在场' if is_merchant_active(group_id) else '未现身'}")
     lines.append(f"🗺️ 秘境：{'已开启' if is_secret_realm_open(group_id) else '未开启'}")
+    # 当前开放的限时地点
+    open_locations = [
+        loc for loc in constants.LOCATIONS
+        if loc in constants.LOCATION_EVENTS and is_location_open(group_id, loc)
+    ]
+    if open_locations:
+        lines.append("🗺️ 限时地图开放：" + "、".join(open_locations))
     return "\n".join(lines)

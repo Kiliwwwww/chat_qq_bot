@@ -70,7 +70,7 @@ def format_shop() -> str:
         item = constants.ITEMS.get(good["item_id"], {})
         lines.append(f"  {i}. {item.get('name', good['item_id'])} - {good['price']} 灵石")
         lines.append(f"     💬 {item.get('desc', '')}")
-    lines.append("\n💡 使用「商城购买 <编号>」购买丹药")
+    lines.append("\n💡 使用「商城购买 <名称> <数量>」购买丹药，如：商城购买 聚气散 3（也可用编号）")
     lines.append("💡 材料/丹药/装备可卖给商城换灵石：「商城出售 <物品> <数量>」")
     return "\n".join(lines)
 
@@ -95,6 +95,36 @@ def buy_shop_item(group_id: int, user_id: int, index: int) -> dict:
     db.update_player(group_id, user_id, {"coin": player.get("coin", 0) - price})
     db.add_item(group_id, user_id, good["item_id"], 1)
     return {"ok": True, "text": f"🛒 购得【{item.get('name', '')}】×1，花费 {price} 灵石！\n💊 发送「服用 {item.get('name', '')}」使用"}
+
+
+def buy_shop_item_by_name(group_id: int, user_id: int, item_name: str, quantity: int = 1) -> dict:
+    """按名称从常驻商城购买丹药（支持数量）"""
+    if quantity <= 0:
+        return {"ok": False, "text": "数量必须为正数"}
+
+    item_id = ""
+    for key, item in constants.ITEMS.items():
+        if item["name"] == item_name:
+            item_id = key
+            break
+    if not item_id:
+        return {"ok": False, "text": f"商城没有「{item_name}」这个商品，发送「商城」查看"}
+
+    good = next((g for g in constants.SHOP_GOODS if g["item_id"] == item_id), None)
+    if not good:
+        return {"ok": False, "text": f"「{item_name}」不在常驻商城出售，发送「商城」查看可购商品"}
+
+    player = db.get_player(group_id, user_id)
+    if not player:
+        return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    total = good["price"] * quantity
+    if player.get("coin", 0) < total:
+        return {"ok": False, "text": f"灵石不足，购买【{item_name}】×{quantity} 需要 {total} 灵石"}
+
+    db.update_player(group_id, user_id, {"coin": player.get("coin", 0) - total})
+    db.add_item(group_id, user_id, item_id, quantity)
+    return {"ok": True, "text": f"🛒 购得【{item_name}】×{quantity}，花费 {total} 灵石！\n💊 发送「服用 {item_name} {quantity}」使用"}
 
 
 def get_item_buyback_price(item_id: str) -> int:

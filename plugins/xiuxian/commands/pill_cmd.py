@@ -83,10 +83,27 @@ async def handle_shop(bot: Bot, event, args: Message = CommandArg()):
 async def handle_shop_buy(bot: Bot, event, args: Message = CommandArg()):
     group_id = await require_game(shop_buy_cmd, event)
 
-    arg = args.extract_plain_text().strip()
-    if not arg.isdigit():
-        await reply_finish(shop_buy_cmd, event, "请指定商品编号，如：商城购买 1（发送「商城」查看）")
-    result = market_svc.buy_shop_item(group_id, event.user_id, int(arg))
+    parts = args.extract_plain_text().strip().split()
+    if not parts:
+        await reply_finish(shop_buy_cmd, event, "请指定要购买的商品，如：商城购买 聚气散 3（或 商城购买 1）")
+
+    # 按编号购买（兼容旧指令）
+    if parts[0].isdigit():
+        result = market_svc.buy_shop_item(group_id, event.user_id, int(parts[0]))
+        await reply_finish(shop_buy_cmd, event, result["text"])
+
+    # 按名称购买 + 可选数量
+    name = parts[0]
+    quantity = 1
+    if len(parts) > 1:
+        try:
+            quantity = int(parts[1])
+        except ValueError:
+            await reply_finish(shop_buy_cmd, event, "数量必须是数字，如：商城购买 聚气散 3")
+    if quantity <= 0:
+        await reply_finish(shop_buy_cmd, event, "数量必须为正数")
+
+    result = market_svc.buy_shop_item_by_name(group_id, event.user_id, name, quantity)
     await reply_finish(shop_buy_cmd, event, result["text"])
 
 

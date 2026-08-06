@@ -5,12 +5,15 @@ from ..state import db
 
 
 def _find_pet_food(group_id: int, user_id: int) -> tuple[str, int]:
-    """查找背包中可用于喂养灵宠的丹药，返回 (item_id, 经验值) 或 ("", 0)"""
+    """查找背包中可用于喂养灵宠的丹药，优先消耗经验更高的（凝魄丹→精元丹）。"""
+    best = ("", 0)
     for inv in db.get_inventory(group_id, user_id):
         item = constants.ITEMS.get(inv["item_id"], {})
         if item.get("type") == "pill" and "pet_exp" in item.get("effect", {}):
-            return inv["item_id"], item["effect"]["pet_exp"]
-    return "", 0
+            exp = item["effect"]["pet_exp"]
+            if exp > best[1]:
+                best = (inv["item_id"], exp)
+    return best
 
 
 def feed_pet(group_id: int, user_id: int, pet_index: int) -> dict:

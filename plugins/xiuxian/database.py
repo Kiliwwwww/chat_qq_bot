@@ -74,6 +74,7 @@ class Database:
                         pk_boost REAL DEFAULT 0,
                         pk_hp_cost INTEGER DEFAULT 0,
                         xiuxiu_until REAL DEFAULT 0,
+                        debuffs TEXT DEFAULT '',
                         created_at REAL NOT NULL,
                         PRIMARY KEY (group_id, user_id)
                     );
@@ -183,6 +184,15 @@ class Database:
                         PRIMARY KEY (group_id, user_id)
                     );
 
+                    -- 大乱斗每日参与次数表
+                    CREATE TABLE IF NOT EXISTS battle_daily (
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        date_str TEXT NOT NULL,
+                        count INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (group_id, user_id, date_str)
+                    );
+
                     -- PK 冷却表
                     CREATE TABLE IF NOT EXISTS pk_cooldown (
                         group_id INTEGER NOT NULL,
@@ -234,6 +244,8 @@ class Database:
                 conn.execute("ALTER TABLE players ADD COLUMN pk_hp_cost INTEGER DEFAULT 0")
             if "xiuxiu_until" not in columns:
                 conn.execute("ALTER TABLE players ADD COLUMN xiuxiu_until REAL DEFAULT 0")
+            if "debuffs" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN debuffs TEXT DEFAULT ''")
         except Exception as e:
             logger.error(f"数据库迁移失败: {e}")
 
@@ -298,7 +310,7 @@ class Database:
                 "fortune", "physique", "talent", "attack", "defense", "hp", "coin",
                 "alchemy_level", "alchemy_exp", "forge_level", "forge_exp",
                 "bottleneck_until", "weapon", "armor", "treasure", "ring", "boots", "rebirth_count",
-                "cur_hp", "dead_until", "pk_boost", "pk_hp_cost", "xiuxiu_until",
+                "cur_hp", "dead_until", "pk_boost", "pk_hp_cost", "xiuxiu_until", "debuffs",
             }
             updates = {k: v for k, v in fields.items() if k in allowed}
             if not updates:
@@ -856,6 +868,36 @@ class Database:
             return True
         except Exception as e:
             logger.error(f"清空大乱斗报名失败: {e}")
+            return False
+
+    def get_battle_daily_count(self, group_id: int, user_id: int, date_str: str) -> int:
+        """获取玩家某天参与大乱斗的次数"""
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT count FROM battle_daily WHERE group_id = ? AND user_id = ? AND date_str = ?",
+                    (group_id, user_id, date_str),
+                ).fetchone()
+                return row["count"] if row else 0
+        except Exception as e:
+            logger.error(f"获取大乱斗每日次数失败: {e}")
+            return 0
+
+    def add_battle_daily(self, group_id: int, user_id: int, date_str: str, count: int = 1) -> bool:
+        """累加玩家某天参与大乱斗的次数"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO battle_daily (group_id, user_id, date_str, count) VALUES (?, ?, ?, ?)
+                    ON CONFLICT(group_id, user_id, date_str) DO UPDATE SET count = count + excluded.count
+                    """,
+                    (group_id, user_id, date_str, count),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"累加大乱斗每日次数失败: {e}")
             return False
 
     # ==================== PK 冷却 ====================

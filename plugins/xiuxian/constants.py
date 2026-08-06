@@ -147,11 +147,26 @@ LOCATIONS = {
     "灵脉": {"multiplier": 1.5, "risk": 0.05, "desc": "灵气充盈，修炼速度大增"},
     "妖兽森林": {"multiplier": 2.5, "risk": 0.25, "desc": "高收益，但可能遭遇妖兽"},
     "秘境": {"multiplier": 4.0, "risk": 0.40, "desc": "高风险高收益的凶险之地"},
+    "灵药谷": {"multiplier": 2.0, "risk": 0.15, "desc": "灵药遍地，炼丹玩家最爱"},
+    "万妖山": {"multiplier": 2.8, "risk": 0.30, "desc": "群妖汇聚，妖丹材料丰富"},
+    "星辰殿": {"multiplier": 3.0, "risk": 0.25, "desc": "星辉洒落，观星悟道之地"},
+    "远古战场": {"multiplier": 3.2, "risk": 0.35, "desc": "上古战场遗迹，神兵传承无数"},
+    "幽冥深渊": {"multiplier": 3.8, "risk": 0.45, "desc": "深不见底的凶险深渊，收益惊人"},
 }
 
 # 妖兽暴动事件对妖兽森林的额外收益/风险加成
 FOREST_EVENT_MULT = 1.5
 FOREST_EVENT_RISK_ADD = 0.10
+
+# 限时开放地点 → 对应世界事件（不在映射中的地点常开，如洞府/灵脉/妖兽森林）
+LOCATION_EVENTS = {
+    "秘境": "shanggu_mijing",
+    "灵药谷": "tianjiang_lingyu",
+    "万妖山": "wanshou_caozong",
+    "星辰殿": "tiandi_yixiang",
+    "远古战场": "daoyun_miman",
+    "幽冥深渊": "mochao_xiongyong",
+}
 
 # ==================== 特殊体质系统 ====================
 
@@ -209,22 +224,23 @@ ITEMS = {
     "yaodan": {"name": "妖丹", "type": "material", "desc": "妖兽体内凝聚的精华"},
     "lingquan": {"name": "灵泉", "type": "material", "desc": "天地灵气凝结的泉水"},
     "xuantie": {"name": "玄铁", "type": "material", "desc": "炼器常用材料"},
-    "zijinsha": {"name": "紫金砂", "type": "material", "desc": "高阶炼器材料"},
+    "zijinsha": {"name": "紫金砂", "type": "material", "desc": "高阶炼器材料，锻造必备"},
     "shoupi": {"name": "兽皮", "type": "material", "desc": "妖兽皮毛，炼器材料"},
     "longxiancao": {"name": "龙涎草", "type": "material", "desc": "高阶炼丹材料"},
     "xingchenshi": {"name": "星辰石", "type": "material", "desc": "天外陨铁，稀有炼器材料"},
     "qiannian_ls": {"name": "千年灵参", "type": "material", "desc": "稀有炼丹材料"},
     "xiulian_dan": {"name": "修炼丹", "type": "pill", "desc": "服用后获得修为", "effect": {"progress": 500}},
-    "jusan_san": {"name": "聚气散", "type": "pill", "desc": "低阶丹药，服用增加少量修为", "effect": {"progress": 300}},
+    "jusan_san": {"name": "聚气散", "type": "pill", "desc": "低阶丹药，性价比最高的基础修为丹", "effect": {"progress": 400}},
     "ningshen_dan": {"name": "凝神丹", "type": "pill", "desc": "中阶丹药，服用增加大量修为", "effect": {"progress": 800}},
     "peiyuan_dan": {"name": "培元丹", "type": "pill", "desc": "高阶丹药，服用暴增修为", "effect": {"progress": 2000}},
     "wudao_dan": {"name": "悟道丹", "type": "pill", "desc": "传说丹药，服用修为暴涨", "effect": {"progress": 5000}},
-    "yunlun_dan": {"name": "蕴神丹", "type": "pill", "desc": "稀有丹药，服用增加气运", "effect": {"fortune": 50}},
+    "yunlun_dan": {"name": "蕴神丹", "type": "pill", "desc": "稀有丹药，服用增加气运", "effect": {"fortune": 120}},
     "tianji_dan": {"name": "天机丹", "type": "pill", "desc": "传说丹药，服用大幅增加气运", "effect": {"fortune": 200}},
     "dali_wan": {"name": "大力丸", "type": "pill", "desc": "服用后力量大增，攻击永久+20", "effect": {"attack": 20}},
     "jingang_dan": {"name": "金刚丹", "type": "pill", "desc": "服用后铜皮铁骨，防御永久+20", "effect": {"defense": 20}},
     "qixue_dan": {"name": "气血丹", "type": "pill", "desc": "服用后气血充盈，气血上限+200", "effect": {"hp": 200}},
     "xisui_dan": {"name": "洗髓丹", "type": "pill", "desc": "服用后洗髓伐骨，灵根品质提升一级", "effect": {"upgrade_quality": True}},
+    "tianling_dan": {"name": "天灵丹", "type": "pill", "desc": "天道灵韵凝聚，服用后灵根品质提升一级", "effect": {"upgrade_quality": True}},
     "pojing_dan": {"name": "破境丹", "type": "pill", "desc": "突破时使用可大幅提高成功率", "effect": {"breakthrough": 0.15}},
     "huiling_dan": {"name": "回灵丹", "type": "pill", "desc": "服用后恢复气血", "effect": {"heal": 100}},
     "dahuan_dan": {"name": "大还丹", "type": "pill", "desc": "服用后气血全满", "effect": {"heal_full": True}},
@@ -277,7 +293,7 @@ ALCHEMY_RECIPES = {
 }
 
 # 炼器消耗
-FORGE_COST = {"materials": {"lingcao": 2, "yaodan": 2, "lingquan": 1, "xuantie": 1}, "cost": 100}
+FORGE_COST = {"materials": {"lingcao": 2, "yaodan": 2, "lingquan": 1, "xuantie": 1, "zijinsha": 1}, "cost": 100}
 
 # ==================== 世界事件系统 ====================
 
@@ -304,24 +320,24 @@ WORLD_EVENTS = {
     "tiandi_yixiang": {
         "name": "天地异象",
         "explore_luck": 1.5,
-        "desc": "天地异象频生，可能触发隐藏任务、特殊NPC、神秘传承",
+        "desc": "天地异象频生，星辰殿开启，可能触发隐藏任务、特殊NPC、神秘传承",
     },
     "tianjiang_lingyu": {
         "name": "天降灵雨",
         "rate": 1.3,
-        "desc": "灵雨滋润大地，全服修炼速度提升30%",
+        "desc": "灵雨滋润大地，全服修炼速度提升30%，灵药谷灵药疯长",
     },
     "daoyun_miman": {
         "name": "道韵弥漫",
         "rate": 1.1,
         "breakthrough": 0.05,
         "enlighten": 0.05,
-        "desc": "道韵弥漫天地，修炼提升10%，突破成功率提升5%，更易顿悟",
+        "desc": "道韵弥漫天地，修炼提升10%，突破成功率提升5%，远古战场浮现",
     },
     "wanshou_caozong": {
         "name": "万兽朝宗",
         "forest": 1.8,
-        "desc": "万兽朝宗，妖兽森林收益提升80%",
+        "desc": "万兽朝宗，妖兽森林收益提升80%，万妖山群妖汇聚",
     },
     "xianyuan_jianglin": {
         "name": "仙缘降临",
@@ -332,7 +348,7 @@ WORLD_EVENTS = {
         "name": "魔潮汹涌",
         "forest": 2.0,
         "risk": 0.15,
-        "desc": "魔潮汹涌，妖兽森林收益翻倍但遇险概率大增",
+        "desc": "魔潮汹涌，妖兽森林收益翻倍但遇险概率大增，幽冥深渊开启",
     },
 }
 
@@ -357,6 +373,7 @@ MERCHANT_GOODS = [
 
 # 常驻商城：长期出售的丹药（价格高于炼丹成本，方便缺材料的玩家直接购买）
 SHOP_GOODS = [
+    {"item_id": "zijinsha", "price": 250},
     {"item_id": "jusan_san", "price": 100},
     {"item_id": "xiulian_dan", "price": 200},
     {"item_id": "ningshen_dan", "price": 500},
@@ -400,6 +417,7 @@ SHOP_BUYBACK = {
     "jingang_dan": 180,
     "qixue_dan": 180,
     "xisui_dan": 3000,
+    "tianling_dan": 3000,
     "pojing_dan": 180,
     "huiling_dan": 60,
     "jingyuan_dan": 90,
@@ -447,3 +465,136 @@ PILL_DIMINISH_MIN = 0.5
 
 # 突破失败产生的瓶颈冷却时间（分钟），期间无法再次突破
 BOTTLENECK_MINUTES = 30
+
+# ==================== 探索奇遇系统 ====================
+
+# 探索时触发奇遇的基础概率
+ENCOUNTER_CHANCE = 0.25
+
+# 探索奇遇池：每次探索可能随机触发其一
+# success: items(材料/丹药) / progress(修为) / coins(灵石) / pet(灵宠) / equip(装备) / gongfa_exp(功法熟练度)
+# fail: damage(血量比例) / lose_coins(丢失灵石)
+ENCOUNTERS = [
+    {
+        "name": "山涧仙泉",
+        "weight": 15,
+        "desc": "你在山涧中发现一汪冒着灵气的仙泉，波光粼粼，沁人心脾",
+        "success_chance": 0.70,
+        "success": {"items": {"lingquan": 3}, "progress": 300, "text": "你捧起泉水痛饮，灵气涌入四肢百骸，修为精进！"},
+        "fail": {"damage": 0.15, "text": "泉水暗藏瘴毒，你饮下后头晕目眩，中毒受伤！"},
+    },
+    {
+        "name": "神秘洞府",
+        "weight": 12,
+        "desc": "你发现一处前人留下的神秘洞府，石门半掩，内有宝光闪烁",
+        "success_chance": 0.65,
+        "success": {"equip": True, "coins": 100, "text": "你在洞府深处寻得一件神兵与灵石，满载而归！"},
+        "fail": {"damage": 0.15, "lose_coins": 80, "text": "洞府年久失修轰然崩塌，你被落石砸伤，还丢了灵石！"},
+    },
+    {
+        "name": "云游道人",
+        "weight": 12,
+        "desc": "一位仙风道骨的云游道人在你面前停下，含笑打量着你",
+        "success_chance": 0.75,
+        "success": {"gongfa_exp": 60, "progress": 500, "text": "道人见你资质不凡，口传玄妙口诀，你功法精进、修为大涨！"},
+        "fail": {"lose_coins": 100, "text": "道人摇头叹息「缘分未到」，飘然而去，你还丢了灵石！"},
+    },
+    {
+        "name": "灵兽幼崽",
+        "weight": 10,
+        "desc": "你发现一只受伤的灵兽幼崽，可怜巴巴地望着你",
+        "success_chance": 0.60,
+        "success": {"pet": True, "text": "你悉心照料，灵兽幼崽认你为主！"},
+        "fail": {"damage": 0.20, "text": "幼崽的父母突然杀到，护犊心切，将你重创！"},
+    },
+    {
+        "name": "天材地宝",
+        "weight": 12,
+        "desc": "你闻到一股浓郁药香，发现一株奇珍灵药正在生长",
+        "success_chance": 0.65,
+        "success": {"items": {"longxiancao": 1, "qiannian_ls": 1}, "text": "你小心翼翼采下灵药，药香扑鼻，收获颇丰！"},
+        "fail": {"damage": 0.15, "lose_coins": 60, "text": "守护灵药的妖兽暴起袭击，你仓皇而逃，还丢了灵石！"},
+    },
+    {
+        "name": "古道残碑",
+        "weight": 10,
+        "desc": "你发现一块刻满古老符文的残碑，隐隐透着大道韵味",
+        "success_chance": 0.55,
+        "success": {"progress": 800, "gongfa_exp": 100, "text": "你参悟残碑古纹，顿悟大道真意，修为暴涨！"},
+        "fail": {"damage": 0.20, "lose_coins": 100, "text": "残碑突现诅咒之力，你心神受创，气血翻涌！"},
+    },
+    {
+        "name": "遗落宝箱",
+        "weight": 12,
+        "desc": "你在草丛中发现一个古旧的宝箱，锁扣松动，隐隐透出金光",
+        "success_chance": 0.65,
+        "success": {"coins": 300, "equip": True, "text": "你撬开宝箱，灵石与一件法宝尽入囊中！"},
+        "fail": {"damage": 0.10, "lose_coins": 150, "text": "宝箱竟是一个机关陷阱，毒雾喷出，你狼狈逃离！"},
+    },
+    {
+        "name": "星辰坠落",
+        "weight": 10,
+        "desc": "天际划过一道流星，轰然坠落在不远处，扬起漫天烟尘",
+        "success_chance": 0.60,
+        "success": {"items": {"xingchenshi": 2}, "coins": 200, "text": "你抢在众人之前赶到，拾得星辰石与灵石！"},
+        "fail": {"damage": 0.25, "text": "陨石携带灼热天火，你躲避不及被炸得遍体鳞伤！"},
+    },
+    {
+        "name": "天地灵根",
+        "weight": 6,
+        "desc": "你感应到一缕天道灵韵，似有灵根在此处悄然孕育",
+        "success_chance": 0.55,
+        "success": {"items": {"tianling_dan": 1}, "progress": 200, "text": "你寻得天地灵根凝聚的天灵丹，药香绕体三日不散！"},
+        "fail": {"damage": 0.15, "text": "灵根灵性反噬，你气血翻涌，受伤不轻！"},
+    },
+]
+
+# ==================== 负面状态（Debuff）系统 ====================
+
+# 可扩展的负面状态定义：新增一种状态只需在此添加一项，并在需要的逻辑处挂接效果。
+# 效果字段：
+#   rate            修炼速率加成（负数=降低）
+#   fortune         气运减益（倒霉状态）
+#   damage_tick     持续掉血（每小时血量，中毒类）
+#   block_cultivate 是否禁止闭关
+DEBUFFS = {
+    "daomei": {
+        "name": "霉运缠身",
+        "desc": "诸事不顺，喝水塞牙，气运大跌",
+        "duration": 180,
+        "fortune": -500,
+        "rate": -0.05,
+    },
+    "shenti_touzhi": {
+        "name": "身体透支",
+        "desc": "双修过度，元气大伤，修炼受阻",
+        "duration": 120,
+        "rate": -0.20,
+    },
+    "danyao_zhongdu": {
+        "name": "丹药中毒",
+        "desc": "丹药服食过多，体内淤毒，触发时立即损失修为并持续掉血",
+        "duration": 120,
+        "rate": -0.10,
+        "damage_tick": 5,
+    },
+    "zouhuo_rumo": {
+        "name": "走火入魔",
+        "desc": "闭关过久气血逆行，心神紊乱，无法修炼",
+        "duration": 180,
+        "rate": -0.30,
+        "block_cultivate": True,
+    },
+}
+
+# 各 debuff 触发概率
+DEBUFF_TRIGGER = {
+    "xiuxiu_shenti_touzhi": 0.20,   # 每次双修触发身体透支
+    "pill_zhongdu_base": 0.05,      # 服用丹药中毒基础概率
+    "zouhuo": 0.30,                 # 闭关超时走火入魔
+    "pk_fail_daomei": 0.30,         # PK 落败触发霉运
+    "breakthrough_fail_daomei": 0.25,  # 突破失败触发霉运
+}
+
+# 丹药中毒触发时立即损失的修为比例
+PILL_POISON_PROGRESS_LOSS = 0.10

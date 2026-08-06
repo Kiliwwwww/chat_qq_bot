@@ -8,7 +8,7 @@ import time
 
 from .. import constants
 from ..state import config, db
-from . import combat, rng, world
+from . import combat, debuff, rng, world
 
 
 def calculate_rate(group_id: int, player: dict, location: str) -> float:
@@ -71,12 +71,15 @@ def calculate_rate(group_id: int, player: dict, location: str) -> float:
             bonus *= 2
         furnace_bonus += bonus
 
+    # 负面状态（debuff）对修炼速率的影响
+    debuff_bonus = debuff.rate_bonus(player)
+
     rate = (
         constants.BASE_CULTIVATION_RATE
         * quality_mult
         * location_mult
         * world_mult
-        * (1 + gongfa_bonus + physique_bonus + rebirth_bonus + pet_bonus + furnace_bonus)
+        * (1 + gongfa_bonus + physique_bonus + rebirth_bonus + pet_bonus + furnace_bonus + debuff_bonus)
     )
     return max(1.0, rate)
 
@@ -118,6 +121,14 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
     if combat.get_cur_hp(player) <= 0:
         return False, "你气血耗尽，无法修炼！服用回灵丹/大还丹恢复气血"
 
+    if debuff.block_cultivate(player):
+        blocker = next(
+            (d for d in debuff.get_active_debuffs(player) if d.get("block_cultivate")),
+            None,
+        )
+        name = blocker["name"] if blocker else "走火入魔"
+        return False, f"你正处于【{name}】状态，无法闭关！"
+
     if db.get_cultivation(group_id, user_id):
         return False, "你正在闭关修炼中，先「出关」吧"
 
@@ -128,8 +139,11 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
     if location not in constants.LOCATIONS:
         return False, f"未知修炼地点，可选：{'、'.join(constants.LOCATIONS.keys())}"
 
-    if location == "秘境" and not world.is_secret_realm_open(group_id):
-        return False, "秘境尚未开启，等待「上古秘境」事件出现吧"
+    if not world.is_location_open(group_id, location):
+        event_name = world.location_open_event(location)
+        if event_name:
+            return False, f"{location}尚未开启，等待「{event_name}」事件出现吧"
+        return False, f"{location}尚未开启"
 
     if not db.start_cultivation(group_id, user_id, location):
         return False, "开始修炼失败，请稍后再试"
@@ -190,6 +204,25 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
         progress += bonus
         result["enlighten"] = True
         result["risk_text"] = (result["risk_text"] + "\n" if result["risk_text"] else "") + "💡 悟道顿悟，额外获得大量修为！"
+
+    # 闭关过久，可能走火入魔（禁止修炼一段时间 + 损失修为）
+    if elapsed_hours >= config.zouhuo_cultivate_hours:
+        if rng.luck_roll(constants.DEBUFF_TRIGGER["zouhuo"], player.get("fortune", 1000)):
+            d = debuff.add_debuff(group_id, user_id, "zouhuo_rumo")
+            lost = int(progress * 0.05)
+            progress -= lost
+            result["risk_failed"] = True
+            result["risk_text"] = (result["risk_text"] + "\n" if result["risk_text"] else "") + (
+                f"🔥 闭关过久气血逆行，走火入魔！【{d['name']}】缠身，损失 {lost} 修为，暂时无法闭关！"
+            )
+
+    # 负面状态持续掉血（如丹药中毒）
+    tick = debuff.damage_per_hour(player)
+    if tick > 0:
+        dmg = int(tick * elapsed_hours)
+        if dmg > 0:
+            combat.take_damage(group_id, user_id, dmg)
+            result["risk_text"] = (result["risk_text"] + "\n" if result["risk_text"] else "") + f"🩸 体内淤毒发作，损失 {dmg} 点气血！"
 
     # 修为结算（不超过当前境界容量）
     realm_index = player.get("realm", 0)

@@ -4,7 +4,7 @@ import time
 
 from .. import constants
 from ..state import config, db
-from . import rng, world
+from . import debuff, rng, world
 
 # 品质对突破成功率的加成
 _QUALITY_BREAKTHROUGH_BONUS = {
@@ -42,7 +42,7 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
     bonus = 0.0
     bonus += _QUALITY_BREAKTHROUGH_BONUS.get(player.get("spirit_quality", ""), 0.0)
     bonus += world.breakthrough_bonus(group_id)
-    bonus += rng.fortune_factor(player.get("fortune", 1000))
+    bonus += rng.fortune_factor(debuff.effective_fortune(player))
     # 破境丹
     if use_pill:
         if db.get_item_quantity(group_id, user_id, "pojing_dan") <= 0:
@@ -51,7 +51,7 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
         db.remove_item(group_id, user_id, "pojing_dan", 1)
 
     success_rate = min(0.95, max(0.05, base + bonus))
-    success = rng.luck_roll(success_rate, player.get("fortune", 1000))
+    success = rng.luck_roll(success_rate, debuff.effective_fortune(player))
 
     if success:
         new_realm = realm_index + 1
@@ -89,10 +89,16 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
             "realm_progress": new_progress,
             "bottleneck_until": bottleneck_until,
         })
+        # 突破失败可能霉运缠身
+        daomei_text = ""
+        if rng.luck_roll(constants.DEBUFF_TRIGGER["breakthrough_fail_daomei"], player.get("fortune", 1000)):
+            d = debuff.add_debuff(group_id, user_id, "daomei")
+            daomei_text = f"\n😵 突破失败让你霉运缠身，气运大跌！"
         return {
             "ok": True,
             "success": False,
             "rate": round(success_rate * 100, 1),
             "text": f"💥 突破失败！损失 {lost} 修为，陷入瓶颈（{constants.BOTTLENECK_MINUTES} 分钟内无法再次突破）。"
-                    f"\n💡 可服用「破境丹」提高成功率",
+                    f"\n💡 可服用「破境丹」提高成功率"
+                    f"{daomei_text}",
         }

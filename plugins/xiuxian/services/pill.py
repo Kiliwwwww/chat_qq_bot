@@ -6,7 +6,7 @@
 
 from .. import constants
 from ..state import db
-from . import combat
+from . import combat, debuff, rng
 
 
 def use_pill(group_id: int, user_id: int, pill_key: str, quantity: int = 1) -> dict:
@@ -131,6 +131,18 @@ def use_pill(group_id: int, user_id: int, pill_key: str, quantity: int = 1) -> d
         hp_cost = effect.get("hp_cost", 0)
         db.update_player(group_id, user_id, {"pk_boost": boost, "pk_hp_cost": hp_cost})
         lines.append(f"💥 狂暴之力附体！下次 PK 战力 +{int(boost * 100)}%，但 PK 后将额外损失 {hp_cost} 点气血")
+
+    # 服用丹药过多可能丹药中毒（同种丹药吃得越多越容易，触发时立即损失修为）
+    if "progress" in effect:
+        used = db.get_pill_usage(group_id, user_id, pill_key)
+        poison_chance = min(0.30, constants.DEBUFF_TRIGGER["pill_zhongdu_base"] + used * 0.03)
+        if rng.luck_roll(poison_chance, fortune):
+            d = debuff.add_debuff(group_id, user_id, "danyao_zhongdu")
+            # 立即损失 10% 修为
+            cur_player = db.get_player(group_id, user_id)
+            lost = int(cur_player.get("realm_progress", 0) * constants.PILL_POISON_PROGRESS_LOSS)
+            db.update_player(group_id, user_id, {"realm_progress": max(0, cur_player.get("realm_progress", 0) - lost)})
+            lines.append(f"😵 药力过猛中毒！触发【{d['name']}】，立即损失 {lost} 修为！")
 
     return {"ok": True, "text": "\n".join(lines)}
 

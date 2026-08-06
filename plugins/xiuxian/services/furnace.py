@@ -9,7 +9,7 @@ import time
 
 from .. import constants
 from ..state import config, db, get_cache
-from . import rng, stats
+from . import debuff, rng, stats
 
 _ESCAPE_COOLDOWN = 120  # 挣脱尝试冷却（秒）
 
@@ -134,12 +134,20 @@ def xiuxiu(group_id: int, user_id: int, index: int) -> dict:
 
     target_name = target["name"] if target else str(furnace["target_id"])
     target_realm_name = constants.REALMS[target_realm]["name"] if target else "炼气"
+
+    # 双修过度可能身体透支
+    debuff_text = ""
+    if rng.luck_roll(constants.DEBUFF_TRIGGER["xiuxiu_shenti_touzhi"], player.get("fortune", 1000)):
+        d = debuff.add_debuff(group_id, user_id, "shenti_touzhi")
+        debuff_text = f"\n😵 元阳亏损，你感到【{d['name']}】，修炼将受到影响！"
+
     return {
         "ok": True,
         "text": (
             f"💞 【双修】你与炉鼎「{target_name}」（{target_realm_name}）阴阳交融，气息暴涨！\n"
             f"✨ 获得修为 {gain}（当前境界容量的 {int(constants.XIUXIU_PROGRESS_RATE * 100)}%）（当前 {int(current)}）\n"
             f"⏳ 下次双修需等待 {config.xiuxiu_cooldown_minutes} 分钟"
+            f"{debuff_text}"
         ),
     }
 

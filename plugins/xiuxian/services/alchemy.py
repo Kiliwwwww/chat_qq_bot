@@ -2,7 +2,7 @@
 
 from .. import constants
 from ..state import db
-from . import rng
+from . import debuff, rng
 
 
 def _quality_bonus(quality: str) -> float:
@@ -46,7 +46,7 @@ def alchemy(group_id: int, user_id: int, pill_key: str) -> dict:
     base = 0.55 + level * 0.03 + _quality_bonus(player.get("spirit_quality", ""))
     if player.get("physique") == "jiuqiao_lt":
         base += 0.05
-    fortune = player.get("fortune", 1000)
+    fortune = debuff.effective_fortune(player)
     success = rng.luck_roll(base, fortune)
 
     # 炼丹经验
@@ -97,7 +97,7 @@ def forge(group_id: int, user_id: int) -> dict:
     base = 0.6 + level * 0.03 + _quality_bonus(player.get("spirit_quality", ""))
     if player.get("physique") == "jiuqiao_lt":
         base += 0.05
-    fortune = player.get("fortune", 1000)
+    fortune = debuff.effective_fortune(player)
     success = rng.luck_roll(base, fortune)
 
     exp_gain = 25

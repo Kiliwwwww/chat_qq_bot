@@ -41,6 +41,9 @@ class Config(BaseModel):
     # 双修冷却时间（分钟）
     xiuxiu_cooldown_minutes: int = 10
 
+    # 闭关超过该小时数，出关时可能走火入魔
+    zouhuo_cultivate_hours: float = 6.0
+
     # 学习新功法的灵石费用（境界越高越贵，此为基础值）
     learn_gongfa_cost: int = 100
 
