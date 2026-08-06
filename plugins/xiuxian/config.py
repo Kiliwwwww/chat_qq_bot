@@ -1,0 +1,45 @@
+from pydantic import BaseModel
+
+
+class Config(BaseModel):
+    """修仙挂机游戏配置类"""
+
+    # 管理员 QQ 号（只有此人可在群内执行「开启修仙」/「关闭修仙」）
+    admin_qq: int = 1154798056
+
+    # Redis 配置
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str = ""
+    redis_key_prefix: str = "xiuxian:"
+
+    # 世界 Tick 间隔（秒），世界状态推进周期
+    world_tick_interval: int = 60
+
+    # 世界事件切换间隔（分钟），事件持续时长
+    world_event_duration: int = 180
+
+    # 神秘商人出现间隔（分钟）
+    merchant_interval: int = 120
+
+    # 秘境开启持续时长（分钟）
+    secret_realm_duration: int = 60
+
+    # 探索冷却时间（秒）
+    explore_cooldown: int = 600
+
+    # 突破失败损失修为比例
+    breakthrough_fail_penalty: float = 0.2
+
+    # 每个玩家最多可同时修炼的功法数量
+    max_gongfa: int = 5
+
+    # 炉鼎数量上限
+    max_furnace: int = 3
+
+    # 学习新功法的灵石费用（境界越高越贵，此为基础值）
+    learn_gongfa_cost: int = 100
+
+    # 更换体质的基础灵石费用（按境界翻倍，指定目标体质为基础费用的 3 倍）
+    change_physique_cost: int = 5000
