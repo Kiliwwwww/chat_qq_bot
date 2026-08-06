@@ -40,9 +40,10 @@ async def buy_merchant_item(group_id: int, user_id: int, good_index: int) -> dic
 
     good = goods[good_index - 1]
 
-    # 同一批商品每名玩家限购一次（Redis 缓存，降级后同实例内存生效）
+    # 同一批商品每名玩家限购一次（key 带上批次种子，刷新后新批次可重新购买）
     cache = get_cache()
-    key = f"{group_id}:merchant_bought:{user_id}"
+    seed = _merchant_seed(group_id)
+    key = f"{group_id}:merchant_bought:{seed}:{user_id}"
     bought = await cache.hget(key, str(good_index))
     if bought:
         return {"ok": False, "text": "你已经购买过该商品了"}

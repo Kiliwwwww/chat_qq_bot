@@ -19,6 +19,7 @@ from .cultivation_cmd import (
     gongfa_cmd,
     learn_gongfa_cmd,
     catalog_cmd,
+    upgrade_gongfa_cmd,
 )
 from .world_cmd import world_cmd
 from .alchemy_cmd import (
@@ -37,7 +38,8 @@ from .market_cmd import (
     market_buy_merchant_cmd,
     market_cancel_cmd,
 )
-from .furnace_cmd import capture_cmd, furnace_cmd, escape_cmd, release_cmd
+from .furnace_cmd import capture_cmd, furnace_cmd, escape_cmd, release_cmd, xiuxiu_cmd
+from .combat_cmd import signup_cmd, battle_status_cmd, pk_cmd
 from .ranking_cmd import ranking_cmd
 
 __all__ = [
@@ -58,6 +60,7 @@ __all__ = [
     "gongfa_cmd",
     "learn_gongfa_cmd",
     "catalog_cmd",
+    "upgrade_gongfa_cmd",
     "world_cmd",
     "lian_dan_cmd",
     "lian_qi_cmd",
@@ -79,5 +82,9 @@ __all__ = [
     "furnace_cmd",
     "escape_cmd",
     "release_cmd",
+    "xiuxiu_cmd",
+    "signup_cmd",
+    "battle_status_cmd",
+    "pk_cmd",
     "ranking_cmd",
 ]

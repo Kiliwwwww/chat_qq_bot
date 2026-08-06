@@ -34,6 +34,7 @@ from .commands import (  # noqa: F401  导入以注册指令
     gongfa_cmd,
     learn_gongfa_cmd,
     catalog_cmd,
+    upgrade_gongfa_cmd,
     world_cmd,
     lian_dan_cmd,
     lian_qi_cmd,
@@ -55,6 +56,10 @@ from .commands import (  # noqa: F401  导入以注册指令
     furnace_cmd,
     escape_cmd,
     release_cmd,
+    xiuxiu_cmd,
+    signup_cmd,
+    battle_status_cmd,
+    pk_cmd,
     ranking_cmd,
 )
 
@@ -113,6 +118,7 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "gongfa_cmd",
     "learn_gongfa_cmd",
     "catalog_cmd",
+    "upgrade_gongfa_cmd",
     "world_cmd",
     "lian_dan_cmd",
     "lian_qi_cmd",
@@ -134,5 +140,9 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "furnace_cmd",
     "escape_cmd",
     "release_cmd",
+    "xiuxiu_cmd",
+    "signup_cmd",
+    "battle_status_cmd",
+    "pk_cmd",
     "ranking_cmd",
 ]

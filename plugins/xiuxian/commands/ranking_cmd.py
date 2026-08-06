@@ -4,7 +4,7 @@ from nonebot.adapters.onebot.v11 import Bot, Message
 from nonebot.params import CommandArg
 
 from ..services import ranking as rank_svc
-from .helpers import require_game, xiuxian_command
+from .helpers import require_game, xiuxian_command, reply_finish
 
 ranking_cmd = xiuxian_command("修仙排行榜", aliases={"修仙排行"}, priority=5, block=True)
 
@@ -24,4 +24,4 @@ async def handle_ranking(bot: Bot, event, args: Message = CommandArg()):
 
     arg = args.extract_plain_text().strip()
     category = _CATEGORY_ALIASES.get(arg, arg or "realm")
-    await ranking_cmd.finish(rank_svc.format_ranking(group_id, category))
+    await reply_finish(ranking_cmd, event, rank_svc.format_ranking(group_id, category))

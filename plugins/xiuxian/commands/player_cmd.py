@@ -8,7 +8,7 @@ from ..state import config, db
 from ..services import player as player_svc
 from ..services import stats as stats_svc
 from ..services import gongfa as gongfa_svc
-from .helpers import get_nickname, require_game, xiuxian_command
+from .helpers import get_nickname, require_game, xiuxian_command, reply_finish
 
 # 修仙入口
 xiuxian_cmd = xiuxian_command("我要修仙", aliases={"修仙"}, priority=5, block=True)
@@ -40,10 +40,10 @@ async def handle_xiuxian(bot: Bot, event, args: Message = CommandArg()):
             "1️⃣「随机天命」- 随机灵根、品质，可能一鸣惊人\n"
             "2️⃣「废材流主角」- 空灵根废品起步，但气运极高，逆天改命"
         )
-        await xiuxian_cmd.finish(text)
+        await reply_finish(xiuxian_cmd, event, text)
 
     gongfa_text = gongfa_svc.list_gongfas(group_id, event.user_id)
-    await xiuxian_cmd.finish(player_svc.format_player_profile(group_id, player, gongfa_text))
+    await reply_finish(xiuxian_cmd, event, player_svc.format_player_profile(group_id, player, gongfa_text))
 
 
 async def _create_and_finish(cmd, bot, event, talent: str):
@@ -52,7 +52,7 @@ async def _create_and_finish(cmd, bot, event, talent: str):
     name = await get_nickname(bot, group_id, event.user_id)
     ok, msg, data = player_svc.create_character(group_id, event.user_id, name, talent)
     if not ok:
-        await cmd.finish(msg)
+        await reply_finish(cmd, event, msg)
 
     if talent == "trash":
         intro = (
@@ -73,7 +73,7 @@ async def _create_and_finish(cmd, bot, event, talent: str):
         phys = constants.PHYSIQUE_BY_ID.get(data["physique"], {})
         intro += f"\n✨ 天赋异禀！觉醒特殊体质【{phys.get('name', '')}】！"
     intro += "\n\n发送「我的状态」查看面板，或「修仙帮助」查看玩法"
-    await cmd.finish(intro)
+    await reply_finish(cmd, event, intro)
 
 
 @random_fate_cmd.handle()
@@ -92,7 +92,7 @@ async def handle_status(bot: Bot, event, args: Message = CommandArg()):
 
     player = db.get_player(group_id, event.user_id)
     if not player:
-        await status_cmd.finish("你还没有修仙角色，发送「我要修仙」开启仙途")
+        await reply_finish(status_cmd, event, "你还没有修仙角色，发送「我要修仙」开启仙途")
 
     gongfa_text = gongfa_svc.list_gongfas(group_id, event.user_id)
     panel = player_svc.format_player_profile(group_id, player, gongfa_text)
@@ -100,7 +100,7 @@ async def handle_status(bot: Bot, event, args: Message = CommandArg()):
     # 附加装备与战力信息
     from ..services import inventory as inv_svc
     equip_parts = []
-    for slot in ("weapon", "armor", "treasure"):
+    for slot in ("weapon", "armor", "treasure", "ring", "boots"):
         item_id = player.get(slot, "")
         if item_id:
             parts = item_id.split(":")
@@ -111,7 +111,7 @@ async def handle_status(bot: Bot, event, args: Message = CommandArg()):
         panel += "\n🛡️ 装备：" + "、".join(equip_parts)
     power = stats_svc.get_power(group_id, player)
     panel += f"\n⚔️ 战力：{power}"
-    await status_cmd.finish(panel)
+    await reply_finish(status_cmd, event, panel)
 
 
 @change_physique_cmd.handle()
@@ -120,11 +120,11 @@ async def handle_change_physique(bot: Bot, event, args: Message = CommandArg()):
 
     player = db.get_player(group_id, event.user_id)
     if not player:
-        await change_physique_cmd.finish("你还没有修仙角色，发送「我要修仙」开启仙途")
+        await reply_finish(change_physique_cmd, event, "你还没有修仙角色，发送「我要修仙」开启仙途")
 
     target = args.extract_plain_text().strip()
     result = player_svc.change_physique(group_id, event.user_id, target)
-    await change_physique_cmd.finish(result["text"])
+    await reply_finish(change_physique_cmd, event, result["text"])
 
 
 @rebirth_cmd.handle()
@@ -133,12 +133,12 @@ async def handle_rebirth(bot: Bot, event, args: Message = CommandArg()):
 
     player = db.get_player(group_id, event.user_id)
     if not player:
-        await rebirth_cmd.finish("你还没有修仙角色，发送「我要修仙」开启仙途")
+        await reply_finish(rebirth_cmd, event, "你还没有修仙角色，发送「我要修仙」开启仙途")
 
     # 确认参数：必须带「确认」才能执行，防止误触清空数据
     arg = args.extract_plain_text().strip()
     if not arg or "确认" not in arg:
-        await rebirth_cmd.finish(
+        await reply_finish(rebirth_cmd, event, 
             "🌀 【转世重生】将清空你的修为、功法、背包、灵宠与炉鼎！\n"
             "保留灵根、品质、体质与天命，并获得永久气运+修炼加成。\n"
             f"⚠️ 至少需要达到【{constants.REALMS[config.rebirth_min_realm]['name']}】境界。\n"
@@ -146,7 +146,7 @@ async def handle_rebirth(bot: Bot, event, args: Message = CommandArg()):
         )
 
     result = player_svc.rebirth(group_id, event.user_id)
-    await rebirth_cmd.finish(result["text"])
+    await reply_finish(rebirth_cmd, event, result["text"])
 
 
 @suicide_cmd.handle()
@@ -155,19 +155,19 @@ async def handle_suicide(bot: Bot, event, args: Message = CommandArg()):
 
     player = db.get_player(group_id, event.user_id)
     if not player:
-        await suicide_cmd.finish("你还没有修仙角色，无法自杀")
+        await reply_finish(suicide_cmd, event, "你还没有修仙角色，无法自杀")
 
     # 二次确认，防止误触彻底清空
     arg = args.extract_plain_text().strip()
     if not arg or "确认" not in arg:
-        await suicide_cmd.finish(
+        await reply_finish(suicide_cmd, event, 
             "💀 【自杀】将彻底清空你的所有数据！\n"
             "包括：境界、修为、灵石、功法、背包、灵宠、炉鼎、体质、灵根——一切归零，无法找回！\n"
             "确认自杀请发送：自杀 确认"
         )
 
     result = player_svc.suicide(group_id, event.user_id)
-    await suicide_cmd.finish(result["text"])
+    await reply_finish(suicide_cmd, event, result["text"])
 
 
 @help_cmd.handle()
@@ -199,13 +199,14 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "  · 探索 秘境     → 仅上古秘境开启时可进\n"
         "━━━━━━━━━━━━━━━\n"
         "📜 功法\n"
-        "  · 功法          → 查看已学功法\n"
+        "  · 功法          → 查看已学功法及熟练度进度\n"
         "  · 功法图鉴      → 查看全部功法\n"
         "  · 学习功法 焚天诀 → 学习新功法（普通灵根只能学对应系）\n"
+        "  · 升级功法 焚天诀 → 花灵石直接突破功法熟练度\n"
         "━━━━━━━━━━━━━━━\n"
         "⚗️ 炼丹炼器装备\n"
-        "  · 炼丹 修炼丹   → 炼丹（破境丹/回灵丹/精元丹）\n"
-        "  · 炼器          → 锻造武器/法袍/法宝\n"
+        "  · 炼丹 修炼丹   → 炼丹（破境丹/回灵丹/大还丹/涅槃丹/狂暴丹等）\n"
+        "  · 炼器          → 锻造武器/法袍/法宝/戒指/战靴\n"
         "  · 背包          → 查看物品\n"
         "  · 装备 神兵·仙器 → 穿戴装备\n"
         "  · 卸下 武器     → 卸下装备\n"
@@ -214,7 +215,13 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "  · 商城          → 常驻商城，长期出售各种丹药\n"
         "  · 商城购买 1    → 购买丹药\n"
         "  · 商城出售 灵草 5 → 把材料/丹药/装备卖给商城换灵石\n"
-        "  · 服用 修炼丹   → 服用丹药增加修为/气运（聚气散/凝神丹/培元丹/蕴神丹/天机丹等）\n"
+        "  · 服用 修炼丹   → 服用丹药（回灵丹回血/大还丹满血/涅槃丹复活/狂暴丹PK加成）\n"
+        "━━━━━━━━━━━━━━━\n"
+        "⚔️ 战斗系统\n"
+        "  · 攻击 @玩家    → PK 对决（按战力分胜负，输家扣血；对同一人 5 分钟冷却）\n"
+        "  · 报名大乱斗    → 5 人混战，最后 2 名胜者各得 1000 灵石\n"
+        "  · 大乱斗        → 查看当前报名情况\n"
+        "  · 血量 0 会归西，60 秒后自动复活；血量过低记得服用回灵丹/大还丹\n"
         "━━━━━━━━━━━━━━━\n"
         "🐾 灵宠\n"
         "  · 灵宠          → 查看灵宠\n"
@@ -230,6 +237,7 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "🔥 炉鼎互动\n"
         "  · 抓捕 @玩家    → 抓捕闭关的低境界玩家（高境界才可）\n"
         "  · 炉鼎          → 查看自己拥有的炉鼎\n"
+        "  · 双修 1        → 与炉鼎双修，获得修为（境界越高收益越多）\n"
         "  · 放走 1        → 放走炉鼎（对方恢复自由）\n"
         "  · 挣脱          → 被俘后尝试反抗（高气运可触发天命觉醒）\n"
         "━━━━━━━━━━━━━━━\n"
@@ -240,4 +248,4 @@ async def handle_help(bot: Bot, event, args: Message = CommandArg()):
         "  · 挂机收益受灵根品质/功法/地点/世界事件影响\n"
         "  · 气运越高奇遇越多，关注「世界」事件变化！"
     )
-    await help_cmd.finish(help_text)
+    await reply_finish(help_cmd, event, help_text)

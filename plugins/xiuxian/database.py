@@ -66,7 +66,14 @@ class Database:
                         weapon TEXT DEFAULT '',
                         armor TEXT DEFAULT '',
                         treasure TEXT DEFAULT '',
+                        ring TEXT DEFAULT '',
+                        boots TEXT DEFAULT '',
                         rebirth_count INTEGER DEFAULT 0,
+                        cur_hp INTEGER DEFAULT 0,
+                        dead_until REAL DEFAULT 0,
+                        pk_boost REAL DEFAULT 0,
+                        pk_hp_cost INTEGER DEFAULT 0,
+                        xiuxiu_until REAL DEFAULT 0,
                         created_at REAL NOT NULL,
                         PRIMARY KEY (group_id, user_id)
                     );
@@ -168,6 +175,32 @@ class Database:
                         game_enabled INTEGER NOT NULL DEFAULT 1
                     );
 
+                    -- 大乱斗报名表
+                    CREATE TABLE IF NOT EXISTS battle_royale (
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        signed_at REAL NOT NULL,
+                        PRIMARY KEY (group_id, user_id)
+                    );
+
+                    -- PK 冷却表
+                    CREATE TABLE IF NOT EXISTS pk_cooldown (
+                        group_id INTEGER NOT NULL,
+                        attacker_id INTEGER NOT NULL,
+                        target_id INTEGER NOT NULL,
+                        until_time REAL NOT NULL,
+                        PRIMARY KEY (group_id, attacker_id, target_id)
+                    );
+
+                    -- 丹药服用次数表（用于修为丹药效果递减）
+                    CREATE TABLE IF NOT EXISTS pill_usage (
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        pill_key TEXT NOT NULL,
+                        count INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (group_id, user_id, pill_key)
+                    );
+
                     CREATE INDEX IF NOT EXISTS idx_players_group ON players(group_id);
                     CREATE INDEX IF NOT EXISTS idx_gongfas_group ON gongfas(group_id);
                     CREATE INDEX IF NOT EXISTS idx_inventory_group ON inventory(group_id);
@@ -187,6 +220,20 @@ class Database:
             columns = {r["name"] for r in conn.execute("PRAGMA table_info(players)").fetchall()}
             if "rebirth_count" not in columns:
                 conn.execute("ALTER TABLE players ADD COLUMN rebirth_count INTEGER DEFAULT 0")
+            if "ring" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN ring TEXT DEFAULT ''")
+            if "boots" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN boots TEXT DEFAULT ''")
+            if "cur_hp" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN cur_hp INTEGER DEFAULT 0")
+            if "dead_until" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN dead_until REAL DEFAULT 0")
+            if "pk_boost" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN pk_boost REAL DEFAULT 0")
+            if "pk_hp_cost" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN pk_hp_cost INTEGER DEFAULT 0")
+            if "xiuxiu_until" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN xiuxiu_until REAL DEFAULT 0")
         except Exception as e:
             logger.error(f"数据库迁移失败: {e}")
 
@@ -203,9 +250,9 @@ class Database:
                     """
                     INSERT OR REPLACE INTO players
                     (group_id, user_id, name, realm, realm_progress, spirit_root, spirit_quality,
-                     fortune, physique, talent, attack, defense, hp, coin,
+                     fortune, physique, talent, attack, defense, hp, cur_hp, coin,
                      alchemy_level, alchemy_exp, forge_level, forge_exp, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         group_id, user_id, data.get("name", ""),
@@ -214,6 +261,7 @@ class Database:
                         data.get("fortune", 1000), data.get("physique", ""),
                         data.get("talent", "random"),
                         data.get("attack", 10), data.get("defense", 10), data.get("hp", 100),
+                        data.get("cur_hp", data.get("hp", 100)),
                         data.get("coin", 100),
                         data.get("alchemy_level", 1), data.get("alchemy_exp", 0),
                         data.get("forge_level", 1), data.get("forge_exp", 0),
@@ -249,7 +297,8 @@ class Database:
                 "name", "realm", "realm_progress", "spirit_root", "spirit_quality",
                 "fortune", "physique", "talent", "attack", "defense", "hp", "coin",
                 "alchemy_level", "alchemy_exp", "forge_level", "forge_exp",
-                "bottleneck_until", "weapon", "armor", "treasure", "rebirth_count",
+                "bottleneck_until", "weapon", "armor", "treasure", "ring", "boots", "rebirth_count",
+                "cur_hp", "dead_until", "pk_boost", "pk_hp_cost", "xiuxiu_until",
             }
             updates = {k: v for k, v in fields.items() if k in allowed}
             if not updates:
@@ -758,6 +807,115 @@ class Database:
         except Exception as e:
             logger.error(f"获取探索冷却失败: {e}")
             return 0
+
+    # ==================== 大乱斗报名 ====================
+
+    def add_battle_signup(self, group_id: int, user_id: int) -> bool:
+        """报名大乱斗（去重）"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO battle_royale (group_id, user_id, signed_at) VALUES (?, ?, ?)",
+                    (group_id, user_id, time.time()),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"报名大乱斗失败: {e}")
+            return False
+
+    def is_battle_signed(self, group_id: int, user_id: int) -> bool:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT 1 FROM battle_royale WHERE group_id = ? AND user_id = ?",
+                    (group_id, user_id),
+                ).fetchone()
+                return row is not None
+        except Exception as e:
+            logger.error(f"查询大乱斗报名失败: {e}")
+            return False
+
+    def get_battle_signups(self, group_id: int) -> list[dict]:
+        try:
+            with self._get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM battle_royale WHERE group_id = ? ORDER BY signed_at",
+                    (group_id,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"获取大乱斗报名失败: {e}")
+            return []
+
+    def clear_battle_signups(self, group_id: int) -> bool:
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM battle_royale WHERE group_id = ?", (group_id,))
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"清空大乱斗报名失败: {e}")
+            return False
+
+    # ==================== PK 冷却 ====================
+
+    def set_pk_cooldown(self, group_id: int, attacker_id: int, target_id: int, until_time: float) -> bool:
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO pk_cooldown (group_id, attacker_id, target_id, until_time) VALUES (?, ?, ?, ?)",
+                    (group_id, attacker_id, target_id, until_time),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"设置 PK 冷却失败: {e}")
+            return False
+
+    def get_pk_cooldown(self, group_id: int, attacker_id: int, target_id: int) -> float:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT until_time FROM pk_cooldown WHERE group_id = ? AND attacker_id = ? AND target_id = ?",
+                    (group_id, attacker_id, target_id),
+                ).fetchone()
+                return row["until_time"] if row else 0
+        except Exception as e:
+            logger.error(f"获取 PK 冷却失败: {e}")
+            return 0
+
+    # ==================== 丹药服用次数 ====================
+
+    def get_pill_usage(self, group_id: int, user_id: int, pill_key: str) -> int:
+        """获取玩家服用某种丹药的累计次数"""
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT count FROM pill_usage WHERE group_id = ? AND user_id = ? AND pill_key = ?",
+                    (group_id, user_id, pill_key),
+                ).fetchone()
+                return row["count"] if row else 0
+        except Exception as e:
+            logger.error(f"获取丹药服用次数失败: {e}")
+            return 0
+
+    def add_pill_usage(self, group_id: int, user_id: int, pill_key: str, count: int = 1) -> bool:
+        """累加玩家服用某种丹药的次数"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO pill_usage (group_id, user_id, pill_key, count) VALUES (?, ?, ?, ?)
+                    ON CONFLICT(group_id, user_id, pill_key) DO UPDATE SET count = count + excluded.count
+                    """,
+                    (group_id, user_id, pill_key, count),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"累加丹药服用次数失败: {e}")
+            return False
 
     # ==================== 通用 ====================
 

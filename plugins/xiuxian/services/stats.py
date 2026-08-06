@@ -45,7 +45,7 @@ def get_effective_stats(group_id: int, player: dict, gongfas: Optional[list[dict
         # cultivation 类功法不直接加属性
 
     # 装备加成
-    for slot in ("weapon", "armor", "treasure"):
+    for slot in ("weapon", "armor", "treasure", "ring", "boots"):
         item_id = player.get(slot, "")
         parsed = _parse_equip(item_id)
         if not parsed:
@@ -89,8 +89,23 @@ def get_effective_stats(group_id: int, player: dict, gongfas: Optional[list[dict
 
 
 def get_power(group_id: int, player: dict) -> int:
-    """计算玩家战力"""
+    """计算玩家战力。
+
+    战力 = (攻击×10 + 防御×8 + 气血) × 境界倍率 × (1 + 功法加成)
+    其中功法加成包含所有已学功法的加成（含修炼类功法，体现整体修为深度）。
+    """
     stats = get_effective_stats(group_id, player)
     realm_mult = constants.REALM_POWER_MULT.get(player.get("realm", 0), 1)
-    power = (stats["attack"] * 10 + stats["defense"] * 8 + stats["hp"]) * realm_mult
-    return int(power)
+    base = (stats["attack"] * 10 + stats["defense"] * 8 + stats["hp"]) * realm_mult
+
+    # 功法战力加成（所有功法按熟练度计入，修炼类功法代表整体修为）
+    gongfa_bonus = 0.0
+    for g in db.get_gongfas(group_id, player["user_id"]):
+        info = constants.GONGFA_BY_ID.get(g["gongfa_id"])
+        if not info:
+            continue
+        mult = constants.PROFICIENCY_MULT[g.get("level", 0)]
+        gongfa_bonus += info["bonus"] * mult
+
+    power = int(base * (1 + gongfa_bonus))
+    return max(1, power)

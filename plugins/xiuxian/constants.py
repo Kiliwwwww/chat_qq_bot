@@ -200,21 +200,38 @@ PET_EXP_BASE = 100
 # 丹药 effect 字段：
 #   progress    服用增加修为
 #   fortune     服用增加气运
+#   attack/defense/hp  服用增加对应属性
+#   upgrade_quality  服用灵根品质提升一级
 #   breakthrough 突破时提高成功率
 #   pet_exp     喂养灵宠提升经验
 ITEMS = {
     "lingcao": {"name": "灵草", "type": "material", "desc": "炼丹基础材料"},
     "yaodan": {"name": "妖丹", "type": "material", "desc": "妖兽体内凝聚的精华"},
     "lingquan": {"name": "灵泉", "type": "material", "desc": "天地灵气凝结的泉水"},
+    "xuantie": {"name": "玄铁", "type": "material", "desc": "炼器常用材料"},
+    "zijinsha": {"name": "紫金砂", "type": "material", "desc": "高阶炼器材料"},
+    "shoupi": {"name": "兽皮", "type": "material", "desc": "妖兽皮毛，炼器材料"},
+    "longxiancao": {"name": "龙涎草", "type": "material", "desc": "高阶炼丹材料"},
+    "xingchenshi": {"name": "星辰石", "type": "material", "desc": "天外陨铁，稀有炼器材料"},
+    "qiannian_ls": {"name": "千年灵参", "type": "material", "desc": "稀有炼丹材料"},
     "xiulian_dan": {"name": "修炼丹", "type": "pill", "desc": "服用后获得修为", "effect": {"progress": 500}},
     "jusan_san": {"name": "聚气散", "type": "pill", "desc": "低阶丹药，服用增加少量修为", "effect": {"progress": 300}},
     "ningshen_dan": {"name": "凝神丹", "type": "pill", "desc": "中阶丹药，服用增加大量修为", "effect": {"progress": 800}},
     "peiyuan_dan": {"name": "培元丹", "type": "pill", "desc": "高阶丹药，服用暴增修为", "effect": {"progress": 2000}},
+    "wudao_dan": {"name": "悟道丹", "type": "pill", "desc": "传说丹药，服用修为暴涨", "effect": {"progress": 5000}},
     "yunlun_dan": {"name": "蕴神丹", "type": "pill", "desc": "稀有丹药，服用增加气运", "effect": {"fortune": 50}},
     "tianji_dan": {"name": "天机丹", "type": "pill", "desc": "传说丹药，服用大幅增加气运", "effect": {"fortune": 200}},
+    "dali_wan": {"name": "大力丸", "type": "pill", "desc": "服用后力量大增，攻击永久+20", "effect": {"attack": 20}},
+    "jingang_dan": {"name": "金刚丹", "type": "pill", "desc": "服用后铜皮铁骨，防御永久+20", "effect": {"defense": 20}},
+    "qixue_dan": {"name": "气血丹", "type": "pill", "desc": "服用后气血充盈，气血上限+200", "effect": {"hp": 200}},
+    "xisui_dan": {"name": "洗髓丹", "type": "pill", "desc": "服用后洗髓伐骨，灵根品质提升一级", "effect": {"upgrade_quality": True}},
     "pojing_dan": {"name": "破境丹", "type": "pill", "desc": "突破时使用可大幅提高成功率", "effect": {"breakthrough": 0.15}},
-    "huiling_dan": {"name": "回灵丹", "type": "pill", "desc": "服用后恢复气血", "effect": {"hp": 100}},
+    "huiling_dan": {"name": "回灵丹", "type": "pill", "desc": "服用后恢复气血", "effect": {"heal": 100}},
+    "dahuan_dan": {"name": "大还丹", "type": "pill", "desc": "服用后气血全满", "effect": {"heal_full": True}},
+    "niepan_dan": {"name": "涅槃丹", "type": "pill", "desc": "归西状态下服用立即复活", "effect": {"revive": True}},
+    "kuangbao_dan": {"name": "狂暴丹", "type": "pill", "desc": "下次PK战力+50%，但PK后额外扣自己血量", "effect": {"pk_boost": 0.5, "hp_cost": 150}},
     "jingyuan_dan": {"name": "精元丹", "type": "pill", "desc": "喂养灵宠可提升其经验", "effect": {"pet_exp": 100}},
+    "ningpo_dan": {"name": "凝魄丹", "type": "pill", "desc": "喂养灵宠可获得大量经验", "effect": {"pet_exp": 500}},
 }
 
 ITEM_BY_NAME = {v["name"]: {"id": k, **v} for k, v in ITEMS.items()}
@@ -233,6 +250,8 @@ EQUIPMENT_KINDS = {
     "weapon": {"name": "神兵", "stat": "attack"},
     "armor": {"name": "法袍", "stat": "defense"},
     "treasure": {"name": "法宝", "stat": "hp"},
+    "ring": {"name": "戒指", "stat": "attack"},
+    "boots": {"name": "战靴", "stat": "defense"},
 }
 
 # 炼丹消耗与产物
@@ -241,15 +260,24 @@ ALCHEMY_RECIPES = {
     "jusan_san": {"materials": {"lingcao": 2}, "cost": 30},
     "ningshen_dan": {"materials": {"lingcao": 2, "lingquan": 1}, "cost": 80},
     "peiyuan_dan": {"materials": {"lingcao": 3, "lingquan": 1, "yaodan": 1}, "cost": 200},
+    "wudao_dan": {"materials": {"lingcao": 3, "lingquan": 2, "qiannian_ls": 1}, "cost": 500},
     "yunlun_dan": {"materials": {"lingquan": 2, "yaodan": 1}, "cost": 150},
     "tianji_dan": {"materials": {"lingquan": 2, "yaodan": 2}, "cost": 400},
+    "dali_wan": {"materials": {"lingcao": 2, "yaodan": 1}, "cost": 40},
+    "jingang_dan": {"materials": {"lingcao": 2, "xuantie": 1}, "cost": 40},
+    "qixue_dan": {"materials": {"lingcao": 1, "lingquan": 1, "shoupi": 1}, "cost": 40},
+    "xisui_dan": {"materials": {"lingcao": 3, "longxiancao": 2, "yaodan": 2}, "cost": 800},
     "pojing_dan": {"materials": {"lingcao": 2, "yaodan": 1}, "cost": 60},
     "huiling_dan": {"materials": {"lingcao": 1, "lingquan": 1}, "cost": 20},
+    "dahuan_dan": {"materials": {"lingcao": 2, "lingquan": 2}, "cost": 100},
+    "niepan_dan": {"materials": {"longxiancao": 1, "xingchenshi": 1}, "cost": 200},
+    "kuangbao_dan": {"materials": {"lingcao": 2, "xuantie": 2, "yaodan": 1}, "cost": 150},
     "jingyuan_dan": {"materials": {"yaodan": 2}, "cost": 30},
+    "ningpo_dan": {"materials": {"yaodan": 2, "xingchenshi": 1}, "cost": 80},
 }
 
 # 炼器消耗
-FORGE_COST = {"materials": {"lingcao": 2, "yaodan": 2, "lingquan": 1}, "cost": 100}
+FORGE_COST = {"materials": {"lingcao": 2, "yaodan": 2, "lingquan": 1, "xuantie": 1}, "cost": 100}
 
 # ==================== 世界事件系统 ====================
 
@@ -270,10 +298,12 @@ WORLD_EVENTS = {
     },
     "shanggu_mijing": {
         "name": "上古秘境开启",
+        "opens_secret_realm": True,
         "desc": "上古秘境开启，全服玩家可进入探索，获得稀有功法、装备、材料",
     },
     "tiandi_yixiang": {
         "name": "天地异象",
+        "explore_luck": 1.5,
         "desc": "天地异象频生，可能触发隐藏任务、特殊NPC、神秘传承",
     },
     "tianjiang_lingyu": {
@@ -331,31 +361,56 @@ SHOP_GOODS = [
     {"item_id": "xiulian_dan", "price": 200},
     {"item_id": "ningshen_dan", "price": 500},
     {"item_id": "peiyuan_dan", "price": 1500},
+    {"item_id": "wudao_dan", "price": 3000},
     {"item_id": "yunlun_dan", "price": 400},
     {"item_id": "tianji_dan", "price": 1500},
+    {"item_id": "dali_wan", "price": 300},
+    {"item_id": "jingang_dan", "price": 300},
+    {"item_id": "qixue_dan", "price": 300},
+    {"item_id": "xisui_dan", "price": 5000},
     {"item_id": "pojing_dan", "price": 300},
     {"item_id": "jingyuan_dan", "price": 150},
+    {"item_id": "ningpo_dan", "price": 400},
     {"item_id": "huiling_dan", "price": 100},
+    {"item_id": "dahuan_dan", "price": 500},
+    {"item_id": "niepan_dan", "price": 1000},
+    {"item_id": "kuangbao_dan", "price": 800},
 ]
 
 # 商城回购价格（玩家将材料/丹药卖给商城换灵石）
+# 平衡规则：回购价约为商城售价的 60%，避免低买高卖刷灵石
 SHOP_BUYBACK = {
-    "lingcao": 30,
-    "yaodan": 60,
-    "lingquan": 80,
-    "jusan_san": 50,
-    "xiulian_dan": 100,
-    "ningshen_dan": 250,
-    "peiyuan_dan": 750,
-    "yunlun_dan": 200,
-    "tianji_dan": 750,
-    "pojing_dan": 150,
-    "huiling_dan": 50,
-    "jingyuan_dan": 75,
+    "lingcao": 50,
+    "yaodan": 100,
+    "lingquan": 120,
+    "xuantie": 200,
+    "zijinsha": 250,
+    "shoupi": 150,
+    "longxiancao": 300,
+    "xingchenshi": 400,
+    "qiannian_ls": 500,
+    "jusan_san": 60,
+    "xiulian_dan": 120,
+    "ningshen_dan": 300,
+    "peiyuan_dan": 900,
+    "wudao_dan": 1800,
+    "yunlun_dan": 240,
+    "tianji_dan": 900,
+    "dali_wan": 180,
+    "jingang_dan": 180,
+    "qixue_dan": 180,
+    "xisui_dan": 3000,
+    "pojing_dan": 180,
+    "huiling_dan": 60,
+    "jingyuan_dan": 90,
+    "ningpo_dan": 240,
+    "dahuan_dan": 300,
+    "niepan_dan": 600,
+    "kuangbao_dan": 480,
 }
 
-# 装备按品质回购（武器/法袍/法宝统一价格）
-EQUIP_BUYBACK = {"普通": 100, "优秀": 300, "极品": 800, "灵器": 2000, "仙器": 5000}
+# 装备按品质回购（武器/法袍/法宝/戒指/战靴统一价格）
+EQUIP_BUYBACK = {"普通": 150, "优秀": 400, "极品": 1000, "灵器": 2500, "仙器": 6000}
 
 # ==================== 修炼/战斗基础数值 ====================
 
@@ -382,6 +437,13 @@ TRASH_FORTUNE = 10000
 
 # 炉鼎收益：每个炉鼎提供的修炼加速
 FURNACE_RATE_BONUS = 0.10
+
+# 双修修为收益：当前境界容量的百分比
+XIUXIU_PROGRESS_RATE = 0.05
+
+# 丹药效果递减：同种修为丹药每次服用效果下降的步长，最低降至
+PILL_DIMINISH_STEP = 0.125
+PILL_DIMINISH_MIN = 0.5
 
 # 突破失败产生的瓶颈冷却时间（分钟），期间无法再次突破
 BOTTLENECK_MINUTES = 30

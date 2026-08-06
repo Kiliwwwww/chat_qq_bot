@@ -14,41 +14,55 @@ from . import rng
 # key: 结果类型；coins/items/progress 为产出；risk 为危险结果
 EXPLORE_POOL = {
     "洞府": [
-        {"key": "coin", "weight": 40, "text": "在洞府密室中发现了一些前人遗留的灵石", "coins": 50},
-        {"key": "lingcao", "weight": 25, "text": "在洞府后院采到几株灵草", "items": {"lingcao": 2}},
-        {"key": "progress", "weight": 20, "text": "触景生情，感悟天地之道", "progress": 120},
-        {"key": "lingquan", "weight": 10, "text": "发现一处隐蔽的灵泉", "items": {"lingquan": 1}},
+        {"key": "coin", "weight": 35, "text": "在洞府密室中发现了一些前人遗留的灵石", "coins": 50},
+        {"key": "lingcao", "weight": 22, "text": "在洞府后院采到几株灵草", "items": {"lingcao": 2}},
+        {"key": "progress", "weight": 18, "text": "触景生情，感悟天地之道", "progress": 120},
+        {"key": "lingquan", "weight": 9, "text": "发现一处隐蔽的灵泉", "items": {"lingquan": 1}},
+        {"key": "xuantie", "weight": 8, "text": "在洞府矿藏中挖到一块玄铁", "items": {"xuantie": 1}},
+        {"key": "shoupi", "weight": 6, "text": "找到一张结实的兽皮", "items": {"shoupi": 1}},
         {"key": "pet", "weight": 3, "text": "捡到一枚神秘的灵宠蛋"},
         {"key": "equip", "weight": 2, "text": "在角落找到一件蒙尘的宝物"},
     ],
     "灵脉": [
-        {"key": "coin", "weight": 35, "text": "在灵脉中采掘到大量灵石矿", "coins": 120},
-        {"key": "progress", "weight": 30, "text": "借灵脉之势参悟道法，修为大进", "progress": 300},
-        {"key": "lingquan", "weight": 20, "text": "灵脉深处涌出一汪灵泉", "items": {"lingquan": 2}},
-        {"key": "pet", "weight": 8, "text": "灵脉中孕育着一枚灵兽蛋"},
-        {"key": "equip", "weight": 7, "text": "从矿脉中挖出一件埋藏已久的法宝"},
+        {"key": "coin", "weight": 30, "text": "在灵脉中采掘到大量灵石矿", "coins": 120},
+        {"key": "progress", "weight": 26, "text": "借灵脉之势参悟道法，修为大进", "progress": 300},
+        {"key": "lingquan", "weight": 18, "text": "灵脉深处涌出一汪灵泉", "items": {"lingquan": 2}},
+        {"key": "xuantie", "weight": 10, "text": "采到一块高品质玄铁", "items": {"xuantie": 2}},
+        {"key": "xingchenshi", "weight": 5, "text": "在灵脉深处发现星辰石", "items": {"xingchenshi": 1}},
+        {"key": "pet", "weight": 7, "text": "灵脉中孕育着一枚灵兽蛋"},
+        {"key": "equip", "weight": 6, "text": "从矿脉中挖出一件埋藏已久的法宝"},
     ],
     "妖兽森林": [
-        {"key": "yaodan", "weight": 35, "text": "猎杀妖兽，收获妖丹", "items": {"yaodan": 2}},
-        {"key": "coin", "weight": 25, "text": "从妖兽巢穴搜刮到灵石", "coins": 100},
-        {"key": "progress", "weight": 15, "text": "与妖兽搏斗，实战感悟颇多", "progress": 200},
-        {"key": "pet", "weight": 8, "text": "捕获一只幼兽作为灵宠"},
+        {"key": "yaodan", "weight": 28, "text": "猎杀妖兽，收获妖丹", "items": {"yaodan": 2}},
+        {"key": "coin", "weight": 20, "text": "从妖兽巢穴搜刮到灵石", "coins": 100},
+        {"key": "shoupi", "weight": 15, "text": "剥下妖兽的兽皮", "items": {"shoupi": 2}},
+        {"key": "progress", "weight": 13, "text": "与妖兽搏斗，实战感悟颇多", "progress": 200},
+        {"key": "xuantie", "weight": 8, "text": "从妖兽巢穴中找到玄铁", "items": {"xuantie": 1}},
+        {"key": "pet", "weight": 7, "text": "捕获一只幼兽作为灵宠"},
         {"key": "equip", "weight": 5, "text": "从妖兽尸体旁捡到一件宝物"},
         {"key": "risk", "weight": 12, "text": "遭遇强大妖兽，重伤而逃", "lose_coins": 60},
     ],
     "秘境": [
-        {"key": "equip", "weight": 20, "text": "在秘境宝库中发现稀世神兵"},
-        {"key": "progress", "weight": 25, "text": "秘境灵气充沛，修为暴涨", "progress": 800},
-        {"key": "yaodan", "weight": 15, "text": "猎杀秘境守卫妖兽，获得妖丹", "items": {"yaodan": 3}},
-        {"key": "lingquan", "weight": 10, "text": "饮下秘境灵泉，脱胎换骨", "items": {"lingquan": 3}},
-        {"key": "pet", "weight": 10, "text": "秘境中收服一只上古异兽"},
-        {"key": "coin", "weight": 10, "text": "秘境中藏有大量灵石", "coins": 300},
+        {"key": "equip", "weight": 18, "text": "在秘境宝库中发现稀世神兵"},
+        {"key": "progress", "weight": 22, "text": "秘境灵气充沛，修为暴涨", "progress": 800},
+        {"key": "yaodan", "weight": 12, "text": "猎杀秘境守卫妖兽，获得妖丹", "items": {"yaodan": 3}},
+        {"key": "lingquan", "weight": 9, "text": "饮下秘境灵泉，脱胎换骨", "items": {"lingquan": 3}},
+        {"key": "longxiancao", "weight": 8, "text": "采到一株龙涎草", "items": {"longxiancao": 1}},
+        {"key": "qiannian_ls", "weight": 6, "text": "寻得千年灵参", "items": {"qiannian_ls": 1}},
+        {"key": "xingchenshi", "weight": 7, "text": "拾得一枚星辰石", "items": {"xingchenshi": 2}},
+        {"key": "zijinsha", "weight": 8, "text": "找到一把紫金砂", "items": {"zijinsha": 1}},
+        {"key": "pet", "weight": 9, "text": "秘境中收服一只上古异兽"},
+        {"key": "coin", "weight": 8, "text": "秘境中藏有大量灵石", "coins": 300},
         {"key": "risk", "weight": 10, "text": "触发秘境机关，狼狈逃离", "lose_coins": 100},
     ],
 }
 
 # 气运修正的正面结果
-_POSITIVE_KEYS = ["coin", "lingcao", "yaodan", "lingquan", "progress", "pet", "equip"]
+_POSITIVE_KEYS = [
+    "coin", "lingcao", "yaodan", "lingquan", "progress",
+    "pet", "equip", "xuantie", "zijinsha", "shoupi",
+    "longxiancao", "xingchenshi", "qiannian_ls",
+]
 
 # 各地点探索的基础灵石收益（每次探索必定获得）
 _LOCATION_BASE_COINS = {
@@ -85,6 +99,14 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    from . import combat
+    combat.try_revive(group_id, user_id)
+    player = db.get_player(group_id, user_id)
+    if combat.is_dead(player):
+        return {"ok": False, "text": f"你已归西，气血归零无法探索！还需 {combat.dead_remain_seconds(player)} 秒复活"}
+    if combat.get_cur_hp(player) <= 0:
+        return {"ok": False, "text": "你气血耗尽，无法探索！服用回灵丹/大还丹恢复气血"}
 
     if db.get_cultivation(group_id, user_id):
         return {"ok": False, "text": "你正在闭关修炼中，无法探索，先「出关」吧"}
@@ -152,6 +174,11 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
     if outcome["key"] == "equip":
         equip_text = _grant_equip(group_id, user_id)
         result["text"] += f"\n🎁 {equip_text}"
+
+    # 危险结果扣除血量（血量过低需回血，归西则 60 秒后复活）
+    if outcome["key"] == "risk":
+        dmg = combat.apply_negative_damage(group_id, user_id)
+        result["text"] += f"\n🩸 {dmg['text']}"
 
     # 高气运额外触发隐藏机缘（仙缘降临事件提升触发率与奖励）
     from . import world

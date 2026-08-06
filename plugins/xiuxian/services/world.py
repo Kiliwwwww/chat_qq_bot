@@ -54,9 +54,18 @@ def is_event_active(group_id: int) -> bool:
 
 
 def is_secret_realm_open(group_id: int) -> bool:
-    """秘境是否开启"""
+    """秘境是否开启。
+
+    只要「上古秘境」事件正在持续，无论秘境时间戳数据是否已同步，都视为开启，
+    避免出现"事件显示开启但进不去"的情况。
+    """
     state = ensure_world(group_id)
-    return time.time() < state.get("secret_realm_end_time", 0)
+    if time.time() < state.get("secret_realm_end_time", 0):
+        return True
+    event_id = state.get("current_event", "")
+    if event_id == "shanggu_mijing":
+        return is_event_active(group_id)
+    return False
 
 
 def is_merchant_active(group_id: int) -> bool:
@@ -156,7 +165,11 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
     # 3. 事件切换
     if event_active:
         # 事件持续中（事件效果在计算时另行应用）
-        pass
+        # 上古秘境事件：秘境开启时间与事件保持同步（修复旧数据/重启导致秘境提前关闭）
+        if event_id == "shanggu_mijing":
+            realm_end = state.get("secret_realm_end_time", 0)
+            if now >= realm_end:
+                db.update_world_state(group_id, {"secret_realm_end_time": event_end})
     else:
         # 事件已结束，尝试触发新事件
         if event_id:
@@ -165,20 +178,25 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
         if random.random() < 0.35:
             new_event = _roll_event()
             duration = config.world_event_duration * 60
+            new_end = now + duration
             db.update_world_state(group_id, {
                 "current_event": new_event,
-                "event_end_time": now + duration,
+                "event_end_time": new_end,
             })
             event_info = constants.WORLD_EVENTS[new_event]
-            # 上古秘境事件自动开启秘境
+            # 上古秘境事件自动开启秘境（持续整个事件期间）
             if new_event == "shanggu_mijing":
                 db.update_world_state(group_id, {
-                    "secret_realm_end_time": now + config.secret_realm_duration * 60,
+                    "secret_realm_end_time": new_end,
                 })
             db.log_world_event(group_id, new_event, event_info["name"])
             announcements.append({
                 "type": "event",
-                "text": f"🌍 【世界事件】{event_info['name']}\n{event_info['desc']}",
+                "text": (
+                    f"🌍 【世界事件】{event_info['name']}\n"
+                    f"{event_info['desc']}\n"
+                    f"⚡ 效果：{format_event_effects(event_info)}"
+                ),
             })
 
     # 4. 神秘商人出现/消失
@@ -255,6 +273,28 @@ def start_world_scheduler() -> None:
         logger.error(f"注册世界 Tick 任务失败: {e}")
 
 
+def format_event_effects(event: dict) -> str:
+    """将世界事件的数值效果格式化为详细描述"""
+    if not event:
+        return "暂无特殊效果"
+    parts = []
+    if event.get("rate"):
+        parts.append(f"修炼速度 ×{event['rate']}")
+    if event.get("breakthrough"):
+        parts.append(f"突破成功率 +{int(event['breakthrough'] * 100)}%")
+    if event.get("forest"):
+        parts.append(f"妖兽森林收益 ×{event['forest']}")
+    if event.get("risk"):
+        parts.append(f"妖兽森林遇险率 +{int(event['risk'] * 100)}%")
+    if event.get("enlighten"):
+        parts.append(f"顿悟概率 +{int(event['enlighten'] * 100)}%")
+    if event.get("explore_luck"):
+        parts.append(f"探索奇遇 ×{event['explore_luck']}")
+    if event.get("opens_secret_realm"):
+        parts.append("开启秘境供探索")
+    return "，".join(parts) if parts else "暂无特殊效果"
+
+
 def format_world_status(group_id: int) -> str:
     """格式化世界状态展示文本"""
     state = ensure_world(group_id)
@@ -268,6 +308,7 @@ def format_world_status(group_id: int) -> str:
         event = constants.WORLD_EVENTS[event_id]
         remaining = int((state["event_end_time"] - time.time()) / 60)
         lines.append(f"✨ 当前事件：{event['name']}（剩余 {max(remaining, 0)} 分钟）")
+        lines.append(f"   ⚡ 效果：{format_event_effects(event)}")
     else:
         lines.append("✨ 当前事件：暂无（天地平静）")
     lines.append(f"🏪 神秘商人：{'在场' if is_merchant_active(group_id) else '未现身'}")

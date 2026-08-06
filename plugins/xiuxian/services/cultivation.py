@@ -8,7 +8,7 @@ import time
 
 from .. import constants
 from ..state import config, db
-from . import rng, world
+from . import combat, rng, world
 
 
 def calculate_rate(group_id: int, player: dict, location: str) -> float:
@@ -110,6 +110,14 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
     if not player:
         return False, "你还没有修仙角色，发送「我要修仙」创建角色"
 
+    # 归西复活检查（复活时间到则自动复活）
+    combat.try_revive(group_id, user_id)
+    player = db.get_player(group_id, user_id)
+    if combat.is_dead(player):
+        return False, f"你已归西，气血归零无法修炼！还需 {combat.dead_remain_seconds(player)} 秒复活"
+    if combat.get_cur_hp(player) <= 0:
+        return False, "你气血耗尽，无法修炼！服用回灵丹/大还丹恢复气血"
+
     if db.get_cultivation(group_id, user_id):
         return False, "你正在闭关修炼中，先「出关」吧"
 
@@ -152,19 +160,28 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
         "rate": round(rate, 1),
         "progress": 0.0,
         "coins": 0,
+        "healed_full": False,
         "risk_failed": False,
         "risk_text": "",
         "enlighten": False,
         "gongfa_levelup": [],
     }
 
-    # 失败判定（遇险）：气运越高越容易避开危险
+    # 闭关满一定时长，出关后气血回满（静养恢复）
+    if elapsed_sec >= config.cultivation_heal_minutes * 60:
+        heal = combat.heal_full(group_id, user_id)
+        result["healed_full"] = True
+        result["healed_hp"] = f"{heal['hp']}/{heal['max_hp']}"
+
+    # 失败判定（遇险）：气运越高越容易避开危险，遇险会扣除气血
     risk = _location_risk(group_id, location)
     if rng.risk_roll(risk, player.get("fortune", 1000)):
         lost = progress * 0.3
         progress -= lost
         result["risk_failed"] = True
         result["risk_text"] = f"⚠️ 修炼途中遭遇{random.choice(['妖兽突袭', '灵气暴乱', '心魔入侵'])}，损失部分修为！"
+        dmg = combat.apply_negative_damage(group_id, user_id)
+        result["risk_text"] += f"\n🩸 {dmg['text']}"
 
     # 顿悟判定（气运越高越容易触发，道韵弥漫事件额外加成）
     enlighten_chance = constants.ENLIGHTEN_CHANCE + world.enlighten_bonus(group_id)
@@ -214,6 +231,8 @@ def format_settle_result(group_id: int, result: dict) -> str:
     ]
     if result.get("coins"):
         lines.append(f"💰 获得灵石：{result['coins']}")
+    if result.get("healed_full"):
+        lines.append(f"💚 静养恢复：气血回满（{result.get('healed_hp', '')}）")
     if result.get("risk_text"):
         lines.append(result["risk_text"])
     if result.get("gongfa_levelup"):

@@ -76,6 +76,7 @@ def create_character(group_id: int, user_id: int, name: str, talent: str) -> tup
         "attack": base_stats["attack"],
         "defense": base_stats["defense"],
         "hp": base_stats["hp"],
+        "cur_hp": base_stats["hp"],
         "coin": 100,
         "alchemy_level": 1,
         "forge_level": 1,
@@ -147,10 +148,20 @@ def format_player_profile(group_id: int, player: dict, gongfa_text: str = "") ->
         f"🔰 境界：{realm_name}（修为 {int(player.get('realm_progress', 0))}/{int(capacity) if capacity else '∞'}）",
         f"⚡ 灵根：{root.get('name', player['spirit_root'])}（{player['spirit_quality']}）",
         f"🍀 气运：{player.get('fortune', 0)}",
-        f"⚔️ 攻击：{player.get('attack', 0)}  🛡️ 防御：{player.get('defense', 0)}  ❤️ 气血：{player.get('hp', 0)}",
+        f"⚔️ 攻击：{player.get('attack', 0)}  🛡️ 防御：{player.get('defense', 0)}  ❤️ 气血上限：{player.get('hp', 0)}",
         f"💰 灵石：{player.get('coin', 0)}",
         f"🏃 天命：{'随机天命' if player.get('talent') != 'trash' else '废材流主角'}",
     ]
+    # 血量与归西状态
+    from . import combat
+    max_hp = combat.get_max_hp(player)
+    cur_hp = combat.get_cur_hp(player)
+    if combat.is_dead(player):
+        lines.append(f"💀 状态：归西（{combat.dead_remain_seconds(player)} 秒后复活）")
+    else:
+        lines.append(f"🩸 血量：{cur_hp}/{max_hp}")
+    if player.get("pk_boost", 0):
+        lines.append(f"💥 狂暴之力：下次 PK 战力 +{int(player['pk_boost'] * 100)}%")
     if player.get("rebirth_count"):
         lines.append(f"🌀 转世：{player.get('rebirth_count')} 次（修炼速率永久 +{int(player.get('rebirth_count', 0) * config.rebirth_rate_bonus * 100)}%）")
     if player.get("physique"):
@@ -201,6 +212,12 @@ def rebirth(group_id: int, user_id: int) -> dict:
         "weapon": "",
         "armor": "",
         "treasure": "",
+        "ring": "",
+        "boots": "",
+        "cur_hp": base_stats["hp"],
+        "dead_until": 0,
+        "pk_boost": 0,
+        "pk_hp_cost": 0,
         "fortune": new_fortune,
         "rebirth_count": rebirth_count,
     })

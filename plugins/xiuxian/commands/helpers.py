@@ -1,7 +1,7 @@
 """命令层公共工具。"""
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageEvent
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageEvent, MessageSegment
 from nonebot.rule import Rule
 
 from ..state import db
@@ -33,6 +33,12 @@ def xiuxian_command(cmd: str, aliases=None, **kwargs):
     )
 
 
+async def reply_finish(matcher, event: MessageEvent, content):
+    """以「引用回复」的形式结束指令，回复会引用用户的原消息。"""
+    msg = MessageSegment.reply(event.message_id) + content
+    await matcher.finish(msg)
+
+
 def require_group(event: MessageEvent) -> int:
     """校验群聊消息，非群聊返回 0（调用方据此提示）"""
     if not isinstance(event, GroupMessageEvent):
@@ -47,9 +53,9 @@ async def require_game(matcher, event: MessageEvent) -> int:
     """
     group_id = require_group(event)
     if not group_id:
-        await matcher.finish("修仙游戏只在群聊中生效哦")
+        await reply_finish(matcher, event, "修仙游戏只在群聊中生效哦")
     if not db.is_game_enabled(group_id):
-        await matcher.finish("⛔ 本群修仙功能已关闭，管理员发送「开启修仙」可重新启用")
+        await reply_finish(matcher, event, "⛔ 本群修仙功能已关闭，管理员发送「开启修仙」可重新启用")
     return group_id
 
 

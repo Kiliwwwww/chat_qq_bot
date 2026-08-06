@@ -9,13 +9,19 @@ import time
 
 from .. import constants
 from ..state import config, db, get_cache
-from . import rng
+from . import rng, stats
 
 _ESCAPE_COOLDOWN = 120  # 挣脱尝试冷却（秒）
 
 
 def capture(group_id: int, attacker_id: int, target_id: int) -> dict:
-    """抓捕低境界玩家作为炉鼎"""
+    """抓捕低境界玩家作为炉鼎。
+
+    抓捕需满足：
+    - 境界高于对方
+    - 战力高于对方
+    - 成功率受战力差距与双方气运影响（气运高者更难被抓，更容易抓人）
+    """
     attacker = db.get_player(group_id, attacker_id)
     target = db.get_player(group_id, target_id)
     if not attacker:
@@ -28,6 +34,12 @@ def capture(group_id: int, attacker_id: int, target_id: int) -> dict:
     # 境界判定
     if attacker["realm"] <= target["realm"]:
         return {"ok": False, "text": "只有境界高于对方才能抓捕炉鼎"}
+
+    # 战力对比
+    attacker_power = stats.get_power(group_id, attacker)
+    target_power = stats.get_power(group_id, target)
+    if attacker_power <= target_power:
+        return {"ok": False, "text": f"战力不足！你的战力 {attacker_power} 不高于对方 {target_power}，无法压制抓捕"}
 
     # 对方必须正在闭关
     if not db.get_cultivation(group_id, target_id):
@@ -44,18 +56,92 @@ def capture(group_id: int, attacker_id: int, target_id: int) -> dict:
     if len(db.get_furnaces_by_owner(group_id, attacker_id)) >= furnace_limit:
         return {"ok": False, "text": f"炉鼎数量已达上限（{furnace_limit} 个）"}
 
-    # 抓捕成功率：境界差越大越容易
+    # 抓捕成功率：基础随战力压制与境界差提升，双方气运影响成败
+    power_ratio = target_power / max(1, attacker_power)  # 0~1，越接近1越难
     diff = attacker["realm"] - target["realm"]
-    success_chance = 0.5 + diff * 0.1
+    base = 0.7 - power_ratio * 0.25  # 0.45 ~ 0.7
+    base += max(0, diff) * 0.04
+    base += rng.fortune_factor(attacker.get("fortune", 1000)) * 0.5
+    base -= rng.fortune_factor(target.get("fortune", 1000)) * 0.5
+    success_chance = min(0.95, max(0.05, base))
     if not rng.luck_roll(success_chance, attacker.get("fortune", 1000)):
-        return {"ok": False, "text": "抓捕失败！对方奋力反抗，逃脱了你的掌控"}
+        return {"ok": False, "text": f"抓捕失败！对方气运庇护，挣脱了你的掌控（成功率 {int(success_chance * 100)}%）"}
 
     if not db.add_furnace(group_id, attacker_id, target_id):
         return {"ok": False, "text": "抓捕失败，请稍后再试"}
 
     # 打断对方修炼
     db.end_cultivation(group_id, target_id)
-    return {"ok": True, "text": f"⚡ 抓捕成功！已将对方收为炉鼎，修炼效率提升！"}
+    return {
+        "ok": True,
+        "text": (
+            f"⚡ 抓捕成功！已将对方收为炉鼎，修炼效率提升！\n"
+            f"📊 战力对比：你 {attacker_power} > 对方 {target_power}，成功率 {int(success_chance * 100)}%"
+        ),
+    }
+
+
+def xiuxiu(group_id: int, user_id: int, index: int) -> dict:
+    """与自己的炉鼎双修，获得修为。
+
+    双修收益 = 基础修为 + 炉鼎境界加成，带冷却时间。
+    """
+    player = db.get_player(group_id, user_id)
+    if not player:
+        return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    from . import combat
+    if combat.is_dead(player):
+        return {"ok": False, "text": f"你已归西，还需 {combat.dead_remain_seconds(player)} 秒复活，无法双修"}
+
+    furnaces = db.get_furnaces_by_owner(group_id, user_id)
+    if not furnaces:
+        return {"ok": False, "text": "你还没有炉鼎，无法双修！先「抓捕」一个闭关玩家吧"}
+
+    if index < 1 or index > len(furnaces):
+        return {"ok": False, "text": f"炉鼎编号不存在（1~{len(furnaces)}）"}
+
+    # 冷却检查
+    now = time.time()
+    cooldown_until = player.get("xiuxiu_until", 0) or 0
+    if now < cooldown_until:
+        remain = int(cooldown_until - now)
+        minutes = remain // 60
+        seconds = remain % 60
+        return {"ok": False, "text": f"双修消耗元阳，还需 {minutes} 分 {seconds} 秒才能再次双修"}
+
+    furnace = furnaces[index - 1]
+    target = db.get_player(group_id, furnace["target_id"])
+    target_realm = target["realm"] if target else 0
+
+    # 双修收益：当前境界容量的百分比
+    realm_index = player.get("realm", 0)
+    capacity = constants.REALMS[realm_index]["capacity"]
+    if capacity:
+        gain = int(capacity * constants.XIUXIU_PROGRESS_RATE)
+    else:
+        # 飞升之境无容量上限，按当前修为百分比保底
+        gain = max(100, int(player.get("realm_progress", 0) * constants.XIUXIU_PROGRESS_RATE))
+    gain = max(1, gain)
+
+    current = player.get("realm_progress", 0) + gain
+    if capacity:
+        current = min(current, capacity)
+    db.update_player(group_id, user_id, {
+        "realm_progress": current,
+        "xiuxiu_until": now + config.xiuxiu_cooldown_minutes * 60,
+    })
+
+    target_name = target["name"] if target else str(furnace["target_id"])
+    target_realm_name = constants.REALMS[target_realm]["name"] if target else "炼气"
+    return {
+        "ok": True,
+        "text": (
+            f"💞 【双修】你与炉鼎「{target_name}」（{target_realm_name}）阴阳交融，气息暴涨！\n"
+            f"✨ 获得修为 {gain}（当前境界容量的 {int(constants.XIUXIU_PROGRESS_RATE * 100)}%）（当前 {int(current)}）\n"
+            f"⏳ 下次双修需等待 {config.xiuxiu_cooldown_minutes} 分钟"
+        ),
+    }
 
 
 def list_furnaces(group_id: int, user_id: int) -> str:

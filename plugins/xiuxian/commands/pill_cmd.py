@@ -7,7 +7,7 @@ from .. import constants
 from ..state import db
 from ..services import market as market_svc
 from ..services import pill as pill_svc
-from .helpers import require_game, xiuxian_command
+from .helpers import require_game, xiuxian_command, reply_finish
 
 # 服用丹药
 use_pill_cmd = xiuxian_command("服用", aliases={"服丹", "使用丹药"}, priority=5, block=True)
@@ -48,25 +48,35 @@ def _resolve_sell_item(group_id: int, user_id: int, name: str) -> str:
 async def handle_use_pill(bot: Bot, event, args: Message = CommandArg()):
     group_id = await require_game(use_pill_cmd, event)
 
-    name = args.extract_plain_text().strip()
-    if not name:
+    parts = args.extract_plain_text().strip().split()
+    if not parts:
         pills = "、".join(
             v["name"] for v in constants.ITEMS.values() if v.get("type") == "pill"
         )
-        await use_pill_cmd.finish(f"请指定要服用的丹药名，如：服用 修炼丹\n可用丹药：{pills}")
+        await reply_finish(use_pill_cmd, event, f"请指定要服用的丹药名，如：服用 修炼丹\n可用丹药：{pills}")
+
+    name = parts[0]
+    quantity = 1
+    if len(parts) > 1:
+        try:
+            quantity = int(parts[1])
+        except ValueError:
+            await reply_finish(use_pill_cmd, event, "数量必须是数字，如：服用 修炼丹 5")
+    if quantity <= 0:
+        await reply_finish(use_pill_cmd, event, "数量必须为正数")
 
     pill_key = _resolve_pill_key(name)
     if not pill_key:
-        await use_pill_cmd.finish(f"没有叫「{name}」的丹药")
+        await reply_finish(use_pill_cmd, event, f"没有叫「{name}」的丹药")
 
-    result = pill_svc.use_pill(group_id, event.user_id, pill_key)
-    await use_pill_cmd.finish(result["text"])
+    result = pill_svc.use_pill(group_id, event.user_id, pill_key, quantity)
+    await reply_finish(use_pill_cmd, event, result["text"])
 
 
 @shop_cmd.handle()
 async def handle_shop(bot: Bot, event, args: Message = CommandArg()):
     group_id = await require_game(shop_cmd, event)
-    await shop_cmd.finish(market_svc.format_shop())
+    await reply_finish(shop_cmd, event, market_svc.format_shop())
 
 
 @shop_buy_cmd.handle()
@@ -75,9 +85,9 @@ async def handle_shop_buy(bot: Bot, event, args: Message = CommandArg()):
 
     arg = args.extract_plain_text().strip()
     if not arg.isdigit():
-        await shop_buy_cmd.finish("请指定商品编号，如：商城购买 1（发送「商城」查看）")
+        await reply_finish(shop_buy_cmd, event, "请指定商品编号，如：商城购买 1（发送「商城」查看）")
     result = market_svc.buy_shop_item(group_id, event.user_id, int(arg))
-    await shop_buy_cmd.finish(result["text"])
+    await reply_finish(shop_buy_cmd, event, result["text"])
 
 
 @shop_sell_cmd.handle()
@@ -86,16 +96,16 @@ async def handle_shop_sell(bot: Bot, event, args: Message = CommandArg()):
 
     parts = args.extract_plain_text().strip().split()
     if not parts:
-        await shop_sell_cmd.finish("请指定要出售的物品，如：商城出售 灵草 5\n支持出售：灵草/妖丹/灵泉/各种丹药/装备")
+        await reply_finish(shop_sell_cmd, event, "请指定要出售的物品，如：商城出售 灵草 5\n支持出售：灵草/妖丹/灵泉/各种丹药/装备")
     name = parts[0]
     try:
         quantity = int(parts[1]) if len(parts) > 1 else 1
     except ValueError:
-        await shop_sell_cmd.finish("数量必须是数字")
+        await reply_finish(shop_sell_cmd, event, "数量必须是数字")
 
     item_id = _resolve_sell_item(group_id, event.user_id, name)
     if not item_id:
-        await shop_sell_cmd.finish(f"无法识别可出售的物品「{name}」，请使用背包中的物品名")
+        await reply_finish(shop_sell_cmd, event, f"无法识别可出售的物品「{name}」，请使用背包中的物品名")
 
     result = market_svc.sell_to_shop(group_id, event.user_id, item_id, quantity)
-    await shop_sell_cmd.finish(result["text"])
+    await reply_finish(shop_sell_cmd, event, result["text"])
