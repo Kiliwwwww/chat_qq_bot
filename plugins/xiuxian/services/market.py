@@ -122,7 +122,7 @@ def format_shop() -> str:
         lines.append(f"  {i}. {item.get('name', good['item_id'])} - {good['price']} 灵石")
         lines.append(f"     💬 {item.get('desc', '')}")
     lines.append("\n💡 使用「商城购买 <名称> <数量>」购买丹药，如：商城购买 聚气散 3（也可用编号）")
-    lines.append("💡 材料/丹药/装备可卖给商城换灵石：「商城出售 <物品> <数量>」")
+    lines.append("💡 材料/丹药/突破材料/装备可卖给商城换灵石：「商城出售 <物品> <数量>」")
     return "\n".join(lines)
 
 

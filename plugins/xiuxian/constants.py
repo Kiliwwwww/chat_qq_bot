@@ -560,6 +560,25 @@ SHOP_BUYBACK = {
     "dahuan_dan": 300,
     "niepan_dan": 600,
     "kuangbao_dan": 480,
+    # 突破材料/丹药回购价（约为突破商人售价的 10%，可卖给商城换灵石）
+    "juqi_cao": 300,
+    "juqi_dan": 500,
+    "ningling_hua": 1200,
+    "ningling_dan": 2000,
+    "huaying_guo": 4000,
+    "huaying_dan": 6000,
+    "xuantian_teng": 10000,
+    "xuantian_dan": 16000,
+    "xukong_shihua": 26000,
+    "xukong_dan": 40000,
+    "hundun_linggen": 65000,
+    "hundun_dan": 100000,
+    "shanggu_shenyao": 160000,
+    "shenyao_dan": 250000,
+    "dujie_xiancao": 400000,
+    "dujie_xian_dan": 600000,
+    "feisheng_shenlian": 800000,
+    "feisheng_shendan": 1200000,
 }
 
 # 装备按品质回购（武器/法袍/法宝/戒指/战靴统一价格）
