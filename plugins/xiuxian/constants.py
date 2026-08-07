@@ -197,14 +197,21 @@ PHYSIQUE_CHANCE = 0.08
 
 # ==================== 灵宠系统 ====================
 
-# 灵宠类型：rate 为挂机收益加成，weight 为探索抽取权重
+# 灵宠类型：rate 为每级挂机收益加成，weight 为探索抽取权重
 PET_TYPES = [
-    {"id": "yaoshou", "name": "妖兽", "rate": 0.03, "weight": 70, "desc": "最常见的灵宠，忠诚可靠"},
-    {"id": "shenshou", "name": "神兽", "rate": 0.08, "weight": 25, "desc": "稀有神兽，战力超群"},
-    {"id": "shangguyz", "name": "上古异种", "rate": 0.15, "weight": 5, "desc": "远古血脉，潜力无穷"},
+    {"id": "yaoshou", "name": "妖兽", "rate": 0.03, "weight": 70, "desc": "最常见的灵宠，挂机修炼收益 +3%/级"},
+    {"id": "shenshou", "name": "神兽", "rate": 0.08, "weight": 25, "desc": "稀有神兽，挂机修炼收益 +8%/级，战力超群"},
+    {"id": "shangguyz", "name": "上古异种", "rate": 0.15, "weight": 5, "desc": "远古血脉，挂机修炼收益 +15%/级，潜力无穷"},
 ]
 
 PET_TYPE_BY_ID = {p["id"]: p for p in PET_TYPES}
+
+# 灵兽阁可购买灵兽（定价偏高，探索也有概率免费获得）
+PET_SHOP = [
+    {"pet_type": "yaoshou", "name": "妖兽", "price": 5000, "desc": "最常见的灵宠，挂机修炼收益 +3%/级"},
+    {"pet_type": "shenshou", "name": "神兽", "price": 30000, "desc": "稀有神兽，挂机修炼收益 +8%/级"},
+    {"pet_type": "shangguyz", "name": "上古异种", "price": 100000, "desc": "远古血脉，挂机修炼收益 +15%/级"},
+]
 
 # 灵宠升级所需经验：等级每提升一级所需 exp = PET_EXP_BASE * level
 PET_EXP_BASE = 100
@@ -229,6 +236,9 @@ ITEMS = {
     "longxiancao": {"name": "龙涎草", "type": "material", "desc": "高阶炼丹材料"},
     "xingchenshi": {"name": "星辰石", "type": "material", "desc": "天外陨铁，稀有炼器材料"},
     "qiannian_ls": {"name": "千年灵参", "type": "material", "desc": "稀有炼丹材料"},
+    "lingcao_seed": {"name": "灵草种子", "type": "seed", "desc": "种植后可收获灵草"},
+    "longxiancao_seed": {"name": "龙涎草种子", "type": "seed", "desc": "种植后可收获龙涎草"},
+    "qiannian_ls_seed": {"name": "千年灵参种子", "type": "seed", "desc": "种植后可收获千年灵参"},
     "xiulian_dan": {"name": "修炼丹", "type": "pill", "desc": "服用后获得修为", "effect": {"progress": 500}},
     "jusan_san": {"name": "聚气散", "type": "pill", "desc": "低阶丹药，性价比最高的基础修为丹", "effect": {"progress": 400}},
     "ningshen_dan": {"name": "凝神丹", "type": "pill", "desc": "中阶丹药，服用增加大量修为", "effect": {"progress": 800}},
@@ -239,8 +249,7 @@ ITEMS = {
     "dali_wan": {"name": "大力丸", "type": "pill", "desc": "服用后力量大增，攻击永久+20", "effect": {"attack": 20}},
     "jingang_dan": {"name": "金刚丹", "type": "pill", "desc": "服用后铜皮铁骨，防御永久+20", "effect": {"defense": 20}},
     "qixue_dan": {"name": "气血丹", "type": "pill", "desc": "服用后气血充盈，气血上限+200", "effect": {"hp": 200}},
-    "xisui_dan": {"name": "洗髓丹", "type": "pill", "desc": "服用后洗髓伐骨，灵根品质提升一级", "effect": {"upgrade_quality": True}},
-    "tianling_dan": {"name": "天灵丹", "type": "pill", "desc": "天道灵韵凝聚，服用后灵根品质提升一级", "effect": {"upgrade_quality": True}},
+    "xisui_dan": {"name": "洗髓丹", "type": "pill", "desc": "天道灵韵凝聚，服用后灵根品质提升一级（奇遇专属）", "effect": {"upgrade_quality": True}},
     "pojing_dan": {"name": "破境丹", "type": "pill", "desc": "突破时使用可大幅提高成功率", "effect": {"breakthrough": 0.15}},
     "huiling_dan": {"name": "回灵丹", "type": "pill", "desc": "服用后恢复气血", "effect": {"heal": 100}},
     "dahuan_dan": {"name": "大还丹", "type": "pill", "desc": "服用后气血全满", "effect": {"heal_full": True}},
@@ -282,7 +291,6 @@ ALCHEMY_RECIPES = {
     "dali_wan": {"materials": {"lingcao": 2, "yaodan": 1}, "cost": 40},
     "jingang_dan": {"materials": {"lingcao": 2, "xuantie": 1}, "cost": 40},
     "qixue_dan": {"materials": {"lingcao": 1, "lingquan": 1, "shoupi": 1}, "cost": 40},
-    "xisui_dan": {"materials": {"lingcao": 3, "longxiancao": 2, "yaodan": 2}, "cost": 800},
     "pojing_dan": {"materials": {"lingcao": 2, "yaodan": 1}, "cost": 60},
     "huiling_dan": {"materials": {"lingcao": 1, "lingquan": 1}, "cost": 20},
     "dahuan_dan": {"materials": {"lingcao": 2, "lingquan": 2}, "cost": 100},
@@ -294,6 +302,49 @@ ALCHEMY_RECIPES = {
 
 # 炼器消耗
 FORGE_COST = {"materials": {"lingcao": 2, "yaodan": 2, "lingquan": 1, "xuantie": 1, "zijinsha": 1}, "cost": 100}
+
+# ==================== 种植系统 ====================
+
+# 作物：seed 为所需种子，result 为收获产物，grow_minutes 为生长时长
+CROPS = {
+    "lingcao": {"name": "灵草", "seed": "lingcao_seed", "result": "lingcao", "grow_minutes": 10, "desc": "炼丹基础灵草"},
+    "longxiancao": {"name": "龙涎草", "seed": "longxiancao_seed", "result": "longxiancao", "grow_minutes": 30, "desc": "高阶炼丹灵草"},
+    "qiannian_ls": {"name": "千年灵参", "seed": "qiannian_ls_seed", "result": "qiannian_ls", "grow_minutes": 60, "desc": "稀有炼丹灵参"},
+}
+
+# ==================== 世界 Boss 系统 ====================
+
+# Boss 名字池
+BOSS_NAMES = [
+    "黑山老妖", "深渊魔尊", "九头妖王", "血魔老祖",
+    "荒古凶兽", "噬魂妖皇", "赤炎魔王", "幽冥鬼帝", "吞天巨蟒", "万妖之祖",
+]
+
+# 每 tick(60秒) 刷新 Boss 的概率
+BOSS_SPAWN_CHANCE = 0.02
+
+# Boss 存活时长（分钟）
+BOSS_LIFETIME_MINUTES = 30
+
+# 玩家讨伐冷却（秒）
+BOSS_ATTACK_COOLDOWN = 30
+
+# Boss 实力按群内最强玩家战力定（比最强玩家强一点）
+BOSS_MAX_HP_FACTOR = 10        # 血量 = 最强战力 × 10
+BOSS_ATTACK_FACTOR = 0.05      # 攻击 = 最强战力 × 5%
+BOSS_DMG_MIN = 0.10            # 玩家每次伤害下限（自身战力比例）
+BOSS_DMG_MAX = 0.20            # 玩家每次伤害上限
+BOSS_MIN_MAX_HP = 1000
+
+# 奖励
+BOSS_REWARD_BASE = 200         # 参与保底灵石
+BOSS_REWARD_MVP = 3000         # 最高伤害额外灵石
+BOSS_REWARD_LAST_HIT = 1500    # 最后一击额外灵石
+BOSS_SHARE_POOL_FACTOR = 0.10  # 伤害分成灵石池 = Boss血量 × 系数
+BOSS_PROGRESS_REWARD = 0.05    # 修为奖励 = 自身战力 × 系数
+
+# 灵气潮汐事件期间玩家伤害倍率
+BOSS_EVENT_DAMAGE_MULT = 1.3
 
 # ==================== 世界事件系统 ====================
 
@@ -374,6 +425,9 @@ MERCHANT_GOODS = [
 # 常驻商城：长期出售的丹药（价格高于炼丹成本，方便缺材料的玩家直接购买）
 SHOP_GOODS = [
     {"item_id": "zijinsha", "price": 250},
+    {"item_id": "lingcao_seed", "price": 50},
+    {"item_id": "longxiancao_seed", "price": 200},
+    {"item_id": "qiannian_ls_seed", "price": 400},
     {"item_id": "jusan_san", "price": 100},
     {"item_id": "xiulian_dan", "price": 200},
     {"item_id": "ningshen_dan", "price": 500},
@@ -384,7 +438,6 @@ SHOP_GOODS = [
     {"item_id": "dali_wan", "price": 300},
     {"item_id": "jingang_dan", "price": 300},
     {"item_id": "qixue_dan", "price": 300},
-    {"item_id": "xisui_dan", "price": 5000},
     {"item_id": "pojing_dan", "price": 300},
     {"item_id": "jingyuan_dan", "price": 150},
     {"item_id": "ningpo_dan", "price": 400},
@@ -406,6 +459,9 @@ SHOP_BUYBACK = {
     "longxiancao": 300,
     "xingchenshi": 400,
     "qiannian_ls": 500,
+    "lingcao_seed": 30,
+    "longxiancao_seed": 120,
+    "qiannian_ls_seed": 240,
     "jusan_san": 60,
     "xiulian_dan": 120,
     "ningshen_dan": 300,
@@ -417,7 +473,6 @@ SHOP_BUYBACK = {
     "jingang_dan": 180,
     "qixue_dan": 180,
     "xisui_dan": 3000,
-    "tianling_dan": 3000,
     "pojing_dan": 180,
     "huiling_dan": 60,
     "jingyuan_dan": 90,
@@ -544,7 +599,7 @@ ENCOUNTERS = [
         "weight": 6,
         "desc": "你感应到一缕天道灵韵，似有灵根在此处悄然孕育",
         "success_chance": 0.55,
-        "success": {"items": {"tianling_dan": 1}, "progress": 200, "text": "你寻得天地灵根凝聚的天灵丹，药香绕体三日不散！"},
+        "success": {"items": {"xisui_dan": 1}, "progress": 200, "text": "你寻得天地灵根凝聚的洗髓丹，药香绕体三日不散！"},
         "fail": {"damage": 0.15, "text": "灵根灵性反噬，你气血翻涌，受伤不轻！"},
     },
 ]

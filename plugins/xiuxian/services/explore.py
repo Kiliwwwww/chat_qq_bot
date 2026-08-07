@@ -57,13 +57,16 @@ EXPLORE_POOL = {
         {"key": "risk", "weight": 10, "text": "触发秘境机关，狼狈逃离", "lose_coins": 100},
     ],
     "灵药谷": [
-        {"key": "lingcao", "weight": 28, "text": "采到一大片灵草", "items": {"lingcao": 3}},
-        {"key": "lingquan", "weight": 22, "text": "发现灵药谷深处的一汪灵泉", "items": {"lingquan": 2}},
-        {"key": "longxiancao", "weight": 15, "text": "寻得一株龙涎草", "items": {"longxiancao": 1}},
-        {"key": "qiannian_ls", "weight": 10, "text": "采到一株千年灵参", "items": {"qiannian_ls": 1}},
-        {"key": "progress", "weight": 10, "text": "药香扑鼻，闻之修为精进", "progress": 300},
-        {"key": "coin", "weight": 7, "text": "捡到采药人遗留的灵石", "coins": 120},
-        {"key": "risk", "weight": 8, "text": "惊动守药灵兽，被追咬逃窜", "lose_coins": 60},
+        {"key": "lingcao", "weight": 24, "text": "采到一大片灵草", "items": {"lingcao": 3}},
+        {"key": "lingquan", "weight": 18, "text": "发现灵药谷深处的一汪灵泉", "items": {"lingquan": 2}},
+        {"key": "lingcao_seed", "weight": 15, "text": "拾到一包灵草种子", "items": {"lingcao_seed": 2}},
+        {"key": "longxiancao", "weight": 12, "text": "寻得一株龙涎草", "items": {"longxiancao": 1}},
+        {"key": "longxiancao_seed", "weight": 8, "text": "捡到龙涎草种子", "items": {"longxiancao_seed": 1}},
+        {"key": "qiannian_ls", "weight": 8, "text": "采到一株千年灵参", "items": {"qiannian_ls": 1}},
+        {"key": "qiannian_ls_seed", "weight": 5, "text": "寻得千年灵参种子", "items": {"qiannian_ls_seed": 1}},
+        {"key": "progress", "weight": 8, "text": "药香扑鼻，闻之修为精进", "progress": 300},
+        {"key": "coin", "weight": 5, "text": "捡到采药人遗留的灵石", "coins": 120},
+        {"key": "risk", "weight": 7, "text": "惊动守药灵兽，被追咬逃窜", "lose_coins": 60},
     ],
     "万妖山": [
         {"key": "yaodan", "weight": 28, "text": "猎杀群妖，收获大量妖丹", "items": {"yaodan": 3}},
@@ -107,6 +110,7 @@ _POSITIVE_KEYS = [
     "coin", "lingcao", "yaodan", "lingquan", "progress",
     "pet", "equip", "xuantie", "zijinsha", "shoupi",
     "longxiancao", "xingchenshi", "qiannian_ls",
+    "lingcao_seed", "longxiancao_seed", "qiannian_ls_seed",
 ]
 
 # 各地点探索的基础灵石收益（每次探索必定获得）

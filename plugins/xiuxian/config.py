@@ -20,6 +20,9 @@ class Config(BaseModel):
     # 世界事件切换间隔（分钟），事件持续时长
     world_event_duration: int = 180
 
+    # 管理员手动触发事件的持续时长（分钟）
+    trigger_event_duration: int = 30
+
     # 神秘商人出现间隔（分钟）
     merchant_interval: int = 120
 

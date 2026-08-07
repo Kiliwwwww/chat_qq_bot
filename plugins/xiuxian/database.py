@@ -193,6 +193,37 @@ class Database:
                         PRIMARY KEY (group_id, user_id, date_str)
                     );
 
+                    -- 种植表
+                    CREATE TABLE IF NOT EXISTS planting (
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        crop_id TEXT NOT NULL,
+                        planted_at REAL NOT NULL,
+                        PRIMARY KEY (group_id, user_id)
+                    );
+
+                    -- 世界 Boss 表（每个群一只）
+                    CREATE TABLE IF NOT EXISTS world_boss (
+                        group_id INTEGER PRIMARY KEY,
+                        boss_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        hp REAL NOT NULL,
+                        max_hp REAL NOT NULL,
+                        attack INTEGER NOT NULL,
+                        spawn_time REAL NOT NULL,
+                        expire_time REAL NOT NULL,
+                        last_hitter INTEGER DEFAULT 0
+                    );
+
+                    -- 世界 Boss 伤害贡献表
+                    CREATE TABLE IF NOT EXISTS world_boss_damage (
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        total_damage REAL NOT NULL DEFAULT 0,
+                        last_attack REAL DEFAULT 0,
+                        PRIMARY KEY (group_id, user_id)
+                    );
+
                     -- PK 冷却表
                     CREATE TABLE IF NOT EXISTS pk_cooldown (
                         group_id INTEGER NOT NULL,
@@ -899,6 +930,152 @@ class Database:
         except Exception as e:
             logger.error(f"累加大乱斗每日次数失败: {e}")
             return False
+
+    # ==================== 种植 ====================
+
+    def get_planting(self, group_id: int, user_id: int) -> Optional[dict]:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT * FROM planting WHERE group_id = ? AND user_id = ?",
+                    (group_id, user_id),
+                ).fetchone()
+                return self._to_dict(row)
+        except Exception as e:
+            logger.error(f"获取种植状态失败: {e}")
+            return None
+
+    def set_planting(self, group_id: int, user_id: int, crop_id: str) -> bool:
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO planting (group_id, user_id, crop_id, planted_at) VALUES (?, ?, ?, ?)",
+                    (group_id, user_id, crop_id, time.time()),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"设置种植状态失败: {e}")
+            return False
+
+    def clear_planting(self, group_id: int, user_id: int) -> bool:
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "DELETE FROM planting WHERE group_id = ? AND user_id = ?",
+                    (group_id, user_id),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"清除种植状态失败: {e}")
+            return False
+
+    # ==================== 世界 Boss ====================
+
+    def get_world_boss(self, group_id: int) -> Optional[dict]:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT * FROM world_boss WHERE group_id = ?", (group_id,)
+                ).fetchone()
+                return self._to_dict(row)
+        except Exception as e:
+            logger.error(f"获取世界 Boss 失败: {e}")
+            return None
+
+    def spawn_world_boss(self, group_id: int, boss: dict) -> bool:
+        """刷新一只世界 Boss（覆盖旧的）"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO world_boss
+                    (group_id, boss_id, name, hp, max_hp, attack, spawn_time, expire_time, last_hitter)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (group_id, boss["boss_id"], boss["name"], boss["hp"], boss["max_hp"],
+                     boss["attack"], boss["spawn_time"], boss["expire_time"], 0),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"刷新世界 Boss 失败: {e}")
+            return False
+
+    def clear_world_boss(self, group_id: int) -> bool:
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM world_boss WHERE group_id = ?", (group_id,))
+                conn.execute("DELETE FROM world_boss_damage WHERE group_id = ?", (group_id,))
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"清除世界 Boss 失败: {e}")
+            return False
+
+    def update_world_boss(self, group_id: int, fields: dict) -> bool:
+        if not fields:
+            return True
+        try:
+            allowed = {"hp", "last_hitter"}
+            updates = {k: v for k, v in fields.items() if k in allowed}
+            if not updates:
+                return False
+            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            params = list(updates.values()) + [group_id]
+            with self._get_conn() as conn:
+                conn.execute(f"UPDATE world_boss SET {set_clause} WHERE group_id = ?", params)
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"更新世界 Boss 失败: {e}")
+            return False
+
+    def get_boss_damage(self, group_id: int, user_id: int) -> Optional[dict]:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT * FROM world_boss_damage WHERE group_id = ? AND user_id = ?",
+                    (group_id, user_id),
+                ).fetchone()
+                return self._to_dict(row)
+        except Exception as e:
+            logger.error(f"获取 Boss 伤害贡献失败: {e}")
+            return None
+
+    def add_boss_damage(self, group_id: int, user_id: int, damage: float) -> bool:
+        """累加玩家对 Boss 的伤害并记录攻击时间"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO world_boss_damage (group_id, user_id, total_damage, last_attack)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(group_id, user_id) DO UPDATE SET
+                        total_damage = total_damage + excluded.total_damage,
+                        last_attack = excluded.last_attack
+                    """,
+                    (group_id, user_id, damage, time.time()),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"累加 Boss 伤害失败: {e}")
+            return False
+
+    def get_boss_contributions(self, group_id: int) -> list[dict]:
+        """获取群内所有玩家对 Boss 的伤害贡献（按伤害降序）"""
+        try:
+            with self._get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM world_boss_damage WHERE group_id = ? ORDER BY total_damage DESC",
+                    (group_id,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"获取 Boss 伤害贡献列表失败: {e}")
+            return []
 
     # ==================== PK 冷却 ====================
 

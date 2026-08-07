@@ -90,6 +90,47 @@ def location_open_event(location: str) -> str:
     return constants.WORLD_EVENTS.get(event_id, {}).get("name", "")
 
 
+def trigger_event(group_id: int, event_name: str) -> dict:
+    """管理员手动触发世界事件。
+
+    event_name 为事件名称或 id；传入「无/结束/清除」可结束当前事件。
+    """
+    now = time.time()
+
+    # 清除当前事件
+    if event_name in ("无", "结束", "清除"):
+        db.update_world_state(group_id, {"current_event": "", "event_end_time": 0, "secret_realm_end_time": 0})
+        return {"ok": True, "text": "🌄 当前世界事件已清除，天地恢复平静"}
+
+    # 按名称或 id 解析事件
+    event_id = None
+    for eid, ev in constants.WORLD_EVENTS.items():
+        if ev["name"] == event_name or eid == event_name:
+            event_id = eid
+            break
+    if not event_id:
+        names = "、".join(ev["name"] for ev in constants.WORLD_EVENTS.values())
+        return {"ok": False, "text": f"未找到事件「{event_name}」，可选：{names}"}
+
+    duration = config.trigger_event_duration * 60
+    end_time = now + duration
+    fields = {"current_event": event_id, "event_end_time": end_time}
+    # 上古秘境事件同步开启秘境，其余事件关闭秘境
+    fields["secret_realm_end_time"] = end_time if event_id == "shanggu_mijing" else 0
+    db.update_world_state(group_id, fields)
+    db.log_world_event(group_id, event_id, constants.WORLD_EVENTS[event_id]["name"])
+
+    ev = constants.WORLD_EVENTS[event_id]
+    return {
+        "ok": True,
+        "text": (
+            f"🌍 【世界事件】{ev['name']}（持续 {config.trigger_event_duration} 分钟）\n"
+            f"{ev['desc']}\n"
+            f"⚡ 效果：{format_event_effects(ev)}"
+        ),
+    }
+
+
 def is_merchant_active(group_id: int) -> bool:
     """神秘商人是否在场"""
     state = ensure_world(group_id)
@@ -232,7 +273,16 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
                 "text": "🏪 【神秘商人】一位云游商人现身坊市，带来了稀有的丹药与材料，快来「坊市」看看！",
             })
 
-    # 5. 更新世界状态
+    # 5. 世界 Boss 刷新与超时
+    from . import boss as boss_svc
+    boss_announce = boss_svc.maybe_spawn(group_id)
+    if boss_announce:
+        announcements.append({"type": "event", "text": boss_announce})
+    boss_escape = boss_svc.check_expire(group_id)
+    if boss_escape:
+        announcements.append({"type": "event", "text": boss_escape})
+
+    # 6. 更新世界状态
     db.update_world_state(group_id, {
         "weather": new_weather,
         "spirit_concentration": round(spirit, 2),
