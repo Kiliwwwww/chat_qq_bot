@@ -455,6 +455,10 @@ WORLD_EVENTS = {
         "risk": 0.15,
         "desc": "魔潮汹涌，妖兽森林收益翻倍但遇险概率大增，幽冥深渊开启",
     },
+    "yuwai_tianmo": {
+        "name": "域外天魔入侵",
+        "desc": "域外天魔大军降临！全服修士停止一切修炼与探索，必须迎击天魔，守卫仙域！",
+    },
 }
 
 WORLD_EVENT_IDS = list(WORLD_EVENTS.keys())
@@ -583,6 +587,47 @@ SHOP_BUYBACK = {
 
 # 装备按品质回购（武器/法袍/法宝/戒指/战靴统一价格）
 EQUIP_BUYBACK = {"普通": 150, "优秀": 400, "极品": 1000, "灵器": 2500, "仙器": 6000}
+
+# ==================== 域外天魔入侵系统 ====================
+
+# 域外天魔入侵期间，玩家无法进行探索/闭关/炼丹/炼器等操作，必须「迎击天魔」
+# 结束条件：天魔大军全部被剿灭，或入侵时间耗尽
+INVASION_LIFETIME_MINUTES = 30          # 入侵持续时长（分钟）
+INVASION_HP_FACTOR = 3.0                # 天魔大军总血量 = 群平均战力 × 系数
+INVASION_MIN_HP = 1000                  # 天魔大军最低血量
+INVASION_DMG_MIN = 0.08                 # 玩家每次迎击伤害下限（自身战力比例）
+INVASION_DMG_MAX = 0.18                 # 玩家每次迎击伤害上限
+INVASION_COUNTER_RATIO = 0.10           # 天魔反击：每次按玩家气血上限固定比例扣血
+
+# 剿灭奖励（按贡献分配）
+INVASION_REWARD_BASE = 150              # 参与保底灵石
+INVASION_REWARD_MVP = 2000              # 最高伤害额外灵石
+INVASION_SHARE_POOL_FACTOR = 0.06       # 贡献分成灵石池 = 天魔总血量 × 系数
+INVASION_SHARE_POOL_CAP = 3000          # 灵石池上限
+INVASION_PROGRESS_REWARD = 0.06         # 修为池 = 天魔总血量 × 系数
+
+# 域外天魔入侵作为世界事件的触发权重（稀有）
+INVASION_EVENT_WEIGHT = 6
+
+# ==================== 生死台系统 ====================
+
+# 生死台挑战有效期（秒），对方需在此期间内应战
+DUEL_CHALLENGE_EXPIRE = 300
+
+# 生死台决斗冷却（秒），同一玩家对决后需等待才能再次发起/应战
+DUEL_COOLDOWN = 300
+
+# 生死台每回合败者损失气血比例（相对自身气血上限）
+DUEL_ROUND_DAMAGE_RATIO = 0.30
+
+# 生死台安全回合上限，防止极端情况下无限循环
+DUEL_MAX_ROUNDS = 30
+
+# 生死台输家损失灵石比例
+DUEL_LOSE_COIN_RATIO = 0.10
+
+# 生死台输家损失修为比例
+DUEL_LOSE_PROGRESS_RATIO = 0.10
 
 # ==================== 修炼/战斗基础数值 ====================
 

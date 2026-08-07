@@ -7,7 +7,7 @@ import time
 
 from .. import constants
 from ..state import db
-from . import combat, rng
+from . import combat, rng, world
 
 
 def plant(group_id: int, user_id: int, crop_name: str) -> dict:
@@ -15,6 +15,10 @@ def plant(group_id: int, user_id: int, crop_name: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return {"ok": False, "text": inv_block}
 
     if combat.is_dead(player):
         return {"ok": False, "text": f"你已归西，还需 {combat.dead_remain_seconds(player)} 秒复活，无法种植"}
@@ -52,6 +56,10 @@ def harvest(group_id: int, user_id: int) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return {"ok": False, "text": inv_block}
 
     planting = db.get_planting(group_id, user_id)
     if not planting:

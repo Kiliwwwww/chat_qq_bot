@@ -21,6 +21,10 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
 
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return {"ok": False, "text": inv_block}
+
     realm_index = player.get("realm", 0)
     if realm_index >= len(constants.REALMS) - 1:
         return {"ok": False, "text": "你已臻至飞升之境，站在了修仙世界的顶点！"}

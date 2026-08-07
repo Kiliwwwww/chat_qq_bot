@@ -205,6 +205,11 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
 
+    from . import world
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return {"ok": False, "text": inv_block}
+
     from . import combat
     combat.try_revive(group_id, user_id)
     player = db.get_player(group_id, user_id)

@@ -69,9 +69,13 @@ from .commands import (  # noqa: F401  导入以注册指令
     signup_cmd,
     battle_status_cmd,
     pk_cmd,
+    duel_challenge_cmd,
+    duel_accept_cmd,
     boss_attack_cmd,
     boss_status_cmd,
     boss_spawn_cmd,
+    invasion_attack_cmd,
+    invasion_status_cmd,
     ranking_cmd,
 )
 
@@ -165,8 +169,12 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "signup_cmd",
     "battle_status_cmd",
     "pk_cmd",
+    "duel_challenge_cmd",
+    "duel_accept_cmd",
     "boss_attack_cmd",
     "boss_status_cmd",
     "boss_spawn_cmd",
+    "invasion_attack_cmd",
+    "invasion_status_cmd",
     "ranking_cmd",
 ]

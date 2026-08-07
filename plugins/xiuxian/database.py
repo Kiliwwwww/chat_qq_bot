@@ -130,7 +130,18 @@ class Database:
                         last_tick_time REAL DEFAULT 0,
                         merchant_end_time REAL DEFAULT 0,
                         breakthrough_merchant_end_time REAL DEFAULT 0,
-                        secret_realm_end_time REAL DEFAULT 0
+                        secret_realm_end_time REAL DEFAULT 0,
+                        invasion_hp REAL DEFAULT 0,
+                        invasion_max_hp REAL DEFAULT 0
+                    );
+
+                    -- 域外天魔入侵贡献表
+                    CREATE TABLE IF NOT EXISTS invasion_damage (
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        total_damage REAL NOT NULL DEFAULT 0,
+                        last_attack REAL DEFAULT 0,
+                        PRIMARY KEY (group_id, user_id)
                     );
 
                     -- 世界事件日志表
@@ -282,6 +293,10 @@ class Database:
             wstate_columns = {r["name"] for r in conn.execute("PRAGMA table_info(world_state)").fetchall()}
             if "breakthrough_merchant_end_time" not in wstate_columns:
                 conn.execute("ALTER TABLE world_state ADD COLUMN breakthrough_merchant_end_time REAL DEFAULT 0")
+            if "invasion_hp" not in wstate_columns:
+                conn.execute("ALTER TABLE world_state ADD COLUMN invasion_hp REAL DEFAULT 0")
+            if "invasion_max_hp" not in wstate_columns:
+                conn.execute("ALTER TABLE world_state ADD COLUMN invasion_max_hp REAL DEFAULT 0")
         except Exception as e:
             logger.error(f"数据库迁移失败: {e}")
 
@@ -666,7 +681,7 @@ class Database:
             return {"group_id": group_id, "weather": "晴", "spirit_concentration": 1.0,
                     "current_event": "", "event_end_time": 0, "last_tick_time": time.time(),
                     "merchant_end_time": 0, "breakthrough_merchant_end_time": 0,
-                    "secret_realm_end_time": 0}
+                    "secret_realm_end_time": 0, "invasion_hp": 0, "invasion_max_hp": 0}
 
     def get_world_state(self, group_id: int) -> dict:
         return self.ensure_world_state(group_id)
@@ -677,7 +692,7 @@ class Database:
         try:
             allowed = {"weather", "spirit_concentration", "current_event", "event_end_time",
                        "last_tick_time", "merchant_end_time", "breakthrough_merchant_end_time",
-                       "secret_realm_end_time"}
+                       "secret_realm_end_time", "invasion_hp", "invasion_max_hp"}
             updates = {k: v for k, v in fields.items() if k in allowed}
             if not updates:
                 return False
@@ -1083,6 +1098,52 @@ class Database:
         except Exception as e:
             logger.error(f"获取 Boss 伤害贡献列表失败: {e}")
             return []
+
+    # ==================== 域外天魔入侵 ====================
+
+    def add_invasion_damage(self, group_id: int, user_id: int, damage: float) -> bool:
+        """累加玩家对天魔大军的伤害贡献"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO invasion_damage (group_id, user_id, total_damage, last_attack)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(group_id, user_id) DO UPDATE SET
+                        total_damage = total_damage + excluded.total_damage,
+                        last_attack = excluded.last_attack
+                    """,
+                    (group_id, user_id, damage, time.time()),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"累加天魔入侵贡献失败: {e}")
+            return False
+
+    def get_invasion_contributions(self, group_id: int) -> list[dict]:
+        """获取群内所有玩家对天魔大军的伤害贡献（按伤害降序）"""
+        try:
+            with self._get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM invasion_damage WHERE group_id = ? ORDER BY total_damage DESC",
+                    (group_id,),
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"获取天魔入侵贡献列表失败: {e}")
+            return []
+
+    def clear_invasion_damage(self, group_id: int) -> bool:
+        """清除群内天魔入侵贡献记录"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM invasion_damage WHERE group_id = ?", (group_id,))
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"清除天魔入侵贡献失败: {e}")
+            return False
 
     # ==================== PK 冷却 ====================
 

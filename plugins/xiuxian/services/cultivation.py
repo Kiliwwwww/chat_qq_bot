@@ -113,6 +113,10 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
     if not player:
         return False, "你还没有修仙角色，发送「我要修仙」创建角色"
 
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return False, inv_block
+
     # 归西复活检查（复活时间到则自动复活）
     combat.try_revive(group_id, user_id)
     player = db.get_player(group_id, user_id)

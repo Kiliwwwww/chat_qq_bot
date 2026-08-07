@@ -2,7 +2,7 @@
 
 from .. import constants
 from ..state import db
-from . import debuff, rng
+from . import debuff, rng, world
 
 
 def _quality_bonus(quality: str) -> float:
@@ -16,6 +16,10 @@ def alchemy(group_id: int, user_id: int, pill_key: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return {"ok": False, "text": inv_block}
 
     if pill_key not in constants.ITEMS or constants.ITEMS[pill_key]["type"] != "pill":
         return {"ok": False, "text": "该丹药不存在"}
@@ -77,6 +81,10 @@ def forge(group_id: int, user_id: int) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    inv_block = world.invasion_block_text(group_id)
+    if inv_block:
+        return {"ok": False, "text": inv_block}
 
     # 检查材料
     for mat_id, qty in constants.FORGE_COST["materials"].items():

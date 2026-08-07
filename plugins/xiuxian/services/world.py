@@ -27,6 +27,7 @@ _EVENT_WEIGHTS = {
     "wanshou_caozong": 15,
     "xianyuan_jianglin": 20,
     "mochao_xiongyong": 10,
+    "yuwai_tianmo": constants.INVASION_EVENT_WEIGHT,
 }
 
 
@@ -121,12 +122,18 @@ def trigger_event(group_id: int, event_name: str) -> dict:
     db.log_world_event(group_id, event_id, constants.WORLD_EVENTS[event_id]["name"])
 
     ev = constants.WORLD_EVENTS[event_id]
+    extra = ""
+    # 域外天魔入侵：初始化天魔大军并中断全员闭关
+    if event_id == "yuwai_tianmo":
+        from . import invasion as invasion_svc
+        extra = "\n" + invasion_svc.start_invasion(group_id)
     return {
         "ok": True,
         "text": (
             f"🌍 【世界事件】{ev['name']}（持续 {config.trigger_event_duration} 分钟）\n"
             f"{ev['desc']}\n"
             f"⚡ 效果：{format_event_effects(ev)}"
+            f"{extra}"
         ),
     }
 
@@ -203,6 +210,18 @@ def explore_luck_multiplier(group_id: int) -> float:
     return event.get("explore_luck", 1.0)
 
 
+def is_invasion_active(group_id: int) -> bool:
+    """域外天魔入侵是否进行中"""
+    from . import invasion as invasion_svc
+    return invasion_svc.is_active(group_id)
+
+
+def invasion_block_text(group_id: int) -> str:
+    """域外天魔入侵期间的封禁提示文案（无入侵返回空串）"""
+    from . import invasion as invasion_svc
+    return invasion_svc.block_message(group_id)
+
+
 # ==================== 世界推进 ====================
 
 def _roll_event() -> str:
@@ -261,6 +280,10 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
             new_event = _roll_event()
             duration = config.world_event_duration * 60
             new_end = now + duration
+            # 域外天魔入侵：使用较短的入侵专属时长
+            if new_event == "yuwai_tianmo":
+                duration = constants.INVASION_LIFETIME_MINUTES * 60
+                new_end = now + duration
             db.update_world_state(group_id, {
                 "current_event": new_event,
                 "event_end_time": new_end,
@@ -272,16 +295,28 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
                     "secret_realm_end_time": new_end,
                 })
             db.log_world_event(group_id, new_event, event_info["name"])
+            extra = ""
+            if new_event == "yuwai_tianmo":
+                from . import invasion as invasion_svc
+                extra = "\n" + invasion_svc.start_invasion(group_id)
             announcements.append({
                 "type": "event",
                 "text": (
                     f"🌍 【世界事件】{event_info['name']}\n"
                     f"{event_info['desc']}\n"
                     f"⚡ 效果：{format_event_effects(event_info)}"
+                    f"{extra}"
                 ),
             })
 
-    # 4. 神秘商人出现/消失
+    # 4. 域外天魔入侵超时判定（成功剿灭则事件在迎击中自行结束）
+    if event_id == "yuwai_tianmo" and event_active:
+        from . import invasion as invasion_svc
+        timeout_text = invasion_svc.check_timeout(group_id)
+        if timeout_text:
+            announcements.append({"type": "event", "text": timeout_text})
+
+    # 5. 神秘商人出现/消失
     merchant_end = state.get("merchant_end_time", 0)
     if now >= merchant_end:
         if random.random() < 0.05:
@@ -398,6 +433,8 @@ def format_event_effects(event: dict) -> str:
         parts.append(f"探索奇遇 ×{event['explore_luck']}")
     if event.get("opens_secret_realm"):
         parts.append("开启秘境供探索")
+    if event.get("name") == "域外天魔入侵":
+        parts.append("全服停止修炼/探索/炼丹/炼器，必须迎击天魔")
     return "，".join(parts) if parts else "暂无特殊效果"
 
 
@@ -415,6 +452,10 @@ def format_world_status(group_id: int) -> str:
         remaining = int((state["event_end_time"] - time.time()) / 60)
         lines.append(f"✨ 当前事件：{event['name']}（剩余 {max(remaining, 0)} 分钟）")
         lines.append(f"   ⚡ 效果：{format_event_effects(event)}")
+        if event_id == "yuwai_tianmo":
+            from . import invasion as invasion_svc
+            inv = invasion_svc.get_invasion_state(group_id)
+            lines.append(f"   👾 天魔大军气血：{int(inv['hp'])}/{int(inv['max_hp'])}（发送「迎击天魔」参战）")
     else:
         lines.append("✨ 当前事件：暂无（天地平静）")
     lines.append(f"🏪 神秘商人：{'在场' if is_merchant_active(group_id) else '未现身'}")
