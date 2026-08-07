@@ -15,6 +15,23 @@ def _item_display(item_id: str, quantity: int) -> str:
     return f"{item.get('name', item_id)} ×{quantity}"
 
 
+def _item_intro(item_id: str) -> str:
+    """物品用途简介"""
+    if item_id.startswith("equip:"):
+        parts = item_id.split(":")
+        if len(parts) == 3:
+            kind = constants.EQUIPMENT_KINDS.get(parts[1], {})
+            stat_desc = {"attack": "提升攻击", "defense": "提升防御", "hp": "提升气血上限"}.get(kind.get("stat"), "提升属性")
+            quality_mult = 1.0
+            for q in constants.EQUIPMENT_QUALITIES:
+                if q["name"] == parts[2]:
+                    quality_mult = q["mult"]
+                    break
+            return f"穿戴后{stat_desc}（品质倍率×{quality_mult:g}）"
+    item = constants.ITEMS.get(item_id, {})
+    return item.get("desc", "")
+
+
 def format_inventory(group_id: int, user_id: int) -> str:
     """格式化背包"""
     items = db.get_inventory(group_id, user_id)
@@ -23,7 +40,11 @@ def format_inventory(group_id: int, user_id: int) -> str:
 
     lines = ["🎒 【我的背包】"]
     for item in items:
-        lines.append(f"  {_item_display(item['item_id'], item['quantity'])}")
+        item_id = item["item_id"]
+        lines.append(f"  {_item_display(item_id, item['quantity'])}")
+        intro = _item_intro(item_id)
+        if intro:
+            lines.append(f"    └ {intro}")
     lines.append("💡 使用「装备 <物品名>」可装备武器/法袍/法宝")
     return "\n".join(lines)
 
