@@ -76,6 +76,8 @@ from .commands import (  # noqa: F401  导入以注册指令
     boss_spawn_cmd,
     invasion_attack_cmd,
     invasion_status_cmd,
+    invasion_start_cmd,
+    invasion_end_cmd,
     ranking_cmd,
 )
 
@@ -176,5 +178,7 @@ __all__ = [  # 导出指令，保证 NoneBot 注册
     "boss_spawn_cmd",
     "invasion_attack_cmd",
     "invasion_status_cmd",
+    "invasion_start_cmd",
+    "invasion_end_cmd",
     "ranking_cmd",
 ]

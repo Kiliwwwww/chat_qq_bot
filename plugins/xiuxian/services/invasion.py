@@ -30,6 +30,54 @@ def is_running(group_id: int) -> bool:
     return _event_active(group_id)
 
 
+def force_start(group_id: int) -> str:
+    """管理员手动开启域外天魔入侵，返回公告文本。"""
+    if is_running(group_id):
+        return "当前已有域外天魔入侵正在进行中，无法重复开启"
+    if not db.execute_raw("SELECT user_id FROM players WHERE group_id = ?", (group_id,)):
+        return "群内没有玩家，无法开启域外天魔入侵"
+
+    now = time.time()
+    end_time = now + constants.INVASION_LIFETIME_MINUTES * 60
+    db.update_world_state(group_id, {
+        "current_event": "yuwai_tianmo",
+        "event_end_time": end_time,
+        "secret_realm_end_time": 0,
+    })
+    db.log_world_event(group_id, "yuwai_tianmo", constants.WORLD_EVENTS["yuwai_tianmo"]["name"])
+    return start_invasion(group_id)
+
+
+def force_end(group_id: int) -> str:
+    """管理员手动提前结束域外天魔入侵并按贡献结算，返回公告文本。"""
+    if not is_running(group_id):
+        return "当前没有进行中的域外天魔入侵"
+
+    state = get_invasion_state(group_id)
+    contribs = db.get_invasion_contributions(group_id)
+    dealt = sum(c["total_damage"] for c in contribs) or 0
+    cleared_ratio = min(1.0, dealt / max(1, state["max_hp"]))
+
+    # 全部剿灭：正常发放全额奖励
+    if cleared_ratio >= 1.0:
+        reward_text = _grant_rewards(group_id, state["max_hp"])
+        return f"🌄 【域外天魔入侵】天魔大军已被彻底剿灭！\n{reward_text}"
+
+    # 提前结束：按已完成伤害比例发放奖励
+    if not contribs:
+        db.update_world_state(group_id, {"invasion_hp": 0, "invasion_max_hp": 0})
+        db.clear_invasion_damage(group_id)
+        db.update_world_state(group_id, {"current_event": "", "event_end_time": 0})
+        return "🌄 【域外天魔入侵】已提前结束，无人迎击，无奖励结算"
+
+    reward_text = _grant_rewards(group_id, state["max_hp"] * cleared_ratio)
+    return (
+        f"🌄 【域外天魔入侵】已被提前结束！\n"
+        f"📊 天魔大军剩余 {int(state['hp'])}/{int(state['max_hp'])}，按已剿灭比例结算奖励\n"
+        f"{reward_text}"
+    )
+
+
 def start_invasion(group_id: int) -> str:
     """触发域外天魔入侵：生成天魔大军，返回公告文本。"""
     avg_power = _average_power(group_id)
