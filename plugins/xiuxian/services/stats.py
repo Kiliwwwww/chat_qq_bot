@@ -80,6 +80,9 @@ def get_effective_stats(group_id: int, player: dict, gongfas: Optional[list[dict
         attack = int(attack * 1.25)
         defense = int(defense * 1.25)
         hp = int(hp * 1.25)
+    elif physique == "jingang_ti":
+        defense = int(defense * 1.3)
+        hp = int(hp * 1.2)
 
     return {
         "attack": int(attack),

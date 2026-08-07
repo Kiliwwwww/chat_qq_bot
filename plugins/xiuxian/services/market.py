@@ -61,6 +61,57 @@ async def buy_merchant_item(group_id: int, user_id: int, good_index: int) -> dic
     return {"ok": True, "text": f"🛒 购得 {item_name}×{good['quantity']}，花费 {total} 灵石"}
 
 
+# ==================== 突破商人 ====================
+
+def _breakthrough_merchant_seed(group_id: int) -> int:
+    """用突破商人出现时间作为随机种子，保证同一批商品不变"""
+    state = db.get_world_state(group_id)
+    return int(state.get("breakthrough_merchant_end_time", 0))
+
+
+def get_breakthrough_merchant_goods(group_id: int) -> list[dict]:
+    """获取当前突破商人的商品（专售突破大境界所需药材/丹药）"""
+    if not world.is_breakthrough_merchant_active(group_id):
+        return []
+    return list(constants.BREAKTHROUGH_MERCHANT_GOODS)
+
+
+async def buy_breakthrough_merchant_item(group_id: int, user_id: int, good_index: int) -> dict:
+    """购买突破商人商品"""
+    if not world.is_breakthrough_merchant_active(group_id):
+        return {"ok": False, "text": "突破商人已离开坊市"}
+
+    player = db.get_player(group_id, user_id)
+    if not player:
+        return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+
+    goods = constants.BREAKTHROUGH_MERCHANT_GOODS
+    if good_index < 1 or good_index > len(goods):
+        return {"ok": False, "text": "商品编号不存在"}
+
+    good = goods[good_index - 1]
+
+    # 同一批商品每名玩家限购一次（key 带上批次种子，刷新后新批次可重新购买）
+    cache = get_cache()
+    seed = _breakthrough_merchant_seed(group_id)
+    key = f"{group_id}:bt_merchant_bought:{seed}:{user_id}"
+    bought = await cache.hget(key, str(good_index))
+    if bought:
+        return {"ok": False, "text": "你已经购买过该商品了"}
+
+    total = good["price"] * good["quantity"]
+    if player.get("coin", 0) < total:
+        return {"ok": False, "text": f"灵石不足，需要 {total} 灵石"}
+
+    db.update_player(group_id, user_id, {"coin": player.get("coin", 0) - total})
+    db.add_item(group_id, user_id, good["item_id"], good["quantity"])
+    await cache.hset(key, str(good_index), "1")
+    await cache.set(f"{key}:ttl", time.time(), expire=config.breakthrough_merchant_duration * 60)
+
+    item_name = constants.ITEMS.get(good["item_id"], {}).get("name", good["item_id"])
+    return {"ok": True, "text": f"🛒 购得 {item_name}×{good['quantity']}，花费 {total} 灵石"}
+
+
 # ==================== 常驻商城 ====================
 
 def format_shop() -> str:
@@ -256,6 +307,17 @@ def format_market(group_id: int, user_id: int) -> str:
         lines.append("  💡 使用「坊市购商 <编号>」购买")
     else:
         lines.append("\n🧙 神秘商人：未现身")
+
+    # 突破商人（专售突破大境界所需药材/丹药）
+    if world.is_breakthrough_merchant_active(group_id):
+        lines.append("\n💎 突破商人（限时）:")
+        goods = get_breakthrough_merchant_goods(group_id)
+        for i, good in enumerate(goods, start=1):
+            item_name = constants.ITEMS.get(good["item_id"], {}).get("name", good["item_id"])
+            lines.append(f"  {i}. {item_name} - {good['price'] * good['quantity']} 灵石")
+        lines.append("  💡 使用「坊市购突破 <编号>」购买")
+    else:
+        lines.append("\n💎 突破商人：未现身")
 
     # 玩家挂单
     orders = db.get_active_orders(group_id)

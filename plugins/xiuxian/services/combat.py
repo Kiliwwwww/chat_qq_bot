@@ -78,7 +78,11 @@ def take_damage(group_id: int, user_id: int, damage: int) -> dict:
     if new_hp <= 0:
         new_hp = 0
         died = True
-        dead_until = time.time() + DEAD_REVIVE_SECONDS
+        revive_seconds = DEAD_REVIVE_SECONDS
+        # 涅槃圣体：归西复活时间减半
+        if player.get("physique") == "niepan_st":
+            revive_seconds //= 2
+        dead_until = time.time() + revive_seconds
     db.update_player(group_id, user_id, {"cur_hp": new_hp, "dead_until": dead_until})
     return {"died": died, "hp": new_hp, "max_hp": max_hp}
 
@@ -159,6 +163,9 @@ def pk(group_id: int, attacker_id: int, target_id: int) -> dict:
 
     att_power = stats.get_power(group_id, attacker)
     tgt_power = stats.get_power(group_id, target)
+    # 武痴圣体：PK 战力+20%
+    if attacker.get("physique") == "wuchi_st":
+        att_power = int(att_power * 1.2)
     att_power_boosted = int(att_power * (1 + pk_boost)) if pk_boost > 0 else att_power
 
     # 胜率：战力差距越大胜率越高（1/(1+ratio)，碾压时趋近 97%），再受双方气运影响

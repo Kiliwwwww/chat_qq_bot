@@ -26,8 +26,11 @@ class Config(BaseModel):
     # 神秘商人出现间隔（分钟）
     merchant_interval: int = 120
 
+    # 突破商人停留时长（分钟）
+    breakthrough_merchant_duration: int = 60
+
     # 探索冷却时间（秒）
-    explore_cooldown: int = 120
+    explore_cooldown: int = 20
 
     # 闭关达到该时长（分钟）出关后可回满血量
     cultivation_heal_minutes: int = 5
@@ -35,13 +38,10 @@ class Config(BaseModel):
     # 突破失败损失修为比例
     breakthrough_fail_penalty: float = 0.2
 
-    # 每个玩家最多可同时修炼的功法数量
-    max_gongfa: int = 5
-
-    # 炉鼎数量上限
+    # 弟子数量上限
     max_furnace: int = 3
 
-    # 双修冷却时间（分钟）
+    # 传功冷却时间（分钟）
     xiuxiu_cooldown_minutes: int = 10
 
     # 闭关超过该小时数，出关时可能走火入魔

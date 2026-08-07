@@ -87,10 +87,6 @@ def learn_gongfa(group_id: int, user_id: int, gongfa_name: str) -> dict:
     if db.get_gongfa(group_id, user_id, gongfa["id"]):
         return {"ok": False, "text": f"你已经学会了「{gongfa['name']}」"}
 
-    # 数量限制
-    if len(db.get_gongfas(group_id, user_id)) >= config.max_gongfa:
-        return {"ok": False, "text": f"功法数量已达上限（{config.max_gongfa} 本），先练精再学新吧"}
-
     # 费用
     cost = config.learn_gongfa_cost * (1 + player.get("realm", 0))
     if player.get("coin", 0) < cost:

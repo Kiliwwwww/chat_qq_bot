@@ -129,6 +129,7 @@ class Database:
                         event_end_time REAL DEFAULT 0,
                         last_tick_time REAL DEFAULT 0,
                         merchant_end_time REAL DEFAULT 0,
+                        breakthrough_merchant_end_time REAL DEFAULT 0,
                         secret_realm_end_time REAL DEFAULT 0
                     );
 
@@ -141,7 +142,7 @@ class Database:
                         description TEXT DEFAULT ''
                     );
 
-                    -- 炉鼎关系表
+                    -- 师徒关系表
                     CREATE TABLE IF NOT EXISTS furnaces (
                         group_id INTEGER NOT NULL,
                         owner_id INTEGER NOT NULL,
@@ -277,6 +278,10 @@ class Database:
                 conn.execute("ALTER TABLE players ADD COLUMN xiuxiu_until REAL DEFAULT 0")
             if "debuffs" not in columns:
                 conn.execute("ALTER TABLE players ADD COLUMN debuffs TEXT DEFAULT ''")
+
+            wstate_columns = {r["name"] for r in conn.execute("PRAGMA table_info(world_state)").fetchall()}
+            if "breakthrough_merchant_end_time" not in wstate_columns:
+                conn.execute("ALTER TABLE world_state ADD COLUMN breakthrough_merchant_end_time REAL DEFAULT 0")
         except Exception as e:
             logger.error(f"数据库迁移失败: {e}")
 
@@ -371,7 +376,7 @@ class Database:
             return False
 
     def _clear_player_related(self, conn: sqlite3.Connection, group_id: int, user_id: int) -> None:
-        """清除玩家关联数据（功法/背包/灵宠/炉鼎/挂机/冷却/挂单），保留玩家主记录"""
+        """清除玩家关联数据（功法/背包/灵宠/师徒/挂机/冷却/挂单），保留玩家主记录"""
         conn.execute("DELETE FROM cultivation WHERE group_id = ? AND user_id = ?", (group_id, user_id))
         conn.execute("DELETE FROM gongfas WHERE group_id = ? AND user_id = ?", (group_id, user_id))
         conn.execute("DELETE FROM inventory WHERE group_id = ? AND user_id = ?", (group_id, user_id))
@@ -660,7 +665,8 @@ class Database:
             logger.error(f"确保世界状态失败 group={group_id}: {e}")
             return {"group_id": group_id, "weather": "晴", "spirit_concentration": 1.0,
                     "current_event": "", "event_end_time": 0, "last_tick_time": time.time(),
-                    "merchant_end_time": 0, "secret_realm_end_time": 0}
+                    "merchant_end_time": 0, "breakthrough_merchant_end_time": 0,
+                    "secret_realm_end_time": 0}
 
     def get_world_state(self, group_id: int) -> dict:
         return self.ensure_world_state(group_id)
@@ -670,7 +676,8 @@ class Database:
             return True
         try:
             allowed = {"weather", "spirit_concentration", "current_event", "event_end_time",
-                       "last_tick_time", "merchant_end_time", "secret_realm_end_time"}
+                       "last_tick_time", "merchant_end_time", "breakthrough_merchant_end_time",
+                       "secret_realm_end_time"}
             updates = {k: v for k, v in fields.items() if k in allowed}
             if not updates:
                 return False
@@ -698,7 +705,7 @@ class Database:
         except Exception as e:
             logger.error(f"记录世界事件失败: {e}")
 
-    # ==================== 炉鼎 ====================
+    # ==================== 师徒 ====================
 
     def add_furnace(self, group_id: int, owner_id: int, target_id: int) -> bool:
         try:
@@ -710,7 +717,7 @@ class Database:
                 conn.commit()
             return True
         except Exception as e:
-            logger.error(f"添加炉鼎失败: {e}")
+            logger.error(f"收徒失败: {e}")
             return False
 
     def remove_furnace(self, group_id: int, owner_id: int, target_id: int) -> bool:
@@ -723,7 +730,7 @@ class Database:
                 conn.commit()
             return True
         except Exception as e:
-            logger.error(f"移除炉鼎失败: {e}")
+            logger.error(f"解除师徒失败: {e}")
             return False
 
     def get_furnaces_by_owner(self, group_id: int, owner_id: int) -> list[dict]:
@@ -735,11 +742,11 @@ class Database:
                 ).fetchall()
                 return [dict(r) for r in rows]
         except Exception as e:
-            logger.error(f"获取炉鼎列表失败: {e}")
+            logger.error(f"获取弟子列表失败: {e}")
             return []
 
     def get_furnace_by_target(self, group_id: int, target_id: int) -> Optional[dict]:
-        """查询某人是否被作为炉鼎（含自己抓捕自己的反向）"""
+        """查询某人是否被作为弟子（含自己收徒自己的反向）"""
         try:
             with self._get_conn() as conn:
                 row = conn.execute(
@@ -748,7 +755,7 @@ class Database:
                 ).fetchone()
                 return self._to_dict(row)
         except Exception as e:
-            logger.error(f"获取炉鼎归属失败: {e}")
+            logger.error(f"获取师徒归属失败: {e}")
             return None
 
     def get_furnaces_by_group(self, group_id: int) -> list[dict]:
@@ -760,7 +767,7 @@ class Database:
                 ).fetchall()
                 return [dict(r) for r in rows]
         except Exception as e:
-            logger.error(f"获取群炉鼎列表失败: {e}")
+            logger.error(f"获取群师徒列表失败: {e}")
             return []
 
     # ==================== 坊市 ====================

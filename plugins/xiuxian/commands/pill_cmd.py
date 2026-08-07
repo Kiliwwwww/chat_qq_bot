@@ -51,7 +51,8 @@ async def handle_use_pill(bot: Bot, event, args: Message = CommandArg()):
     parts = args.extract_plain_text().strip().split()
     if not parts:
         pills = "、".join(
-            v["name"] for v in constants.ITEMS.values() if v.get("type") == "pill"
+            v["name"] for v in constants.ITEMS.values()
+            if v.get("type") == "pill" and v.get("effect")
         )
         await reply_finish(use_pill_cmd, event, f"请指定要服用的丹药名，如：服用 修炼丹\n可用丹药：{pills}")
 

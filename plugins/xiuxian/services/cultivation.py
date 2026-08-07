@@ -56,7 +56,7 @@ def calculate_rate(group_id: int, player: dict, location: str) -> float:
     if player.get("physique") == "wanling_st":
         pet_bonus *= 2
 
-    # 炉鼎加成（紫金炉体加速翻倍且上限+1；玄阴鼎炉被抓时主人受益翻倍）
+    # 弟子加成（紫金道体加速翻倍且上限+1；玄阴道体被收为弟子时师父受益翻倍）
     furnaces = db.get_furnaces_by_owner(group_id, player["user_id"])
     furnace_limit = config.max_furnace
     furnace_rate = constants.FURNACE_RATE_BONUS
@@ -132,9 +132,9 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
     if db.get_cultivation(group_id, user_id):
         return False, "你正在闭关修炼中，先「出关」吧"
 
-    # 炉鼎状态无法修炼
+    # 已拜入师门的弟子无法修炼
     if db.get_furnace_by_target(group_id, user_id):
-        return False, "你已沦为他人炉鼎，无法自主修炼！发送「挣脱」尝试反抗"
+        return False, "你已是他人弟子，无法自主修炼！发送「叛门」尝试脱离师门"
 
     if location not in constants.LOCATIONS:
         return False, f"未知修炼地点，可选：{'、'.join(constants.LOCATIONS.keys())}"
@@ -197,8 +197,10 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
         dmg = combat.apply_negative_damage(group_id, user_id)
         result["risk_text"] += f"\n🩸 {dmg['text']}"
 
-    # 顿悟判定（气运越高越容易触发，道韵弥漫事件额外加成）
+    # 顿悟判定（气运越高越容易触发，道韵弥漫事件额外加成；太虚灵体翻倍）
     enlighten_chance = constants.ENLIGHTEN_CHANCE + world.enlighten_bonus(group_id)
+    if player.get("physique") == "taixu_lt":
+        enlighten_chance *= 2
     if rng.luck_roll(enlighten_chance, player.get("fortune", 1000)):
         bonus = constants.ENLIGHTEN_PROGRESS * (1 + rng.fortune_factor(player.get("fortune", 1000)) * 2)
         progress += bonus
@@ -234,14 +236,18 @@ def settle_cultivation(group_id: int, user_id: int) -> dict:
     result["progress"] = progress
     result["total_progress"] = current
 
-    # 灵石收益：每小时 = 基础 5 + 修炼速率 * 0.1
+    # 灵石收益：每小时 = 基础 5 + 修炼速率 * 0.1（财源广进体收益+50%）
     coins = int(elapsed_hours * (constants.COIN_PER_HOUR_BASE + rate * constants.COIN_PER_RATE))
+    if player.get("physique") == "caiyuan_ti":
+        coins = int(coins * 1.5)
     if coins > 0:
         db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + coins})
         result["coins"] = coins
 
-    # 功法熟练度成长
+    # 功法熟练度成长（武痴圣体+50%）
     gongfa_exp = elapsed_hours * 15 * (1 + constants.QUALITIES.get(player.get("spirit_quality", "废品"), 0.05))
+    if player.get("physique") == "wuchi_st":
+        gongfa_exp *= 1.5
     for g in db.get_gongfas(group_id, user_id):
         old, new = add_gongfa_exp(group_id, user_id, g["gongfa_id"], gongfa_exp)
         if new > old:

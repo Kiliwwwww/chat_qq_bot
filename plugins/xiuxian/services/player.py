@@ -188,7 +188,7 @@ def rebirth(group_id: int, user_id: int) -> dict:
         required_name = constants.REALMS[config.rebirth_min_realm]["name"]
         return {"ok": False, "text": f"转世重生需要至少达到【{required_name}】境界（当前{constants.REALMS[player['realm']]['name']}）"}
 
-    # 清除关联数据（功法/背包/灵宠/炉鼎/挂机/冷却）
+    # 清除关联数据（功法/背包/灵宠/师徒/挂机/冷却）
     if not db.reset_player_related(group_id, user_id):
         return {"ok": False, "text": "转世失败，请稍后再试"}
 
@@ -234,7 +234,7 @@ def rebirth(group_id: int, user_id: int) -> dict:
         f"{'与特殊体质【' + constants.PHYSIQUE_BY_ID[player['physique']]['name'] + '】' if player.get('physique') else ''}\n"
         f"🍀 气运 +{config.rebirth_fortune_bonus}（现 {new_fortune}）\n"
         f"📈 修炼速率永久 +{int(config.rebirth_rate_bonus * 100)}%（累计 +{int(rebirth_count * config.rebirth_rate_bonus * 100)}%）\n"
-        f"所有修为、功法、背包、灵宠、炉鼎均已归零，重新踏上仙途吧！"
+        f"所有修为、功法、背包、灵宠、弟子均已归零，重新踏上仙途吧！"
     )
     return {"ok": True, "text": text}
 

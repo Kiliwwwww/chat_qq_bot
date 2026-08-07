@@ -71,7 +71,9 @@ def use_pill(group_id: int, user_id: int, pill_key: str, quantity: int = 1) -> d
         eff_total = sum(_pill_effectiveness(used + i) for i in range(quantity))
         db.add_pill_usage(group_id, user_id, pill_key, quantity)
 
-        final_gain = int(gain * quality_mult * luck_mult * eff_total)
+        # 药王体：修为丹药效果+25%
+        pill_mult = 1.25 if player.get("physique") == "yaowang_ti" else 1.0
+        final_gain = int(gain * quality_mult * luck_mult * eff_total * pill_mult)
         realm_index = player.get("realm", 0)
         capacity = constants.REALMS[realm_index]["capacity"]
         current = player.get("realm_progress", 0) + final_gain

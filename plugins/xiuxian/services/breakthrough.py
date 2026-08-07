@@ -37,12 +37,35 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
     if progress < capacity:
         return {"ok": False, "text": f"修为不足，突破{constants.REALMS[realm_index + 1]['name']}需要 {int(capacity)} 修为（当前 {int(progress)}）"}
 
+    # 突破大境界所需药材与丹药（灵药谷刷取或突破商人购买）
+    require = constants.BREAKTHROUGH_REQUIREMENTS.get(realm_index)
+    if require:
+        herb_id, pill_id, location = require
+        herb_name = constants.ITEMS.get(herb_id, {}).get("name", herb_id)
+        pill_name = constants.ITEMS.get(pill_id, {}).get("name", pill_id)
+        herb_have = db.get_item_quantity(group_id, user_id, herb_id)
+        pill_have = db.get_item_quantity(group_id, user_id, pill_id)
+        if herb_have <= 0 or pill_have <= 0:
+            return {
+                "ok": False,
+                "text": (
+                    f"突破需要【{herb_name}】和【{pill_name}】！（当前 药材{herb_have}/1、丹药{pill_have}/1）\n"
+                    f"💡 可在「{location}」等地图探索获得，也可等「突破商人」现身坊市购买"
+                ),
+            }
+        # 消耗材料
+        db.remove_item(group_id, user_id, herb_id, 1)
+        db.remove_item(group_id, user_id, pill_id, 1)
+
     # 计算成功率
     base = realm_cfg["breakthrough_base"]
     bonus = 0.0
     bonus += _QUALITY_BREAKTHROUGH_BONUS.get(player.get("spirit_quality", ""), 0.0)
     bonus += world.breakthrough_bonus(group_id)
     bonus += rng.fortune_factor(debuff.effective_fortune(player))
+    # 造化圣体：突破成功率+10%
+    if player.get("physique") == "zaohua_st":
+        bonus += 0.10
     # 破境丹
     if use_pill:
         if db.get_item_quantity(group_id, user_id, "pojing_dan") <= 0:

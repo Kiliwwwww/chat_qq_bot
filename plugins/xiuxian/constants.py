@@ -50,19 +50,19 @@ QUALITY_WEIGHTS = {
 
 # 境界：index 为境界索引，name 为名称，capacity 为突破到下一境界所需的当前境界修为，breakthrough_base 为基础突破成功率
 REALMS = [
-    {"index": 0, "name": "炼气", "capacity": 1000, "breakthrough_base": 0.90},
-    {"index": 1, "name": "筑基", "capacity": 5000, "breakthrough_base": 0.80},
-    {"index": 2, "name": "金丹", "capacity": 20000, "breakthrough_base": 0.70},
-    {"index": 3, "name": "元婴", "capacity": 60000, "breakthrough_base": 0.60},
-    {"index": 4, "name": "化神", "capacity": 150000, "breakthrough_base": 0.50},
-    {"index": 5, "name": "炼虚", "capacity": 400000, "breakthrough_base": 0.45},
-    {"index": 6, "name": "合体", "capacity": 1000000, "breakthrough_base": 0.40},
-    {"index": 7, "name": "大乘", "capacity": 2500000, "breakthrough_base": 0.35},
-    {"index": 8, "name": "渡劫", "capacity": 6000000, "breakthrough_base": 0.30},
+    {"index": 0, "name": "炼气", "capacity": 1000, "breakthrough_base": 0.75},
+    {"index": 1, "name": "筑基", "capacity": 5000, "breakthrough_base": 0.65},
+    {"index": 2, "name": "金丹", "capacity": 20000, "breakthrough_base": 0.55},
+    {"index": 3, "name": "元婴", "capacity": 60000, "breakthrough_base": 0.45},
+    {"index": 4, "name": "化神", "capacity": 150000, "breakthrough_base": 0.38},
+    {"index": 5, "name": "炼虚", "capacity": 400000, "breakthrough_base": 0.33},
+    {"index": 6, "name": "合体", "capacity": 1000000, "breakthrough_base": 0.28},
+    {"index": 7, "name": "大乘", "capacity": 2500000, "breakthrough_base": 0.24},
+    {"index": 8, "name": "渡劫", "capacity": 6000000, "breakthrough_base": 0.20},
     {"index": 9, "name": "飞升", "capacity": None, "breakthrough_base": 0.0},
 ]
 
-# 境界战力倍率（用于战力计算与抓捕判定）
+# 境界战力倍率（用于战力计算与收徒判定）
 REALM_POWER_MULT = {i: 2 ** i for i in range(10)}
 
 # 基础修炼速率（修为/小时，乘法修正前）
@@ -152,6 +152,7 @@ LOCATIONS = {
     "星辰殿": {"multiplier": 3.0, "risk": 0.25, "desc": "星辉洒落，观星悟道之地"},
     "远古战场": {"multiplier": 3.2, "risk": 0.35, "desc": "上古战场遗迹，神兵传承无数"},
     "幽冥深渊": {"multiplier": 3.8, "risk": 0.45, "desc": "深不见底的凶险深渊，收益惊人"},
+    "古神药园": {"multiplier": 3.5, "risk": 0.30, "desc": "上古神明遗留的药园，可寻得高境界突破神药"},
 }
 
 # 妖兽暴动事件对妖兽森林的额外收益/风险加成
@@ -168,23 +169,47 @@ LOCATION_EVENTS = {
     "幽冥深渊": "mochao_xiongyong",
 }
 
+# 突破大境界所需材料（所有药材/丹药均可在灵药谷刷取）
+# key: 当前境界索引 → (药材 item_id, 丹药 item_id, 刷取地点)
+BREAKTHROUGH_REQUIREMENTS = {
+    0: ("juqi_cao", "juqi_dan", "灵药谷"),
+    1: ("ningling_hua", "ningling_dan", "灵药谷"),
+    2: ("huaying_guo", "huaying_dan", "灵药谷"),
+    3: ("xuantian_teng", "xuantian_dan", "灵药谷"),
+    4: ("xukong_shihua", "xukong_dan", "灵药谷"),
+    5: ("hundun_linggen", "hundun_dan", "灵药谷"),
+    6: ("shanggu_shenyao", "shenyao_dan", "灵药谷"),
+    7: ("dujie_xiancao", "dujie_xian_dan", "灵药谷"),
+    8: ("feisheng_shenlian", "feisheng_shendan", "灵药谷"),
+}
+
 # ==================== 特殊体质系统 ====================
 
 # 特殊体质：rate 为修炼加成，weight 为随机抽取权重
-# 炉鼎相关体质：九阴灵体 / 紫金炉体（主人方）/ 玄阴鼎炉（炉鼎方）
+# 弟子相关体质：九阴灵体 / 紫金道体（师父方）/ 玄阴道体（弟子方）
 PHYSIQUES = [
     {"id": "huanggu_sgt", "name": "荒古圣体", "rate": 0.10, "weight": 30, "desc": "肉身强大，后期成长高"},
     {"id": "tiansheng_jt", "name": "天生剑体", "rate": 0.10, "weight": 25, "desc": "剑法增强，攻击加成"},
     {"id": "tianmo_ti", "name": "天魔体", "rate": 0.15, "weight": 20, "desc": "魔功成长速度增加"},
-    {"id": "jiuyin_lt", "name": "九阴灵体", "rate": 0.10, "weight": 15, "desc": "炉鼎反抗之力增强，挣脱成功率提升"},
-    {"id": "zijin_luti", "name": "紫金炉体", "rate": 0.10, "weight": 10, "desc": "炉鼎大师，每个炉鼎修炼加速翻倍，且可多抓一个"},
-    {"id": "xuanyin_dinglu", "name": "玄阴鼎炉", "rate": 0.10, "weight": 8, "desc": "天生炉鼎之资，被抓后主人受益翻倍，挣脱困难但觉醒更强"},
+    {"id": "jiuyin_lt", "name": "九阴灵体", "rate": 0.10, "weight": 15, "desc": "叛门反抗之力增强，脱离师门成功率提升"},
+    {"id": "zijin_luti", "name": "紫金道体", "rate": 0.10, "weight": 10, "desc": "传功大师，每个弟子修炼加速翻倍，且可多收一个"},
+    {"id": "xuanyin_dinglu", "name": "玄阴道体", "rate": 0.10, "weight": 8, "desc": "天生道体之资，被收为弟子后师父受益翻倍，叛门困难但觉醒更强"},
     {"id": "tongtian_ti", "name": "通天神体", "rate": 0.20, "weight": 12, "desc": "天地亲和，修炼速度大增"},
     {"id": "hundun_ti", "name": "混沌体", "rate": 0.10, "weight": 8, "desc": "混沌初开之体，全属性大幅提升"},
     {"id": "jianxin_tm", "name": "剑心通明", "rate": 0.10, "weight": 10, "desc": "剑道通神，攻击大幅提升"},
     {"id": "jiuqiao_lt", "name": "九窍玲珑心", "rate": 0.10, "weight": 12, "desc": "七窍玲珑，炼丹炼器天赋异禀"},
     {"id": "wanling_st", "name": "万灵圣体", "rate": 0.10, "weight": 10, "desc": "万灵亲和，灵宠收益翻倍"},
     {"id": "yinyang_wx", "name": "阴阳五行体", "rate": 0.12, "weight": 10, "desc": "阴阳调和五行，修炼均衡加成"},
+    {"id": "jingang_ti", "name": "金刚不坏体", "rate": 0.10, "weight": 10, "desc": "肉身成圣，防御+30%、气血+20%"},
+    {"id": "niepan_st", "name": "涅槃圣体", "rate": 0.10, "weight": 8, "desc": "浴火重生，归西复活时间减半"},
+    {"id": "taixu_lt", "name": "太虚灵体", "rate": 0.10, "weight": 8, "desc": "与道合真，闭关顿悟概率翻倍"},
+    {"id": "zaohua_st", "name": "造化圣体", "rate": 0.10, "weight": 8, "desc": "夺天地造化，突破成功率+10%"},
+    {"id": "fenglei_st", "name": "风雷圣体", "rate": 0.10, "weight": 8, "desc": "身法如风、迅疾如雷，探索奇遇触发率+50%"},
+    {"id": "caiyuan_ti", "name": "财源广进体", "rate": 0.10, "weight": 8, "desc": "天生财星，所有灵石收益+50%"},
+    {"id": "wuchi_st", "name": "武痴圣体", "rate": 0.10, "weight": 8, "desc": "嗜武如痴，PK战力+20%、功法熟练度+50%"},
+    {"id": "wanjie_mo", "name": "万劫魔体", "rate": 0.25, "weight": 6, "desc": "历劫而生，修炼速度大增，但探索遇险率提升"},
+    {"id": "yaowang_ti", "name": "药王体", "rate": 0.10, "weight": 8, "desc": "天生药王，服用修为丹药效果+25%"},
+    {"id": "xinghui_st", "name": "星辉圣体", "rate": 0.10, "weight": 6, "desc": "身披星辉，讨伐Boss伤害+30%、掉落率提升"},
 ]
 
 PHYSIQUE_BY_ID = {p["id"]: p for p in PHYSIQUES}
@@ -239,6 +264,25 @@ ITEMS = {
     "lingcao_seed": {"name": "灵草种子", "type": "seed", "desc": "种植后可收获灵草"},
     "longxiancao_seed": {"name": "龙涎草种子", "type": "seed", "desc": "种植后可收获龙涎草"},
     "qiannian_ls_seed": {"name": "千年灵参种子", "type": "seed", "desc": "种植后可收获千年灵参"},
+    # ---- 突破所需药材与丹药（只能从副本刷取，商城不出售）----
+    "juqi_cao": {"name": "聚气草", "type": "material", "desc": "突破筑基所需药材"},
+    "juqi_dan": {"name": "聚气丹", "type": "pill", "desc": "突破筑基所需丹药"},
+    "ningling_hua": {"name": "凝灵花", "type": "material", "desc": "突破金丹所需药材"},
+    "ningling_dan": {"name": "凝灵丹", "type": "pill", "desc": "突破金丹所需丹药"},
+    "huaying_guo": {"name": "化婴果", "type": "material", "desc": "突破元婴所需药材"},
+    "huaying_dan": {"name": "化婴丹", "type": "pill", "desc": "突破元婴所需丹药"},
+    "xuantian_teng": {"name": "玄天藤", "type": "material", "desc": "突破化神所需药材"},
+    "xuantian_dan": {"name": "玄天丹", "type": "pill", "desc": "突破化神所需丹药"},
+    "xukong_shihua": {"name": "虚空石花", "type": "material", "desc": "突破炼虚所需药材"},
+    "xukong_dan": {"name": "虚空丹", "type": "pill", "desc": "突破炼虚所需丹药"},
+    "hundun_linggen": {"name": "混沌灵根", "type": "material", "desc": "突破合体所需药材"},
+    "hundun_dan": {"name": "混沌丹", "type": "pill", "desc": "突破合体所需丹药"},
+    "shanggu_shenyao": {"name": "上古神药", "type": "material", "desc": "突破大乘所需药材"},
+    "shenyao_dan": {"name": "神药丹", "type": "pill", "desc": "突破大乘所需丹药"},
+    "dujie_xiancao": {"name": "渡劫仙草", "type": "material", "desc": "突破渡劫所需药材"},
+    "dujie_xian_dan": {"name": "渡劫仙丹", "type": "pill", "desc": "突破渡劫所需丹药"},
+    "feisheng_shenlian": {"name": "飞升神莲", "type": "material", "desc": "突破飞升所需药材"},
+    "feisheng_shendan": {"name": "飞升神丹", "type": "pill", "desc": "突破飞升所需丹药"},
     "xiulian_dan": {"name": "修炼丹", "type": "pill", "desc": "服用后获得修为", "effect": {"progress": 500}},
     "jusan_san": {"name": "聚气散", "type": "pill", "desc": "低阶丹药，性价比最高的基础修为丹", "effect": {"progress": 400}},
     "ningshen_dan": {"name": "凝神丹", "type": "pill", "desc": "中阶丹药，服用增加大量修为", "effect": {"progress": 800}},
@@ -326,22 +370,32 @@ BOSS_SPAWN_CHANCE = 0.02
 # Boss 存活时长（分钟）
 BOSS_LIFETIME_MINUTES = 30
 
-# 玩家讨伐冷却（秒）
-BOSS_ATTACK_COOLDOWN = 30
-
-# Boss 实力按群内最强玩家战力定（比最强玩家强一点）
-BOSS_MAX_HP_FACTOR = 10        # 血量 = 最强战力 × 10
-BOSS_ATTACK_FACTOR = 0.05      # 攻击 = 最强战力 × 5%
+# Boss 实力按群内玩家平均战力定（比平均值高一点）
+BOSS_MAX_HP_FACTOR = 2.5       # 血量 = 平均战力 × 2.5
+BOSS_ATTACK_FACTOR = 0.02      # 攻击显示值 = 平均战力 × 2%
 BOSS_DMG_MIN = 0.10            # 玩家每次伤害下限（自身战力比例）
 BOSS_DMG_MAX = 0.20            # 玩家每次伤害上限
 BOSS_MIN_MAX_HP = 1000
 
+# Boss 反击：每次按玩家自身气血上限的固定比例扣血（10%，约 10 次才会被打死）
+BOSS_COUNTER_RATIO = 0.10
+
 # 奖励
-BOSS_REWARD_BASE = 200         # 参与保底灵石
-BOSS_REWARD_MVP = 3000         # 最高伤害额外灵石
-BOSS_REWARD_LAST_HIT = 1500    # 最后一击额外灵石
-BOSS_SHARE_POOL_FACTOR = 0.10  # 伤害分成灵石池 = Boss血量 × 系数
-BOSS_PROGRESS_REWARD = 0.05    # 修为奖励 = 自身战力 × 系数
+BOSS_REWARD_BASE = 100         # 参与保底灵石
+BOSS_REWARD_MVP = 1500         # 最高伤害额外灵石
+BOSS_REWARD_LAST_HIT = 500     # 最后一击额外灵石
+BOSS_SHARE_POOL_FACTOR = 0.05  # 伤害分成灵石池 = Boss血量 × 系数
+BOSS_SHARE_POOL_CAP = 2000     # 伤害分成灵石池上限（防止高战力群灵石奖励失控）
+BOSS_PROGRESS_REWARD = 0.05    # 修为池 = Boss血量 × 系数（按伤害比例分配）
+
+# Boss 随机掉落（概率随伤害贡献比例提升）
+BOSS_DROP_PILLS = ["xiulian_dan", "ningshen_dan", "peiyuan_dan", "jingang_dan",
+                   "dali_wan", "huiling_dan", "wudao_dan", "kuangbao_dan"]
+BOSS_DROP_PILL_CHANCE = 0.60
+BOSS_DROP_PET_CHANCE = 0.20
+BOSS_DROP_GONGFA_CHANCE = 0.30
+# Boss 掉落突破材料（对应玩家下一境界所需的药材/丹药）
+BOSS_DROP_BREAKTHROUGH_CHANCE = 0.30
 
 # 灵气潮汐事件期间玩家伤害倍率
 BOSS_EVENT_DAMAGE_MULT = 1.3
@@ -419,6 +473,32 @@ MERCHANT_GOODS = [
     {"item_id": "lingcao", "quantity": 10, "price": 50},
     {"item_id": "lingquan", "quantity": 5, "price": 120},
 ]
+
+# 突破商人商品池：专售突破大境界所需的药材与丹药（单价灵石）
+# 价格随突破所需境界修为（capacity）阶梯上升，让探索刷取仍具价值，同时提供灵石购买捷径
+BREAKTHROUGH_MERCHANT_GOODS = [
+    {"item_id": "juqi_cao", "quantity": 1, "price": 3000},
+    {"item_id": "juqi_dan", "quantity": 1, "price": 5000},
+    {"item_id": "ningling_hua", "quantity": 1, "price": 12000},
+    {"item_id": "ningling_dan", "quantity": 1, "price": 20000},
+    {"item_id": "huaying_guo", "quantity": 1, "price": 40000},
+    {"item_id": "huaying_dan", "quantity": 1, "price": 60000},
+    {"item_id": "xuantian_teng", "quantity": 1, "price": 100000},
+    {"item_id": "xuantian_dan", "quantity": 1, "price": 160000},
+    {"item_id": "xukong_shihua", "quantity": 1, "price": 260000},
+    {"item_id": "xukong_dan", "quantity": 1, "price": 400000},
+    {"item_id": "hundun_linggen", "quantity": 1, "price": 650000},
+    {"item_id": "hundun_dan", "quantity": 1, "price": 1000000},
+    {"item_id": "shanggu_shenyao", "quantity": 1, "price": 1600000},
+    {"item_id": "shenyao_dan", "quantity": 1, "price": 2500000},
+    {"item_id": "dujie_xiancao", "quantity": 1, "price": 4000000},
+    {"item_id": "dujie_xian_dan", "quantity": 1, "price": 6000000},
+    {"item_id": "feisheng_shenlian", "quantity": 1, "price": 8000000},
+    {"item_id": "feisheng_shendan", "quantity": 1, "price": 12000000},
+]
+
+# 突破商人随机现身概率（每世界 Tick 一次判定）
+BREAKTHROUGH_MERCHANT_SPAWN_CHANCE = 0.05
 
 # ==================== 常驻商城系统 ====================
 
@@ -508,10 +588,10 @@ DEFAULT_FORTUNE = 1000
 # 废材流主角气运
 TRASH_FORTUNE = 10000
 
-# 炉鼎收益：每个炉鼎提供的修炼加速
+# 弟子收益：每个弟子提供的修炼加速
 FURNACE_RATE_BONUS = 0.10
 
-# 双修修为收益：当前境界容量的百分比
+# 传功修为收益：当前境界容量的百分比
 XIUXIU_PROGRESS_RATE = 0.05
 
 # 丹药效果递减：同种修为丹药每次服用效果下降的步长，最低降至
@@ -622,7 +702,7 @@ DEBUFFS = {
     },
     "shenti_touzhi": {
         "name": "身体透支",
-        "desc": "双修过度，元气大伤，修炼受阻",
+        "desc": "传功过度，元气大伤，修炼受阻",
         "duration": 120,
         "rate": -0.20,
     },
@@ -644,7 +724,7 @@ DEBUFFS = {
 
 # 各 debuff 触发概率
 DEBUFF_TRIGGER = {
-    "xiuxiu_shenti_touzhi": 0.20,   # 每次双修触发身体透支
+    "xiuxiu_shenti_touzhi": 0.20,   # 每次传功触发身体透支
     "pill_zhongdu_base": 0.05,      # 服用丹药中毒基础概率
     "zouhuo": 0.30,                 # 闭关超时走火入魔
     "pk_fail_daomei": 0.30,         # PK 落败触发霉运

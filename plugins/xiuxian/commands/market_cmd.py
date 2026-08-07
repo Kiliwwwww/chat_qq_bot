@@ -10,6 +10,7 @@ market_cmd = xiuxian_command("坊市", aliases={"市场"}, priority=5, block=Tru
 market_sell_cmd = xiuxian_command("坊市出售", aliases={"出售"}, priority=5, block=True)
 market_buy_cmd = xiuxian_command("坊市购买", priority=5, block=True)
 market_buy_merchant_cmd = xiuxian_command("坊市购商", aliases={"购商"}, priority=5, block=True)
+market_buy_breakthrough_cmd = xiuxian_command("坊市购突破", aliases={"购突破"}, priority=5, block=True)
 market_cancel_cmd = xiuxian_command("坊市撤销", aliases={"撤销挂单"}, priority=5, block=True)
 
 
@@ -80,6 +81,17 @@ async def handle_market_buy_merchant(bot: Bot, event, args: Message = CommandArg
         await reply_finish(market_buy_merchant_cmd, event, "请指定商品编号，如：坊市购商 1")
     result = await market_svc.buy_merchant_item(group_id, event.user_id, int(arg))
     await reply_finish(market_buy_merchant_cmd, event, result["text"])
+
+
+@market_buy_breakthrough_cmd.handle()
+async def handle_market_buy_breakthrough(bot: Bot, event, args: Message = CommandArg()):
+    group_id = await require_game(market_buy_breakthrough_cmd, event)
+
+    arg = args.extract_plain_text().strip()
+    if not arg.isdigit():
+        await reply_finish(market_buy_breakthrough_cmd, event, "请指定商品编号，如：坊市购突破 1")
+    result = await market_svc.buy_breakthrough_merchant_item(group_id, event.user_id, int(arg))
+    await reply_finish(market_buy_breakthrough_cmd, event, result["text"])
 
 
 @market_cancel_cmd.handle()

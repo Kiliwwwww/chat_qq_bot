@@ -21,7 +21,7 @@ from .cultivation_cmd import (
     catalog_cmd,
     upgrade_gongfa_cmd,
 )
-from .world_cmd import world_cmd, trigger_event_cmd
+from .world_cmd import world_cmd, trigger_event_cmd, summon_merchant_cmd
 from .alchemy_cmd import (
     lian_dan_cmd,
     lian_qi_cmd,
@@ -29,6 +29,7 @@ from .alchemy_cmd import (
     equip_cmd,
     unequip_cmd,
 )
+from .gift_cmd import gift_cmd
 from .pet_cmd import pet_cmd, feed_cmd, pet_shop_cmd, pet_shop_buy_cmd
 from .plant_cmd import plant_cmd, harvest_cmd, field_cmd
 from .pill_cmd import use_pill_cmd, shop_cmd, shop_buy_cmd, shop_sell_cmd
@@ -37,11 +38,12 @@ from .market_cmd import (
     market_sell_cmd,
     market_buy_cmd,
     market_buy_merchant_cmd,
+    market_buy_breakthrough_cmd,
     market_cancel_cmd,
 )
 from .furnace_cmd import capture_cmd, furnace_cmd, escape_cmd, release_cmd, xiuxiu_cmd
 from .combat_cmd import signup_cmd, battle_status_cmd, pk_cmd
-from .boss_cmd import boss_attack_cmd, boss_status_cmd
+from .boss_cmd import boss_attack_cmd, boss_status_cmd, boss_spawn_cmd
 from .ranking_cmd import ranking_cmd
 
 __all__ = [
@@ -65,11 +67,13 @@ __all__ = [
     "upgrade_gongfa_cmd",
     "world_cmd",
     "trigger_event_cmd",
+    "summon_merchant_cmd",
     "lian_dan_cmd",
     "lian_qi_cmd",
     "inventory_cmd",
     "equip_cmd",
     "unequip_cmd",
+    "gift_cmd",
     "pet_cmd",
     "feed_cmd",
     "pet_shop_cmd",
@@ -85,6 +89,7 @@ __all__ = [
     "market_sell_cmd",
     "market_buy_cmd",
     "market_buy_merchant_cmd",
+    "market_buy_breakthrough_cmd",
     "market_cancel_cmd",
     "capture_cmd",
     "furnace_cmd",
@@ -96,5 +101,6 @@ __all__ = [
     "pk_cmd",
     "boss_attack_cmd",
     "boss_status_cmd",
+    "boss_spawn_cmd",
     "ranking_cmd",
 ]

@@ -33,37 +33,81 @@ EXPLORE_POOL = {
         {"key": "equip", "weight": 6, "text": "从矿脉中挖出一件埋藏已久的法宝"},
     ],
     "妖兽森林": [
-        {"key": "yaodan", "weight": 28, "text": "猎杀妖兽，收获妖丹", "items": {"yaodan": 2}},
-        {"key": "coin", "weight": 20, "text": "从妖兽巢穴搜刮到灵石", "coins": 100},
-        {"key": "shoupi", "weight": 15, "text": "剥下妖兽的兽皮", "items": {"shoupi": 2}},
-        {"key": "progress", "weight": 13, "text": "与妖兽搏斗，实战感悟颇多", "progress": 200},
-        {"key": "xuantie", "weight": 8, "text": "从妖兽巢穴中找到玄铁", "items": {"xuantie": 1}},
+        {"key": "yaodan", "weight": 24, "text": "猎杀妖兽，收获妖丹", "items": {"yaodan": 2}},
+        {"key": "coin", "weight": 18, "text": "从妖兽巢穴搜刮到灵石", "coins": 100},
+        {"key": "shoupi", "weight": 14, "text": "剥下妖兽的兽皮", "items": {"shoupi": 2}},
+        {"key": "progress", "weight": 12, "text": "与妖兽搏斗，实战感悟颇多", "progress": 200},
+        {"key": "xuantie", "weight": 7, "text": "从妖兽巢穴中找到玄铁", "items": {"xuantie": 1}},
         {"key": "zijinsha", "weight": 5, "text": "在妖兽巢穴中挖到紫金砂", "items": {"zijinsha": 1}},
-        {"key": "pet", "weight": 7, "text": "捕获一只幼兽作为灵宠"},
-        {"key": "equip", "weight": 5, "text": "从妖兽尸体旁捡到一件宝物"},
-        {"key": "risk", "weight": 12, "text": "遭遇强大妖兽，重伤而逃", "lose_coins": 60},
+        {"key": "juqi_cao", "weight": 7, "text": "采到一株聚气草（突破筑基所需）", "items": {"juqi_cao": 1}},
+        {"key": "juqi_dan", "weight": 4, "text": "在妖兽体内找到一枚聚气丹（突破筑基所需）", "items": {"juqi_dan": 1}},
+        {"key": "ningling_hua", "weight": 5, "text": "采到一朵凝灵花（突破金丹所需）", "items": {"ningling_hua": 1}},
+        {"key": "ningling_dan", "weight": 3, "text": "寻得一枚凝灵丹（突破金丹所需）", "items": {"ningling_dan": 1}},
+        {"key": "huaying_guo", "weight": 4, "text": "采到一枚化婴果（突破元婴所需）", "items": {"huaying_guo": 1}},
+        {"key": "huaying_dan", "weight": 3, "text": "寻得一枚化婴丹（突破元婴所需）", "items": {"huaying_dan": 1}},
+        {"key": "pet", "weight": 6, "text": "捕获一只幼兽作为灵宠"},
+        {"key": "equip", "weight": 4, "text": "从妖兽尸体旁捡到一件宝物"},
+        {"key": "risk", "weight": 11, "text": "遭遇强大妖兽，重伤而逃", "lose_coins": 60},
     ],
     "秘境": [
-        {"key": "equip", "weight": 18, "text": "在秘境宝库中发现稀世神兵"},
-        {"key": "progress", "weight": 22, "text": "秘境灵气充沛，修为暴涨", "progress": 800},
-        {"key": "yaodan", "weight": 12, "text": "猎杀秘境守卫妖兽，获得妖丹", "items": {"yaodan": 3}},
-        {"key": "lingquan", "weight": 9, "text": "饮下秘境灵泉，脱胎换骨", "items": {"lingquan": 3}},
-        {"key": "longxiancao", "weight": 8, "text": "采到一株龙涎草", "items": {"longxiancao": 1}},
-        {"key": "qiannian_ls", "weight": 6, "text": "寻得千年灵参", "items": {"qiannian_ls": 1}},
-        {"key": "xingchenshi", "weight": 7, "text": "拾得一枚星辰石", "items": {"xingchenshi": 2}},
-        {"key": "zijinsha", "weight": 8, "text": "找到一把紫金砂", "items": {"zijinsha": 1}},
-        {"key": "pet", "weight": 9, "text": "秘境中收服一只上古异兽"},
-        {"key": "coin", "weight": 8, "text": "秘境中藏有大量灵石", "coins": 300},
-        {"key": "risk", "weight": 10, "text": "触发秘境机关，狼狈逃离", "lose_coins": 100},
+        {"key": "equip", "weight": 14, "text": "在秘境宝库中发现稀世神兵"},
+        {"key": "progress", "weight": 20, "text": "秘境灵气充沛，修为暴涨", "progress": 800},
+        {"key": "yaodan", "weight": 10, "text": "猎杀秘境守卫妖兽，获得妖丹", "items": {"yaodan": 3}},
+        {"key": "lingquan", "weight": 8, "text": "饮下秘境灵泉，脱胎换骨", "items": {"lingquan": 3}},
+        {"key": "longxiancao", "weight": 6, "text": "采到一株龙涎草", "items": {"longxiancao": 1}},
+        {"key": "qiannian_ls", "weight": 5, "text": "寻得千年灵参", "items": {"qiannian_ls": 1}},
+        {"key": "xingchenshi", "weight": 6, "text": "拾得一枚星辰石", "items": {"xingchenshi": 2}},
+        {"key": "zijinsha", "weight": 6, "text": "找到一把紫金砂", "items": {"zijinsha": 1}},
+        {"key": "xuantian_teng", "weight": 7, "text": "采到一段玄天藤（突破化神所需）", "items": {"xuantian_teng": 1}},
+        {"key": "xuantian_dan", "weight": 4, "text": "寻得一枚玄天丹（突破化神所需）", "items": {"xuantian_dan": 1}},
+        {"key": "xukong_shihua", "weight": 5, "text": "采到一朵虚空石花（突破炼虚所需）", "items": {"xukong_shihua": 1}},
+        {"key": "xukong_dan", "weight": 3, "text": "寻得一枚虚空丹（突破炼虚所需）", "items": {"xukong_dan": 1}},
+        {"key": "hundun_linggen", "weight": 4, "text": "寻得混沌灵根（突破合体所需）", "items": {"hundun_linggen": 1}},
+        {"key": "hundun_dan", "weight": 3, "text": "寻得一枚混沌丹（突破合体所需）", "items": {"hundun_dan": 1}},
+        {"key": "pet", "weight": 8, "text": "秘境中收服一只上古异兽"},
+        {"key": "coin", "weight": 7, "text": "秘境中藏有大量灵石", "coins": 300},
+        {"key": "risk", "weight": 9, "text": "触发秘境机关，狼狈逃离", "lose_coins": 100},
+    ],
+    "古神药园": [
+        {"key": "shanggu_shenyao", "weight": 11, "text": "采得一株上古神药（突破大乘所需）", "items": {"shanggu_shenyao": 1}},
+        {"key": "shenyao_dan", "weight": 7, "text": "寻得一枚神药丹（突破大乘所需）", "items": {"shenyao_dan": 1}},
+        {"key": "dujie_xiancao", "weight": 11, "text": "采到一株渡劫仙草（突破渡劫所需）", "items": {"dujie_xiancao": 1}},
+        {"key": "dujie_xian_dan", "weight": 7, "text": "寻得一枚渡劫仙丹（突破渡劫所需）", "items": {"dujie_xian_dan": 1}},
+        {"key": "feisheng_shenlian", "weight": 10, "text": "采到一株飞升神莲（突破飞升所需）", "items": {"feisheng_shenlian": 1}},
+        {"key": "feisheng_shendan", "weight": 6, "text": "寻得一枚飞升神丹（突破飞升所需）", "items": {"feisheng_shendan": 1}},
+        {"key": "longxiancao", "weight": 9, "text": "采到龙涎草", "items": {"longxiancao": 2}},
+        {"key": "qiannian_ls", "weight": 9, "text": "采到千年灵参", "items": {"qiannian_ls": 2}},
+        {"key": "progress", "weight": 14, "text": "吸收神药药力，修为大涨", "progress": 1000},
+        {"key": "coin", "weight": 7, "text": "捡到药园遗留的灵石", "coins": 300},
+        {"key": "risk", "weight": 9, "text": "惊动药园守护兽，重伤而逃", "lose_coins": 150},
     ],
     "灵药谷": [
-        {"key": "lingcao", "weight": 24, "text": "采到一大片灵草", "items": {"lingcao": 3}},
-        {"key": "lingquan", "weight": 18, "text": "发现灵药谷深处的一汪灵泉", "items": {"lingquan": 2}},
-        {"key": "lingcao_seed", "weight": 15, "text": "拾到一包灵草种子", "items": {"lingcao_seed": 2}},
-        {"key": "longxiancao", "weight": 12, "text": "寻得一株龙涎草", "items": {"longxiancao": 1}},
-        {"key": "longxiancao_seed", "weight": 8, "text": "捡到龙涎草种子", "items": {"longxiancao_seed": 1}},
-        {"key": "qiannian_ls", "weight": 8, "text": "采到一株千年灵参", "items": {"qiannian_ls": 1}},
-        {"key": "qiannian_ls_seed", "weight": 5, "text": "寻得千年灵参种子", "items": {"qiannian_ls_seed": 1}},
+        {"key": "lingcao", "weight": 20, "text": "采到一大片灵草", "items": {"lingcao": 3}},
+        {"key": "lingquan", "weight": 14, "text": "发现灵药谷深处的一汪灵泉", "items": {"lingquan": 2}},
+        {"key": "lingcao_seed", "weight": 12, "text": "拾到一包灵草种子", "items": {"lingcao_seed": 2}},
+        {"key": "longxiancao", "weight": 10, "text": "寻得一株龙涎草", "items": {"longxiancao": 1}},
+        {"key": "longxiancao_seed", "weight": 6, "text": "捡到龙涎草种子", "items": {"longxiancao_seed": 1}},
+        {"key": "qiannian_ls", "weight": 6, "text": "采到一株千年灵参", "items": {"qiannian_ls": 1}},
+        {"key": "qiannian_ls_seed", "weight": 4, "text": "寻得千年灵参种子", "items": {"qiannian_ls_seed": 1}},
+        # 突破大境界所需药材与丹药（均可在此刷取）
+        {"key": "juqi_cao", "weight": 8, "text": "采到一株聚气草（突破筑基所需）", "items": {"juqi_cao": 1}},
+        {"key": "juqi_dan", "weight": 6, "text": "寻得一枚聚气丹（突破筑基所需）", "items": {"juqi_dan": 1}},
+        {"key": "ningling_hua", "weight": 7, "text": "采到一朵凝灵花（突破金丹所需）", "items": {"ningling_hua": 1}},
+        {"key": "ningling_dan", "weight": 5, "text": "寻得一枚凝灵丹（突破金丹所需）", "items": {"ningling_dan": 1}},
+        {"key": "huaying_guo", "weight": 6, "text": "采到一枚化婴果（突破元婴所需）", "items": {"huaying_guo": 1}},
+        {"key": "huaying_dan", "weight": 4, "text": "寻得一枚化婴丹（突破元婴所需）", "items": {"huaying_dan": 1}},
+        {"key": "xuantian_teng", "weight": 5, "text": "采到一段玄天藤（突破化神所需）", "items": {"xuantian_teng": 1}},
+        {"key": "xuantian_dan", "weight": 4, "text": "寻得一枚玄天丹（突破化神所需）", "items": {"xuantian_dan": 1}},
+        {"key": "xukong_shihua", "weight": 4, "text": "采到一朵虚空石花（突破炼虚所需）", "items": {"xukong_shihua": 1}},
+        {"key": "xukong_dan", "weight": 3, "text": "寻得一枚虚空丹（突破炼虚所需）", "items": {"xukong_dan": 1}},
+        {"key": "hundun_linggen", "weight": 3, "text": "寻得混沌灵根（突破合体所需）", "items": {"hundun_linggen": 1}},
+        {"key": "hundun_dan", "weight": 3, "text": "寻得一枚混沌丹（突破合体所需）", "items": {"hundun_dan": 1}},
+        {"key": "shanggu_shenyao", "weight": 3, "text": "采得一株上古神药（突破大乘所需）", "items": {"shanggu_shenyao": 1}},
+        {"key": "shenyao_dan", "weight": 2, "text": "寻得一枚神药丹（突破大乘所需）", "items": {"shenyao_dan": 1}},
+        {"key": "dujie_xiancao", "weight": 2, "text": "采到一株渡劫仙草（突破渡劫所需）", "items": {"dujie_xiancao": 1}},
+        {"key": "dujie_xian_dan", "weight": 2, "text": "寻得一枚渡劫仙丹（突破渡劫所需）", "items": {"dujie_xian_dan": 1}},
+        {"key": "feisheng_shenlian", "weight": 2, "text": "采到一株飞升神莲（突破飞升所需）", "items": {"feisheng_shenlian": 1}},
+        {"key": "feisheng_shendan", "weight": 1, "text": "寻得一枚飞升神丹（突破飞升所需）", "items": {"feisheng_shendan": 1}},
         {"key": "progress", "weight": 8, "text": "药香扑鼻，闻之修为精进", "progress": 300},
         {"key": "coin", "weight": 5, "text": "捡到采药人遗留的灵石", "coins": 120},
         {"key": "risk", "weight": 7, "text": "惊动守药灵兽，被追咬逃窜", "lose_coins": 60},
@@ -111,6 +155,12 @@ _POSITIVE_KEYS = [
     "pet", "equip", "xuantie", "zijinsha", "shoupi",
     "longxiancao", "xingchenshi", "qiannian_ls",
     "lingcao_seed", "longxiancao_seed", "qiannian_ls_seed",
+    # 突破材料
+    "juqi_cao", "juqi_dan", "ningling_hua", "ningling_dan",
+    "huaying_guo", "huaying_dan", "xuantian_teng", "xuantian_dan",
+    "xukong_shihua", "xukong_dan", "hundun_linggen", "hundun_dan",
+    "shanggu_shenyao", "shenyao_dan", "dujie_xiancao", "dujie_xian_dan",
+    "feisheng_shenlian", "feisheng_shendan",
 ]
 
 # 各地点探索的基础灵石收益（每次探索必定获得）
@@ -124,6 +174,7 @@ _LOCATION_BASE_COINS = {
     "星辰殿": 100,
     "远古战场": 120,
     "幽冥深渊": 160,
+    "古神药园": 140,
 }
 
 
@@ -181,9 +232,13 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
         remain = int(cooldown_until - time.time())
         return {"ok": False, "text": f"探索消耗心神，还需 {remain} 秒才能再次探索"}
 
-    # 加权抽取结果（气运向正面倾斜）
+    # 加权抽取结果（气运向正面倾斜；万劫魔体提升遇险权重）
     pool = EXPLORE_POOL[location]
     weights = {i: p["weight"] for i, p in enumerate(pool)}
+    if player.get("physique") == "wanjie_mo":
+        for i, p in enumerate(pool):
+            if p["key"] == "risk":
+                weights[i] = weights[i] * 2 + 3
     positive = [i for i, p in enumerate(pool) if p["key"] in _POSITIVE_KEYS]
     shifted = rng.positive_shift(weights, player.get("fortune", 1000), positive)
     result_index = rng.weighted_choice_dict(shifted)
@@ -204,15 +259,18 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
         dmg = combat.take_damage(group_id, user_id, int(tick))
         result["text"] += f"\n🩸 体内淤毒发作，损失 {int(tick)} 点气血！"
 
-    # 基础灵石收益（每次探索必定获得）
+    # 基础灵石收益（每次探索必定获得；财源广进体收益+50%）
+    coin_mult = 1.5 if player.get("physique") == "caiyuan_ti" else 1.0
     base_coins = _LOCATION_BASE_COINS.get(location, 0)
     if base_coins > 0:
-        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + base_coins})
-        result["gains"].append(f"+{base_coins} 灵石")
+        gain = int(base_coins * coin_mult)
+        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + gain})
+        result["gains"].append(f"+{gain} 灵石")
 
     if outcome.get("coins"):
-        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + outcome["coins"]})
-        result["gains"].append(f"+{outcome['coins']} 灵石")
+        gain = int(outcome["coins"] * coin_mult)
+        db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + gain})
+        result["gains"].append(f"+{gain} 灵石")
     if outcome.get("lose_coins"):
         lost = min(outcome["lose_coins"], player.get("coin", 0))
         db.update_player(group_id, user_id, {"coin": player.get("coin", 0) - lost})
@@ -253,8 +311,9 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
         db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + int(bonus_coins)})
         result["text"] += f"\n🌟 天道垂青！额外获得 {int(bonus_coins)} 灵石"
 
-    # 随机奇遇（仙缘降临事件大幅提升触发率）
-    if rng.luck_roll(constants.ENCOUNTER_CHANCE * luck_mult, fortune):
+    # 随机奇遇（仙缘降临事件大幅提升触发率；风雷圣体触发率+50%）
+    enc_mult = 1.5 if player.get("physique") == "fenglei_st" else 1.0
+    if rng.luck_roll(constants.ENCOUNTER_CHANCE * luck_mult * enc_mult, fortune):
         result["text"] += _apply_encounter(group_id, user_id, fortune, luck_mult)
 
     return result

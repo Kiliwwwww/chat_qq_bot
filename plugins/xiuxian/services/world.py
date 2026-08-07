@@ -137,6 +137,25 @@ def is_merchant_active(group_id: int) -> bool:
     return time.time() < state.get("merchant_end_time", 0)
 
 
+def is_breakthrough_merchant_active(group_id: int) -> bool:
+    """突破商人是否在场"""
+    state = ensure_world(group_id)
+    return time.time() < state.get("breakthrough_merchant_end_time", 0)
+
+
+def summon_breakthrough_merchant(group_id: int, duration_minutes: Optional[int] = None) -> str:
+    """管理员手动召唤突破商人（立即出现在坊市），返回公告文本。"""
+    minutes = duration_minutes or config.breakthrough_merchant_duration
+    db.update_world_state(group_id, {
+        "breakthrough_merchant_end_time": time.time() + minutes * 60,
+    })
+    return (
+        f"💎 【突破商人】一位专售突破奇珍的商人现身坊市！\n"
+        f"突破大境界所需的药材与丹药应有尽有，快发送「坊市」看看吧！\n"
+        f"⏳ 停留 {minutes} 分钟，机不可失！"
+    )
+
+
 def get_merchant_goods() -> list[dict]:
     """生成神秘商人的限时商品"""
     goods = random.sample(constants.MERCHANT_GOODS, min(3, len(constants.MERCHANT_GOODS)))
@@ -273,7 +292,22 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
                 "text": "🏪 【神秘商人】一位云游商人现身坊市，带来了稀有的丹药与材料，快来「坊市」看看！",
             })
 
-    # 5. 世界 Boss 刷新与超时
+    # 5. 突破商人随机现身（专售突破大境界所需药材/丹药）
+    bt_merchant_end = state.get("breakthrough_merchant_end_time", 0)
+    if now >= bt_merchant_end:
+        if random.random() < constants.BREAKTHROUGH_MERCHANT_SPAWN_CHANCE:
+            new_end = now + config.breakthrough_merchant_duration * 60
+            db.update_world_state(group_id, {"breakthrough_merchant_end_time": new_end})
+            announcements.append({
+                "type": "merchant",
+                "text": (
+                    f"💎 【突破商人】一位专售突破奇珍的商人现身坊市！\n"
+                    f"突破大境界所需的药材与丹药应有尽有，快发送「坊市」看看吧！\n"
+                    f"⏳ 停留 {config.breakthrough_merchant_duration} 分钟，机不可失！"
+                ),
+            })
+
+    # 6. 世界 Boss 刷新与超时
     from . import boss as boss_svc
     boss_announce = boss_svc.maybe_spawn(group_id)
     if boss_announce:
@@ -282,7 +316,7 @@ def advance_world(group_id: int, now: Optional[float] = None) -> list[dict]:
     if boss_escape:
         announcements.append({"type": "event", "text": boss_escape})
 
-    # 6. 更新世界状态
+    # 7. 更新世界状态
     db.update_world_state(group_id, {
         "weather": new_weather,
         "spirit_concentration": round(spirit, 2),
@@ -384,6 +418,7 @@ def format_world_status(group_id: int) -> str:
     else:
         lines.append("✨ 当前事件：暂无（天地平静）")
     lines.append(f"🏪 神秘商人：{'在场' if is_merchant_active(group_id) else '未现身'}")
+    lines.append(f"💎 突破商人：{'在场' if is_breakthrough_merchant_active(group_id) else '未现身'}")
     lines.append(f"🗺️ 秘境：{'已开启' if is_secret_realm_open(group_id) else '未开启'}")
     # 当前开放的限时地点
     open_locations = [
