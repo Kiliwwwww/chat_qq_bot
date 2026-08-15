@@ -56,8 +56,8 @@ async def handle_daily_wife(bot: Bot, event: GroupMessageEvent, args: Message = 
     group_id = event.group_id
     sender_id = event.user_id
     
-    # 检查今日是否已经抽过
-    cached_wife_id = pairing_manager.get_daily_result(sender_id)
+    # 检查今日是否已经抽过（按群区分）
+    cached_wife_id = pairing_manager.get_daily_result(sender_id, group_id)
     if cached_wife_id:
         wife_name = await get_user_nickname(bot, group_id, cached_wife_id)
         sender_name = await get_user_nickname(bot, group_id, sender_id)
@@ -92,7 +92,16 @@ async def handle_daily_wife(bot: Bot, event: GroupMessageEvent, args: Message = 
     # 没有预设配对或预设配对不在群里，随机选择
     if wife_member is None:
         exclude_id = sender_id if not config.allow_self else None
-        wife_member = await get_random_member(bot, group_id, exclude_user_id=exclude_id)
+        # 优先抽取排行榜用户（加权随机）
+        leaderboard_users = pairing_manager.get_leaderboard_users(group_id)
+        wife_member = await get_random_member(
+            bot,
+            group_id,
+            exclude_user_id=exclude_id,
+            priority_user_ids=leaderboard_users,
+            priority_weight=config.leaderboard_weight,
+            normal_weight=config.normal_weight,
+        )
     
     if wife_member is None:
         await daily_wife_cmd.finish("群里没有其他可选的群友啦~")
@@ -101,8 +110,8 @@ async def handle_daily_wife(bot: Bot, event: GroupMessageEvent, args: Message = 
     sender_name = await get_user_nickname(bot, group_id, sender_id)
     wife_name = await get_user_nickname(bot, group_id, wife_id)
     
-    # 保存今日结果
-    pairing_manager.set_daily_result(sender_id, wife_id)
+    # 保存今日结果（按群区分）
+    pairing_manager.set_daily_result(sender_id, wife_id, group_id)
     
     # 下载头像
     logger.info(f"开始下载头像: sender_id={sender_id}, wife_id={wife_id}")
@@ -141,8 +150,8 @@ async def handle_daily_baby(bot: Bot, event: GroupMessageEvent):
     group_id = event.group_id
     sender_id = event.user_id
     
-    # 检查是否有今日老婆
-    wife_id = pairing_manager.get_daily_result(sender_id)
+    # 检查是否有今日老婆（按群区分）
+    wife_id = pairing_manager.get_daily_result(sender_id, group_id)
     if not wife_id:
         await daily_baby_cmd.finish("你还没有今日老婆哦，先发送「今日老婆」抽取一个吧~")
     

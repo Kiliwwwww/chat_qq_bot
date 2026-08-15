@@ -96,7 +96,12 @@ def get_power(group_id: int, player: dict) -> int:
 
     战力 = (攻击×10 + 防御×8 + 气血) × 境界倍率 × (1 + 功法加成)
     其中功法加成包含所有已学功法的加成（含修炼类功法，体现整体修为深度）。
+    蛊修则按 空窍境界 + 蛊虫 计算蛊修战力。
     """
+    if player.get("cultivation_path") == "gu":
+        from . import gu as gu_svc
+        return gu_svc.gu_power(group_id, player["user_id"], player)
+
     stats = get_effective_stats(group_id, player)
     realm_mult = constants.REALM_POWER_MULT.get(player.get("realm", 0), 1)
     base = (stats["attack"] * 10 + stats["defense"] * 8 + stats["hp"]) * realm_mult

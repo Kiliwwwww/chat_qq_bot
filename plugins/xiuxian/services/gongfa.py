@@ -34,6 +34,8 @@ def upgrade_gongfa(group_id: int, user_id: int, gongfa_name: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，功法是灵修之道"}
 
     gongfa = constants.GONGFA_BY_NAME.get(gongfa_name)
     if not gongfa:
@@ -73,6 +75,8 @@ def learn_gongfa(group_id: int, user_id: int, gongfa_name: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，功法是灵修之道"}
 
     gongfa = constants.GONGFA_BY_NAME.get(gongfa_name)
     if not gongfa:

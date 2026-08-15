@@ -112,6 +112,8 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
     player = db.get_player(group_id, user_id)
     if not player:
         return False, "你还没有修仙角色，发送「我要修仙」创建角色"
+    if player.get("cultivation_path") == "gu":
+        return False, "你是蛊修，不修灵气之道！蛊修请用「采气」「蛊修突破」修炼"
 
     inv_block = world.invasion_block_text(group_id)
     if inv_block:
@@ -142,6 +144,12 @@ def start_cultivating(group_id: int, user_id: int, location: str) -> tuple[bool,
 
     if location not in constants.LOCATIONS:
         return False, f"未知修炼地点，可选：{'、'.join(constants.LOCATIONS.keys())}"
+
+    # 常驻地图境界限制（如：练气~筑基只能去洞府/灵脉）
+    realm_req = constants.LOCATION_REALM_REQUIRE.get(location, 0)
+    if player.get("realm", 0) < realm_req:
+        required = constants.REALMS[realm_req]["name"]
+        return False, f"{location}需要达到【{required}】境界才能闭关"
 
     if not world.is_location_open(group_id, location):
         event_name = world.location_open_event(location)

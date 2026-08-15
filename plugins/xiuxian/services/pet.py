@@ -31,6 +31,8 @@ def buy_pet(group_id: int, user_id: int, index: int) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，蛊虫才是你的灵宠"}
 
     pet_shop = constants.PET_SHOP
     if index < 1 or index > len(pet_shop):

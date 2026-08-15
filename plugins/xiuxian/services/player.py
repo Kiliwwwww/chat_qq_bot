@@ -138,7 +138,14 @@ def change_physique(group_id: int, user_id: int, target_name: str = "") -> dict:
 
 
 def format_player_profile(group_id: int, player: dict, gongfa_text: str = "") -> str:
-    """格式化玩家面板"""
+    """格式化玩家面板（攻击/防御/气血展示最终有效值，含功法/装备/体质加成）"""
+    # 蛊修走蛊修面板
+    if player.get("cultivation_path") == "gu":
+        from . import gu as gu_svc
+        return gu_svc.format_gu_status(group_id, player["user_id"])
+
+    from . import stats as stats_svc
+    eff = stats_svc.get_effective_stats(group_id, player)
     root = constants.SPIRIT_ROOTS.get(player["spirit_root"], {})
     realm_name = constants.REALMS[player["realm"]]["name"]
     capacity = constants.REALMS[player["realm"]]["capacity"]
@@ -148,7 +155,7 @@ def format_player_profile(group_id: int, player: dict, gongfa_text: str = "") ->
         f"🔰 境界：{realm_name}（修为 {int(player.get('realm_progress', 0))}/{int(capacity) if capacity else '∞'}）",
         f"⚡ 灵根：{root.get('name', player['spirit_root'])}（{player['spirit_quality']}）",
         f"🍀 气运：{player.get('fortune', 0)}",
-        f"⚔️ 攻击：{player.get('attack', 0)}  🛡️ 防御：{player.get('defense', 0)}  ❤️ 气血上限：{player.get('hp', 0)}",
+        f"⚔️ 攻击：{eff['attack']}  🛡️ 防御：{eff['defense']}  ❤️ 气血上限：{eff['hp']}",
         f"💰 灵石：{player.get('coin', 0)}",
         f"🏃 天命：{'随机天命' if player.get('talent') != 'trash' else '废材流主角'}",
     ]

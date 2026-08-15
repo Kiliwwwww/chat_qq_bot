@@ -59,6 +59,13 @@ async def require_game(matcher, event: MessageEvent) -> int:
     return group_id
 
 
+async def require_ling(matcher, event: MessageEvent, group_id: int) -> None:
+    """拦截蛊修使用灵修专属指令（闭关/突破/探索/炼丹等）"""
+    player = db.get_player(group_id, event.user_id)
+    if player and player.get("cultivation_path") == "gu":
+        await reply_finish(matcher, event, "你是蛊修，不修灵气之道，请使用蛊修指令（采气/寻蛊/蛊养/炼蛊等）")
+
+
 async def get_nickname(bot, group_id: int, user_id: int) -> str:
     """获取用户在群内的昵称（群名片优先，其次 QQ 昵称，最后 QQ 号）"""
     try:

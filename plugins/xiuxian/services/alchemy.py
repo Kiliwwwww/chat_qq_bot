@@ -16,6 +16,8 @@ def alchemy(group_id: int, user_id: int, pill_key: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，炼丹是灵修之道"}
 
     inv_block = world.invasion_block_text(group_id)
     if inv_block:
@@ -81,6 +83,8 @@ def forge(group_id: int, user_id: int) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，炼器是灵修之道"}
 
     inv_block = world.invasion_block_text(group_id)
     if inv_block:

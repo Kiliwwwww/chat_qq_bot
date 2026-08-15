@@ -6,6 +6,7 @@ from .player_cmd import (
     trash_fate_cmd,
     status_cmd,
     help_cmd,
+    gu_help_cmd,
     change_physique_cmd,
     rebirth_cmd,
     suicide_cmd,
@@ -30,6 +31,19 @@ from .alchemy_cmd import (
     unequip_cmd,
 )
 from .gift_cmd import gift_cmd
+from .gu_cmd import (
+    gu_create_cmd,
+    gu_status_cmd,
+    gu_list_cmd,
+    gu_seek_cmd,
+    gu_feed_cmd,
+    gu_refine_cmd,
+    gu_caigi_cmd,
+    gu_use_cmd,
+    gu_yun_cmd,
+    gu_kill_cmd,
+    gu_break_cmd,
+)
 from .pet_cmd import pet_cmd, feed_cmd, pet_shop_cmd, pet_shop_buy_cmd
 from .plant_cmd import plant_cmd, harvest_cmd, field_cmd
 from .pill_cmd import use_pill_cmd, shop_cmd, shop_buy_cmd, shop_sell_cmd
@@ -59,6 +73,7 @@ __all__ = [
     "trash_fate_cmd",
     "status_cmd",
     "help_cmd",
+    "gu_help_cmd",
     "change_physique_cmd",
     "rebirth_cmd",
     "suicide_cmd",
@@ -81,6 +96,17 @@ __all__ = [
     "equip_cmd",
     "unequip_cmd",
     "gift_cmd",
+    "gu_create_cmd",
+    "gu_status_cmd",
+    "gu_list_cmd",
+    "gu_seek_cmd",
+    "gu_feed_cmd",
+    "gu_refine_cmd",
+    "gu_caigi_cmd",
+    "gu_use_cmd",
+    "gu_yun_cmd",
+    "gu_kill_cmd",
+    "gu_break_cmd",
     "pet_cmd",
     "feed_cmd",
     "pet_shop_cmd",

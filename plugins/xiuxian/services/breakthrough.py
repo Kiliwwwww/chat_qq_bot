@@ -20,6 +20,8 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，不修灵气之道！蛊修请用「蛊修突破」"}
 
     inv_block = world.invasion_block_text(group_id)
     if inv_block:
@@ -40,6 +42,10 @@ def attempt_breakthrough(group_id: int, user_id: int, use_pill: bool = False) ->
     progress = player.get("realm_progress", 0)
     if progress < capacity:
         return {"ok": False, "text": f"修为不足，突破{constants.REALMS[realm_index + 1]['name']}需要 {int(capacity)} 修为（当前 {int(progress)}）"}
+
+    # 使用破境丹突破时，先检查是否持有破境丹（避免突破材料被扣但突破未进行）
+    if use_pill and db.get_item_quantity(group_id, user_id, "pojing_dan") <= 0:
+        return {"ok": False, "text": "你没有破境丹，先去炼丹或坊市获取吧"}
 
     # 突破大境界所需药材与丹药（灵药谷刷取或突破商人购买）
     require = constants.BREAKTHROUGH_REQUIREMENTS.get(realm_index)

@@ -26,6 +26,8 @@ def capture(group_id: int, attacker_id: int, target_id: int) -> dict:
     target = db.get_player(group_id, target_id)
     if not attacker:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if attacker.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，不走收徒传功之道"}
     if not target:
         return {"ok": False, "text": "对方没有修仙角色"}
     if attacker_id == target_id:
@@ -89,6 +91,8 @@ def xiuxiu(group_id: int, user_id: int, index: int) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，不走收徒传功之道"}
 
     from . import combat
     if combat.is_dead(player):

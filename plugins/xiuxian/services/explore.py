@@ -22,6 +22,8 @@ EXPLORE_POOL = {
         {"key": "shoupi", "weight": 6, "text": "找到一张结实的兽皮", "items": {"shoupi": 1}},
         {"key": "pet", "weight": 3, "text": "捡到一枚神秘的灵宠蛋"},
         {"key": "equip", "weight": 2, "text": "在角落找到一件蒙尘的宝物"},
+        {"key": "juqi_cao", "weight": 4, "text": "采到一株聚气草（突破筑基所需）", "items": {"juqi_cao": 1}},
+        {"key": "juqi_dan", "weight": 3, "text": "寻得一枚聚气丹（突破筑基所需）", "items": {"juqi_dan": 1}},
     ],
     "灵脉": [
         {"key": "coin", "weight": 30, "text": "在灵脉中采掘到大量灵石矿", "coins": 120},
@@ -31,6 +33,10 @@ EXPLORE_POOL = {
         {"key": "xingchenshi", "weight": 5, "text": "在灵脉深处发现星辰石", "items": {"xingchenshi": 1}},
         {"key": "pet", "weight": 7, "text": "灵脉中孕育着一枚灵兽蛋"},
         {"key": "equip", "weight": 6, "text": "从矿脉中挖出一件埋藏已久的法宝"},
+        {"key": "juqi_cao", "weight": 5, "text": "采到一株聚气草（突破筑基所需）", "items": {"juqi_cao": 1}},
+        {"key": "juqi_dan", "weight": 4, "text": "寻得一枚聚气丹（突破筑基所需）", "items": {"juqi_dan": 1}},
+        {"key": "ningling_hua", "weight": 4, "text": "采到一朵凝灵花（突破金丹所需）", "items": {"ningling_hua": 1}},
+        {"key": "ningling_dan", "weight": 3, "text": "寻得一枚凝灵丹（突破金丹所需）", "items": {"ningling_dan": 1}},
     ],
     "妖兽森林": [
         {"key": "yaodan", "weight": 24, "text": "猎杀妖兽，收获妖丹", "items": {"yaodan": 2}},
@@ -45,6 +51,8 @@ EXPLORE_POOL = {
         {"key": "ningling_dan", "weight": 3, "text": "寻得一枚凝灵丹（突破金丹所需）", "items": {"ningling_dan": 1}},
         {"key": "huaying_guo", "weight": 4, "text": "采到一枚化婴果（突破元婴所需）", "items": {"huaying_guo": 1}},
         {"key": "huaying_dan", "weight": 3, "text": "寻得一枚化婴丹（突破元婴所需）", "items": {"huaying_dan": 1}},
+        {"key": "xuantian_teng", "weight": 3, "text": "采到一段玄天藤（突破化神所需）", "items": {"xuantian_teng": 1}},
+        {"key": "xuantian_dan", "weight": 2, "text": "寻得一枚玄天丹（突破化神所需）", "items": {"xuantian_dan": 1}},
         {"key": "pet", "weight": 6, "text": "捕获一只幼兽作为灵宠"},
         {"key": "equip", "weight": 4, "text": "从妖兽尸体旁捡到一件宝物"},
         {"key": "risk", "weight": 11, "text": "遭遇强大妖兽，重伤而逃", "lose_coins": 60},
@@ -75,6 +83,10 @@ EXPLORE_POOL = {
         {"key": "dujie_xian_dan", "weight": 7, "text": "寻得一枚渡劫仙丹（突破渡劫所需）", "items": {"dujie_xian_dan": 1}},
         {"key": "feisheng_shenlian", "weight": 10, "text": "采到一株飞升神莲（突破飞升所需）", "items": {"feisheng_shenlian": 1}},
         {"key": "feisheng_shendan", "weight": 6, "text": "寻得一枚飞升神丹（突破飞升所需）", "items": {"feisheng_shendan": 1}},
+        {"key": "xukong_shihua", "weight": 4, "text": "采到一朵虚空石花（突破炼虚所需）", "items": {"xukong_shihua": 1}},
+        {"key": "xukong_dan", "weight": 3, "text": "寻得一枚虚空丹（突破炼虚所需）", "items": {"xukong_dan": 1}},
+        {"key": "hundun_linggen", "weight": 3, "text": "寻得混沌灵根（突破合体所需）", "items": {"hundun_linggen": 1}},
+        {"key": "hundun_dan", "weight": 2, "text": "寻得一枚混沌丹（突破合体所需）", "items": {"hundun_dan": 1}},
         {"key": "longxiancao", "weight": 9, "text": "采到龙涎草", "items": {"longxiancao": 2}},
         {"key": "qiannian_ls", "weight": 9, "text": "采到千年灵参", "items": {"qiannian_ls": 2}},
         {"key": "progress", "weight": 14, "text": "吸收神药药力，修为大涨", "progress": 1000},
@@ -82,35 +94,35 @@ EXPLORE_POOL = {
         {"key": "risk", "weight": 9, "text": "惊动药园守护兽，重伤而逃", "lose_coins": 150},
     ],
     "灵药谷": [
-        {"key": "lingcao", "weight": 20, "text": "采到一大片灵草", "items": {"lingcao": 3}},
-        {"key": "lingquan", "weight": 14, "text": "发现灵药谷深处的一汪灵泉", "items": {"lingquan": 2}},
-        {"key": "lingcao_seed", "weight": 12, "text": "拾到一包灵草种子", "items": {"lingcao_seed": 2}},
-        {"key": "longxiancao", "weight": 10, "text": "寻得一株龙涎草", "items": {"longxiancao": 1}},
-        {"key": "longxiancao_seed", "weight": 6, "text": "捡到龙涎草种子", "items": {"longxiancao_seed": 1}},
-        {"key": "qiannian_ls", "weight": 6, "text": "采到一株千年灵参", "items": {"qiannian_ls": 1}},
-        {"key": "qiannian_ls_seed", "weight": 4, "text": "寻得千年灵参种子", "items": {"qiannian_ls_seed": 1}},
-        # 突破大境界所需药材与丹药（均可在此刷取）
-        {"key": "juqi_cao", "weight": 8, "text": "采到一株聚气草（突破筑基所需）", "items": {"juqi_cao": 1}},
-        {"key": "juqi_dan", "weight": 6, "text": "寻得一枚聚气丹（突破筑基所需）", "items": {"juqi_dan": 1}},
-        {"key": "ningling_hua", "weight": 7, "text": "采到一朵凝灵花（突破金丹所需）", "items": {"ningling_hua": 1}},
-        {"key": "ningling_dan", "weight": 5, "text": "寻得一枚凝灵丹（突破金丹所需）", "items": {"ningling_dan": 1}},
-        {"key": "huaying_guo", "weight": 6, "text": "采到一枚化婴果（突破元婴所需）", "items": {"huaying_guo": 1}},
-        {"key": "huaying_dan", "weight": 4, "text": "寻得一枚化婴丹（突破元婴所需）", "items": {"huaying_dan": 1}},
-        {"key": "xuantian_teng", "weight": 5, "text": "采到一段玄天藤（突破化神所需）", "items": {"xuantian_teng": 1}},
-        {"key": "xuantian_dan", "weight": 4, "text": "寻得一枚玄天丹（突破化神所需）", "items": {"xuantian_dan": 1}},
-        {"key": "xukong_shihua", "weight": 4, "text": "采到一朵虚空石花（突破炼虚所需）", "items": {"xukong_shihua": 1}},
-        {"key": "xukong_dan", "weight": 3, "text": "寻得一枚虚空丹（突破炼虚所需）", "items": {"xukong_dan": 1}},
-        {"key": "hundun_linggen", "weight": 3, "text": "寻得混沌灵根（突破合体所需）", "items": {"hundun_linggen": 1}},
-        {"key": "hundun_dan", "weight": 3, "text": "寻得一枚混沌丹（突破合体所需）", "items": {"hundun_dan": 1}},
-        {"key": "shanggu_shenyao", "weight": 3, "text": "采得一株上古神药（突破大乘所需）", "items": {"shanggu_shenyao": 1}},
-        {"key": "shenyao_dan", "weight": 2, "text": "寻得一枚神药丹（突破大乘所需）", "items": {"shenyao_dan": 1}},
-        {"key": "dujie_xiancao", "weight": 2, "text": "采到一株渡劫仙草（突破渡劫所需）", "items": {"dujie_xiancao": 1}},
-        {"key": "dujie_xian_dan", "weight": 2, "text": "寻得一枚渡劫仙丹（突破渡劫所需）", "items": {"dujie_xian_dan": 1}},
-        {"key": "feisheng_shenlian", "weight": 2, "text": "采到一株飞升神莲（突破飞升所需）", "items": {"feisheng_shenlian": 1}},
+        {"key": "lingcao", "weight": 55, "text": "采到一大片灵草", "items": {"lingcao": 3}},
+        {"key": "lingquan", "weight": 32, "text": "发现灵药谷深处的一汪灵泉", "items": {"lingquan": 2}},
+        {"key": "lingcao_seed", "weight": 28, "text": "拾到一包灵草种子", "items": {"lingcao_seed": 2}},
+        {"key": "longxiancao", "weight": 22, "text": "寻得一株龙涎草", "items": {"longxiancao": 1}},
+        {"key": "longxiancao_seed", "weight": 15, "text": "捡到龙涎草种子", "items": {"longxiancao_seed": 1}},
+        {"key": "qiannian_ls", "weight": 15, "text": "采到一株千年灵参", "items": {"qiannian_ls": 1}},
+        {"key": "qiannian_ls_seed", "weight": 10, "text": "寻得千年灵参种子", "items": {"qiannian_ls_seed": 1}},
+        {"key": "progress", "weight": 25, "text": "药香扑鼻，闻之修为精进", "progress": 300},
+        {"key": "coin", "weight": 13, "text": "捡到采药人遗留的灵石", "coins": 120},
+        {"key": "risk", "weight": 35, "text": "惊动守药灵兽，被追咬逃窜", "lose_coins": 60},
+        # 突破大境界所需药材与丹药（稀有产出，权重随境界阶梯递减：筑基>金丹>元婴>化神>…>飞升）
+        {"key": "juqi_cao", "weight": 3, "text": "采到一株聚气草（突破筑基所需）", "items": {"juqi_cao": 1}},
+        {"key": "juqi_dan", "weight": 3, "text": "寻得一枚聚气丹（突破筑基所需）", "items": {"juqi_dan": 1}},
+        {"key": "ningling_hua", "weight": 2, "text": "采到一朵凝灵花（突破金丹所需）", "items": {"ningling_hua": 1}},
+        {"key": "ningling_dan", "weight": 2, "text": "寻得一枚凝灵丹（突破金丹所需）", "items": {"ningling_dan": 1}},
+        {"key": "huaying_guo", "weight": 1, "text": "采到一枚化婴果（突破元婴所需）", "items": {"huaying_guo": 1}},
+        {"key": "huaying_dan", "weight": 1, "text": "寻得一枚化婴丹（突破元婴所需）", "items": {"huaying_dan": 1}},
+        {"key": "xuantian_teng", "weight": 1, "text": "采到一段玄天藤（突破化神所需）", "items": {"xuantian_teng": 1}},
+        {"key": "xuantian_dan", "weight": 1, "text": "寻得一枚玄天丹（突破化神所需）", "items": {"xuantian_dan": 1}},
+        {"key": "xukong_shihua", "weight": 1, "text": "采到一朵虚空石花（突破炼虚所需）", "items": {"xukong_shihua": 1}},
+        {"key": "xukong_dan", "weight": 1, "text": "寻得一枚虚空丹（突破炼虚所需）", "items": {"xukong_dan": 1}},
+        {"key": "hundun_linggen", "weight": 1, "text": "寻得混沌灵根（突破合体所需）", "items": {"hundun_linggen": 1}},
+        {"key": "hundun_dan", "weight": 1, "text": "寻得一枚混沌丹（突破合体所需）", "items": {"hundun_dan": 1}},
+        {"key": "shanggu_shenyao", "weight": 1, "text": "采得一株上古神药（突破大乘所需）", "items": {"shanggu_shenyao": 1}},
+        {"key": "shenyao_dan", "weight": 1, "text": "寻得一枚神药丹（突破大乘所需）", "items": {"shenyao_dan": 1}},
+        {"key": "dujie_xiancao", "weight": 1, "text": "采到一株渡劫仙草（突破渡劫所需）", "items": {"dujie_xiancao": 1}},
+        {"key": "dujie_xian_dan", "weight": 1, "text": "寻得一枚渡劫仙丹（突破渡劫所需）", "items": {"dujie_xian_dan": 1}},
+        {"key": "feisheng_shenlian", "weight": 1, "text": "采到一株飞升神莲（突破飞升所需）", "items": {"feisheng_shenlian": 1}},
         {"key": "feisheng_shendan", "weight": 1, "text": "寻得一枚飞升神丹（突破飞升所需）", "items": {"feisheng_shendan": 1}},
-        {"key": "progress", "weight": 8, "text": "药香扑鼻，闻之修为精进", "progress": 300},
-        {"key": "coin", "weight": 5, "text": "捡到采药人遗留的灵石", "coins": 120},
-        {"key": "risk", "weight": 7, "text": "惊动守药灵兽，被追咬逃窜", "lose_coins": 60},
     ],
     "万妖山": [
         {"key": "yaodan", "weight": 28, "text": "猎杀群妖，收获大量妖丹", "items": {"yaodan": 3}},
@@ -204,6 +216,8 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
     player = db.get_player(group_id, user_id)
     if not player:
         return {"ok": False, "text": "你还没有修仙角色，发送「我要修仙」创建角色"}
+    if player.get("cultivation_path") == "gu":
+        return {"ok": False, "text": "你是蛊修，不修灵气之道！蛊修请用「寻蛊」「采气」「用蛊」等指令"}
 
     from . import world
     inv_block = world.invasion_block_text(group_id)
@@ -223,6 +237,12 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
 
     if location not in constants.LOCATIONS:
         return {"ok": False, "text": f"未知探索地点，可选：{'、'.join(constants.LOCATIONS.keys())}"}
+
+    # 常驻地图境界限制（如：练气~筑基只能去洞府/灵脉）
+    realm_req = constants.LOCATION_REALM_REQUIRE.get(location, 0)
+    if player.get("realm", 0) < realm_req:
+        required = constants.REALMS[realm_req]["name"]
+        return {"ok": False, "text": f"{location}需要达到【{required}】境界才能进入"}
 
     from . import world
     if not world.is_location_open(group_id, location):
@@ -324,11 +344,26 @@ def explore(group_id: int, user_id: int, location: str) -> dict:
     return result
 
 
+def _grant_gu(group_id: int, user_id: int, player: dict) -> str:
+    """蛊修随机获得一只蛊虫，返回描述"""
+    from . import gu as gu_svc
+    aptitude = gu_svc._aptitude_cfg(player)
+    count = db.get_insect_count(group_id, user_id)
+    if count >= aptitude["capacity"]:
+        return "空窍已满，蛊虫自行遁去"
+    wild = gu_svc._pick_wild_gu(player)
+    if not wild:
+        return "无处可寻蛊虫"
+    db.add_gu(group_id, user_id, wild["id"])
+    return f"获得蛊虫【{wild['name']}】（{wild['tier']}转）"
+
+
 def _apply_encounter(group_id: int, user_id: int, fortune: int, luck_mult: float) -> str:
-    """随机触发一次探索奇遇，返回追加文本。"""
+    """随机触发一次奇遇（灵修/蛊修通用），返回追加文本。"""
     from . import combat, cultivation as cult
 
     player = db.get_player(group_id, user_id)
+    is_gu = player.get("cultivation_path") == "gu"
     enc = rng.weighted_choice(constants.ENCOUNTERS)
     text = f"\n\n🎇 【奇遇·{enc['name']}】{enc['desc']}"
 
@@ -339,29 +374,50 @@ def _apply_encounter(group_id: int, user_id: int, fortune: int, luck_mult: float
         for iid, qty in succ.get("items", {}).items():
             db.add_item(group_id, user_id, iid, qty)
             gains.append(f"{constants.ITEMS.get(iid, {}).get('name', iid)}×{qty}")
-        # 修为
+        # 修为（蛊修转化为蛊修参悟）
         if succ.get("progress"):
-            realm_index = player.get("realm", 0)
-            capacity = constants.REALMS[realm_index]["capacity"]
-            current = player.get("realm_progress", 0) + succ["progress"]
-            if capacity:
-                current = min(current, capacity)
-            db.update_player(group_id, user_id, {"realm_progress": current})
-            gains.append(f"修为 +{succ['progress']}")
+            gain = succ["progress"]
+            if is_gu:
+                gu_realm = player.get("gu_realm", 0)
+                cap = constants.GU_REALM_CAPACITY[gu_realm]
+                current = min(cap, player.get("gu_cond", 0) + gain)
+                db.update_player(group_id, user_id, {"gu_cond": current})
+                gains.append(f"参悟 +{gain}")
+            else:
+                realm_index = player.get("realm", 0)
+                capacity = constants.REALMS[realm_index]["capacity"]
+                current = player.get("realm_progress", 0) + gain
+                if capacity:
+                    current = min(current, capacity)
+                db.update_player(group_id, user_id, {"realm_progress": current})
+                gains.append(f"修为 +{gain}")
         # 灵石
         if succ.get("coins"):
             db.update_player(group_id, user_id, {"coin": player.get("coin", 0) + succ["coins"]})
             gains.append(f"灵石 +{succ['coins']}")
-        # 灵宠
+        # 灵宠（蛊修转化为蛊虫）
         if succ.get("pet"):
-            gains.append(_grant_pet(group_id, user_id))
-        # 装备
+            if is_gu:
+                gains.append(_grant_gu(group_id, user_id, player))
+            else:
+                gains.append(_grant_pet(group_id, user_id))
+        # 装备（蛊修转化为蛊虫）
         if succ.get("equip"):
-            gains.append(_grant_equip(group_id, user_id))
-        # 功法熟练度
+            if is_gu:
+                gains.append(_grant_gu(group_id, user_id, player))
+            else:
+                gains.append(_grant_equip(group_id, user_id))
+        # 功法熟练度（蛊修转化为参悟）
         if succ.get("gongfa_exp"):
-            for g in db.get_gongfas(group_id, user_id):
-                cult.add_gongfa_exp(group_id, user_id, g["gongfa_id"], succ["gongfa_exp"])
+            if is_gu:
+                gu_realm = player.get("gu_realm", 0)
+                cap = constants.GU_REALM_CAPACITY[gu_realm]
+                current = min(cap, player.get("gu_cond", 0) + int(succ["gongfa_exp"] * 1.5))
+                db.update_player(group_id, user_id, {"gu_cond": current})
+                gains.append(f"参悟 +{int(succ['gongfa_exp'] * 1.5)}")
+            else:
+                for g in db.get_gongfas(group_id, user_id):
+                    cult.add_gongfa_exp(group_id, user_id, g["gongfa_id"], succ["gongfa_exp"])
             gains.append(f"功法熟练度 +{succ['gongfa_exp']}")
 
         text += f"\n✨ {succ['text']}"

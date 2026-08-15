@@ -169,18 +169,27 @@ LOCATION_EVENTS = {
     "幽冥深渊": "mochao_xiongyong",
 }
 
-# 突破大境界所需材料（所有药材/丹药均可在灵药谷刷取）
+# 常驻地图境界解锁：达到对应境界索引（含）才能进入该地图
+# 练气~筑基：洞府/灵脉；金丹起：妖兽森林；化神起：古神药园
+LOCATION_REALM_REQUIRE = {
+    "洞府": 0,
+    "灵脉": 0,
+    "妖兽森林": 2,
+    "古神药园": 4,
+}
+
+# 突破大境界所需材料（刷取地点按对应等级可进入的地图安排，避免低等级进不去）
 # key: 当前境界索引 → (药材 item_id, 丹药 item_id, 刷取地点)
 BREAKTHROUGH_REQUIREMENTS = {
-    0: ("juqi_cao", "juqi_dan", "灵药谷"),
-    1: ("ningling_hua", "ningling_dan", "灵药谷"),
-    2: ("huaying_guo", "huaying_dan", "灵药谷"),
-    3: ("xuantian_teng", "xuantian_dan", "灵药谷"),
-    4: ("xukong_shihua", "xukong_dan", "灵药谷"),
-    5: ("hundun_linggen", "hundun_dan", "灵药谷"),
-    6: ("shanggu_shenyao", "shenyao_dan", "灵药谷"),
-    7: ("dujie_xiancao", "dujie_xian_dan", "灵药谷"),
-    8: ("feisheng_shenlian", "feisheng_shendan", "灵药谷"),
+    0: ("juqi_cao", "juqi_dan", "洞府"),
+    1: ("ningling_hua", "ningling_dan", "灵脉"),
+    2: ("huaying_guo", "huaying_dan", "妖兽森林"),
+    3: ("xuantian_teng", "xuantian_dan", "妖兽森林"),
+    4: ("xukong_shihua", "xukong_dan", "古神药园"),
+    5: ("hundun_linggen", "hundun_dan", "古神药园"),
+    6: ("shanggu_shenyao", "shenyao_dan", "古神药园"),
+    7: ("dujie_xiancao", "dujie_xian_dan", "古神药园"),
+    8: ("feisheng_shenlian", "feisheng_shendan", "古神药园"),
 }
 
 # ==================== 特殊体质系统 ====================
@@ -479,7 +488,7 @@ MERCHANT_GOODS = [
 ]
 
 # 突破商人商品池：专售突破大境界所需的药材与丹药（单价灵石）
-# 价格随突破所需境界修为（capacity）阶梯上升，让探索刷取仍具价值，同时提供灵石购买捷径
+# 售价昂贵（玩家给系统出售的回购价极低，防止刷灵石），提供便捷购买捷径
 BREAKTHROUGH_MERCHANT_GOODS = [
     {"item_id": "juqi_cao", "quantity": 1, "price": 3000},
     {"item_id": "juqi_dan", "quantity": 1, "price": 5000},
@@ -564,25 +573,25 @@ SHOP_BUYBACK = {
     "dahuan_dan": 300,
     "niepan_dan": 600,
     "kuangbao_dan": 480,
-    # 突破材料/丹药回购价（约为突破商人售价的 10%，可卖给商城换灵石）
-    "juqi_cao": 300,
-    "juqi_dan": 500,
-    "ningling_hua": 1200,
-    "ningling_dan": 2000,
-    "huaying_guo": 4000,
-    "huaying_dan": 6000,
-    "xuantian_teng": 10000,
-    "xuantian_dan": 16000,
-    "xukong_shihua": 26000,
-    "xukong_dan": 40000,
-    "hundun_linggen": 65000,
-    "hundun_dan": 100000,
-    "shanggu_shenyao": 160000,
-    "shenyao_dan": 250000,
-    "dujie_xiancao": 400000,
-    "dujie_xian_dan": 600000,
-    "feisheng_shenlian": 800000,
-    "feisheng_shendan": 1200000,
+    # 突破材料/丹药回购价（远低于突破商人售价，最高 500，防止刷灵石）
+    "juqi_cao": 50,
+    "juqi_dan": 80,
+    "ningling_hua": 100,
+    "ningling_dan": 130,
+    "huaying_guo": 150,
+    "huaying_dan": 180,
+    "xuantian_teng": 200,
+    "xuantian_dan": 230,
+    "xukong_shihua": 250,
+    "xukong_dan": 280,
+    "hundun_linggen": 300,
+    "hundun_dan": 330,
+    "shanggu_shenyao": 360,
+    "shenyao_dan": 390,
+    "dujie_xiancao": 420,
+    "dujie_xian_dan": 460,
+    "feisheng_shenlian": 480,
+    "feisheng_shendan": 500,
 }
 
 # 装备按品质回购（武器/法袍/法宝/戒指/战靴统一价格）
@@ -661,6 +670,9 @@ XIUXIU_PROGRESS_RATE = 0.05
 # 丹药效果递减：同种修为丹药每次服用效果下降的步长，最低降至
 PILL_DIMINISH_STEP = 0.125
 PILL_DIMINISH_MIN = 0.5
+
+# 属性丹药服用次数上限（大力丸/金刚丹/气血丹/蕴神丹/天机丹等加属性丹药，每人最多服用 10 次）
+PILL_ATTRIBUTE_MAX_USES = 10
 
 # 突破失败产生的瓶颈冷却时间（分钟），期间无法再次突破
 BOTTLENECK_MINUTES = 30
@@ -797,3 +809,84 @@ DEBUFF_TRIGGER = {
 
 # 丹药中毒触发时立即损失的修为比例
 PILL_POISON_PROGRESS_LOSS = 0.10
+
+# ==================== 蛊修系统 ====================
+
+# 空窍资质（天赋）：从高到低 甲＞乙＞丙＞丁＞无
+# capacity=空窍容量（可承载蛊虫数量）, yuan_regen=真元恢复倍率, realm_cap=修炼上限（境界索引0-8）
+GU_APTITUDES = {
+    "无": {"capacity": 2, "yuan_regen": 0.6, "realm_cap": 0, "desc": "天生无窍，难成大器，最多修炼到一转"},
+    "丁": {"capacity": 3, "yuan_regen": 0.8, "realm_cap": 2, "desc": "资质低劣，最多修炼到三转"},
+    "丙": {"capacity": 4, "yuan_regen": 1.0, "realm_cap": 4, "desc": "资质平平，凡人顶点为五转"},
+    "乙": {"capacity": 5, "yuan_regen": 1.3, "realm_cap": 6, "desc": "资质上佳，有望渡劫成仙，最多到七转"},
+    "甲": {"capacity": 6, "yuan_regen": 1.6, "realm_cap": 8, "desc": "天骄之资，仙道有望，最多到九转"},
+}
+
+# 随机资质抽取权重（丙等最常见，甲等最稀有）
+GU_APTITUDE_WEIGHTS = {"无": 10, "丁": 25, "丙": 35, "乙": 20, "甲": 10}
+
+# 蛊修境界：一转~九转（索引 0-8），六转起为蛊仙
+GU_REALM_NAMES = ["一转", "二转", "三转", "四转", "五转", "六转", "七转", "八转", "九转"]
+GU_SUB_REALMS = ["初阶", "中阶", "高阶", "巅峰"]
+
+# 每转（大境界）所需的参悟进度
+GU_REALM_CAPACITY = [100, 300, 800, 2000, 5000, 12000, 30000, 80000, 200000]
+
+# 真元上限 = 基础 + 境界索引 × 增量（资质影响恢复速度）
+GU_YUAN_BASE = 100
+GU_YUAN_STEP = 50
+
+# 蛊虫饥饿速度（每小时饥饿度，满 100 即饿死）
+GU_HUNGER_PER_HOUR = 20
+
+# 采气冷却（秒）
+GU_CAIQI_COOLDOWN = 20
+
+# 寻蛊冷却（秒）
+GU_SEEK_COOLDOWN = 60
+
+# 蛊虫图鉴：category 为 attack/defense/control/aux/revive，feed 为喂食类型
+GU_INSECTS = [
+    {"id": "daozu_gu", "name": "刀足蛊", "tier": 1, "category": "attack", "feed": "血肉", "desc": "足如刀锋，攻伐利刃"},
+    {"id": "tiegu_gu", "name": "铁骨蛊", "tier": 1, "category": "defense", "feed": "矿石", "desc": "淬炼筋骨，肉身坚韧"},
+    {"id": "li_gu", "name": "力蛊", "tier": 1, "category": "attack", "feed": "血肉", "desc": "大力无双，力劈山河"},
+    {"id": "mojiao", "name": "墨蛟", "tier": 2, "category": "attack", "feed": "灵气", "desc": "控水蛟龙，兴风作浪"},
+    {"id": "tongpi_gu", "name": "铜皮蛊", "tier": 2, "category": "defense", "feed": "矿石", "desc": "铜皮铁肤，刀枪不入"},
+    {"id": "qingsi_gu", "name": "情丝蛊", "tier": 3, "category": "control", "feed": "情绪", "desc": "千丝万缕，捆缚敌手"},
+    {"id": "wanshe_gu", "name": "万蛇蛊", "tier": 3, "category": "attack", "feed": "血肉", "desc": "万蛇噬咬，毒入骨髓"},
+    {"id": "tianting_gu", "name": "天庭蛊", "tier": 4, "category": "aux", "feed": "灵气", "desc": "元气结晶，助力修行"},
+    {"id": "lang_gu", "name": "狼蛊", "tier": 4, "category": "attack", "feed": "血肉", "desc": "群狼之势，撕咬一切"},
+    {"id": "shidu_gu", "name": "十毒蛊", "tier": 5, "category": "attack", "feed": "血肉", "desc": "集十种剧毒，见血封喉"},
+    {"id": "xiwang_gu", "name": "希望蛊", "tier": 5, "category": "aux", "feed": "情绪", "desc": "信念之力，无所不能", "unique": True},
+    {"id": "chunqiu_chan", "name": "春秋蝉", "tier": 6, "category": "revive", "feed": "灵气", "desc": "时光之蛊，可逆转生死", "unique": True},
+    {"id": "xiangu_teng", "name": "仙蛊藤", "tier": 6, "category": "control", "feed": "灵气", "desc": "仙道藤蔓，困锁天地", "unique": True},
+    {"id": "xuehai_gu", "name": "血海蛊", "tier": 7, "category": "attack", "feed": "血肉", "desc": "血海滔天，吞噬万物", "unique": True},
+]
+
+GU_INSECT_BY_ID = {g["id"]: g for g in GU_INSECTS}
+
+# 喂食对应物品（蛊虫喂食消耗的背包物品）
+GU_FEED_ITEMS = {
+    "血肉": "yaodan",        # 妖丹
+    "灵气": "lingquan",      # 灵泉
+    "矿石": "xuantie",       # 玄铁
+    "情绪": "qiannian_ls",   # 千年灵参
+}
+
+# 杀招配方：req 为所需蛊虫类别数量，power 为威力倍率
+GU_KILLS = [
+    {"id": "kuanggong", "name": "狂攻杀招", "req": {"attack": 2}, "power": 2.0, "desc": "双攻蛊齐出，攻伐无双"},
+    {"id": "tiebi", "name": "铁壁杀招", "req": {"defense": 2}, "power": 2.0, "desc": "双防蛊护体，坚不可摧"},
+    {"id": "baidu", "name": "百毒杀招", "req": {"attack": 1, "control": 1}, "power": 2.5, "desc": "以控辅攻，毒杀无形"},
+    {"id": "shengsi", "name": "生死杀招", "req": {"attack": 2, "control": 1}, "power": 3.0, "desc": "攻守兼备，收割生死"},
+    {"id": "jingmie", "name": "灭世杀招", "req": {"attack": 3}, "power": 3.5, "desc": "三攻蛊齐祭，毁天灭地"},
+]
+GU_KILL_BY_ID = {k["id"]: k for k in GU_KILLS}
+
+# 蛊修战力系数
+GU_POWER_BASE = 50
+GU_POWER_REALM = 200       # 每转战力
+GU_POWER_SUB = 50          # 每小境界战力
+GU_POWER_INSECT = 80       # 每只蛊按转数叠加
+GU_POWER_UNIQUE_MULT = 2   # 仙蛊（唯一蛊）战力翻倍
+GU_FAIRY_MULT = 1.5        # 蛊仙整体战力倍率

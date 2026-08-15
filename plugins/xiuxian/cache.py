@@ -52,7 +52,7 @@ class Cache:
                 await self.redis.delete(self._key(key))
             except Exception as e:
                 logger.warning(f"Redis 删除失败 {key}: {e}")
-        self._memory.pop(key, None)
+        self._memory.pop(self._key(key), None)
 
     # ==================== 数值操作 ====================
 

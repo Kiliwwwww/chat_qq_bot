@@ -75,6 +75,14 @@ class Database:
                         pk_hp_cost INTEGER DEFAULT 0,
                         xiuxiu_until REAL DEFAULT 0,
                         debuffs TEXT DEFAULT '',
+                        cultivation_path TEXT DEFAULT 'ling',
+                        gu_aptitude TEXT DEFAULT '',
+                        gu_realm INTEGER DEFAULT 0,
+                        gu_sub_realm INTEGER DEFAULT 0,
+                        gu_yuan REAL DEFAULT 0,
+                        gu_yuan_max REAL DEFAULT 100,
+                        gu_cond REAL DEFAULT 0,
+                        gu_awaken INTEGER DEFAULT 0,
                         created_at REAL NOT NULL,
                         PRIMARY KEY (group_id, user_id)
                     );
@@ -254,6 +262,22 @@ class Database:
                         PRIMARY KEY (group_id, user_id, pill_key)
                     );
 
+                    -- 蛊虫表（蛊修）
+                    CREATE TABLE IF NOT EXISTS gu_insects (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        group_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        gu_id TEXT NOT NULL,
+                        name TEXT DEFAULT '',
+                        tier INTEGER DEFAULT 1,
+                        hunger REAL DEFAULT 0,
+                        last_fed REAL NOT NULL,
+                        unique_flag INTEGER DEFAULT 0,
+                        created_at REAL NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_gu_insects ON gu_insects(group_id, user_id);
+
                     CREATE INDEX IF NOT EXISTS idx_players_group ON players(group_id);
                     CREATE INDEX IF NOT EXISTS idx_gongfas_group ON gongfas(group_id);
                     CREATE INDEX IF NOT EXISTS idx_inventory_group ON inventory(group_id);
@@ -289,6 +313,22 @@ class Database:
                 conn.execute("ALTER TABLE players ADD COLUMN xiuxiu_until REAL DEFAULT 0")
             if "debuffs" not in columns:
                 conn.execute("ALTER TABLE players ADD COLUMN debuffs TEXT DEFAULT ''")
+            if "cultivation_path" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN cultivation_path TEXT DEFAULT 'ling'")
+            if "gu_aptitude" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_aptitude TEXT DEFAULT ''")
+            if "gu_realm" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_realm INTEGER DEFAULT 0")
+            if "gu_sub_realm" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_sub_realm INTEGER DEFAULT 0")
+            if "gu_yuan" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_yuan REAL DEFAULT 0")
+            if "gu_yuan_max" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_yuan_max REAL DEFAULT 100")
+            if "gu_cond" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_cond REAL DEFAULT 0")
+            if "gu_awaken" not in columns:
+                conn.execute("ALTER TABLE players ADD COLUMN gu_awaken INTEGER DEFAULT 0")
 
             wstate_columns = {r["name"] for r in conn.execute("PRAGMA table_info(world_state)").fetchall()}
             if "breakthrough_merchant_end_time" not in wstate_columns:
@@ -314,8 +354,10 @@ class Database:
                     INSERT OR REPLACE INTO players
                     (group_id, user_id, name, realm, realm_progress, spirit_root, spirit_quality,
                      fortune, physique, talent, attack, defense, hp, cur_hp, coin,
-                     alchemy_level, alchemy_exp, forge_level, forge_exp, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     alchemy_level, alchemy_exp, forge_level, forge_exp,
+                     cultivation_path, gu_aptitude, gu_realm, gu_sub_realm, gu_yuan, gu_yuan_max, gu_cond, gu_awaken,
+                     created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         group_id, user_id, data.get("name", ""),
@@ -328,6 +370,10 @@ class Database:
                         data.get("coin", 100),
                         data.get("alchemy_level", 1), data.get("alchemy_exp", 0),
                         data.get("forge_level", 1), data.get("forge_exp", 0),
+                        data.get("cultivation_path", "ling"),
+                        data.get("gu_aptitude", ""), data.get("gu_realm", 0), data.get("gu_sub_realm", 0),
+                        data.get("gu_yuan", 0), data.get("gu_yuan_max", 100), data.get("gu_cond", 0),
+                        data.get("gu_awaken", 0),
                         time.time(),
                     ),
                 )
@@ -362,6 +408,8 @@ class Database:
                 "alchemy_level", "alchemy_exp", "forge_level", "forge_exp",
                 "bottleneck_until", "weapon", "armor", "treasure", "ring", "boots", "rebirth_count",
                 "cur_hp", "dead_until", "pk_boost", "pk_hp_cost", "xiuxiu_until", "debuffs",
+                "cultivation_path", "gu_aptitude", "gu_realm", "gu_sub_realm",
+                "gu_yuan", "gu_yuan_max", "gu_cond", "gu_awaken",
             }
             updates = {k: v for k, v in fields.items() if k in allowed}
             if not updates:
@@ -1203,6 +1251,119 @@ class Database:
         except Exception as e:
             logger.error(f"累加丹药服用次数失败: {e}")
             return False
+
+    # ==================== 蛊虫（蛊修） ====================
+
+    def add_gu(self, group_id: int, user_id: int, gu_id: str, name: str = "", tier: int = 1, unique_flag: int = 0) -> Optional[int]:
+        """给玩家添加一只蛊虫，返回蛊虫记录 ID"""
+        info = self._gu_catalog_get(gu_id)
+        if not info:
+            return None
+        t = tier or info.get("tier", 1)
+        u = unique_flag or (1 if info.get("unique") else 0)
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "INSERT INTO gu_insects (group_id, user_id, gu_id, name, tier, hunger, last_fed, unique_flag, created_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)",
+                    (group_id, user_id, gu_id, name or info["name"], t, time.time(), u, time.time()),
+                )
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            logger.error(f"添加蛊虫失败: {e}")
+            return None
+
+    def _gu_catalog_get(self, gu_id: str):
+        """从常量蛊虫图鉴查找（延迟导入避免循环）"""
+        try:
+            from . import constants
+            return constants.GU_INSECT_BY_ID.get(gu_id)
+        except Exception:
+            return None
+
+    def get_gus(self, group_id: int, user_id: int) -> list[dict]:
+        """获取玩家全部蛊虫"""
+        try:
+            with self._get_conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM gu_insects WHERE group_id = ? AND user_id = ? ORDER BY id",
+                    (group_id, user_id),
+                ).fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"获取蛊虫列表失败: {e}")
+            return []
+
+    def get_gu(self, group_id: int, user_id: int, gu_row_id: int) -> Optional[dict]:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT * FROM gu_insects WHERE id = ? AND group_id = ? AND user_id = ?",
+                    (gu_row_id, group_id, user_id),
+                ).fetchone()
+                return self._to_dict(row)
+        except Exception as e:
+            logger.error(f"获取蛊虫失败: {e}")
+            return None
+
+    def update_gu(self, group_id: int, user_id: int, gu_row_id: int, fields: dict) -> bool:
+        if not fields:
+            return True
+        try:
+            allowed = {"name", "tier", "hunger", "last_fed", "unique_flag"}
+            updates = {k: v for k, v in fields.items() if k in allowed}
+            if not updates:
+                return False
+            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            params = list(updates.values()) + [gu_row_id, group_id, user_id]
+            with self._get_conn() as conn:
+                conn.execute(
+                    f"UPDATE gu_insects SET {set_clause} WHERE id = ? AND group_id = ? AND user_id = ?",
+                    params,
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"更新蛊虫失败: {e}")
+            return False
+
+    def remove_gu(self, group_id: int, user_id: int, gu_row_id: int) -> bool:
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "DELETE FROM gu_insects WHERE id = ? AND group_id = ? AND user_id = ?",
+                    (gu_row_id, group_id, user_id),
+                )
+                conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"移除蛊虫失败: {e}")
+            return False
+
+    def get_insect_count(self, group_id: int, user_id: int) -> int:
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT COUNT(*) AS n FROM gu_insects WHERE group_id = ? AND user_id = ?",
+                    (group_id, user_id),
+                ).fetchone()
+                return row["n"] if row else 0
+        except Exception as e:
+            logger.error(f"获取蛊虫数量失败: {e}")
+            return 0
+
+    def get_unique_gu_owner(self, gu_id: str) -> Optional[int]:
+        """查询某只唯一仙蛊已被谁拥有（跨群全局查询，仙蛊唯一）"""
+        try:
+            with self._get_conn() as conn:
+                row = conn.execute(
+                    "SELECT user_id FROM gu_insects WHERE gu_id = ? AND unique_flag = 1 LIMIT 1",
+                    (gu_id,),
+                ).fetchone()
+                return row["user_id"] if row else None
+        except Exception as e:
+            logger.error(f"查询唯一蛊归属失败: {e}")
+            return None
 
     # ==================== 通用 ====================
 
