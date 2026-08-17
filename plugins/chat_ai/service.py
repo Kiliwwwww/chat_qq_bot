@@ -65,6 +65,7 @@ class AIService:
             api_key=api_key,
             base_url=base_url,
             http_client=httpx_client,
+            default_headers={"User-Agent": "curl/8.5.0"},
         )
 
     @staticmethod
