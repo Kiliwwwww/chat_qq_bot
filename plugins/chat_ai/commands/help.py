@@ -39,5 +39,15 @@ async def handle_help(event: MessageEvent):
 /添加ai服务 <名称> <api_key> <base_url> <model> - 添加AI服务（管理员）
 /ai服务 - 查看所有AI服务列表
 /切换ai服务 <id> - 切换到指定AI服务（管理员）
-/删除ai服务 <id> - 删除指定AI服务（管理员）"""
+/删除ai服务 <id> - 删除指定AI服务（管理员）
+
+---知识库管理（私聊）---
+/kb_add <群号> <知识库ID> - 开启群知识库功能（管理员）
+/kb_del <群号> - 关闭群知识库功能（管理员）
+/kb_list - 查看知识库群配置列表（管理员）
+/kb_upload - 手动上传今天的聊天记录（管理员）
+/kb_upload <群号> [日期] - 上传指定群聊天记录
+/kb_summary - 生成今天的聊天记录总结并上传（管理员）
+/kb_summary <群号> [日期] - 生成指定群聊天记录总结并上传
+/kb_sync <群号> [日期] - 同步上传聊天记录并生成总结（管理员，日期默认今天）"""
     await help_cmd.finish(help_text)

@@ -24,6 +24,12 @@ from .admin import (
     ad_keyword_cmd,
     ad_status_cmd,
 )
+from .kb_cmd import (
+    kb_add_cmd,
+    kb_del_cmd,
+    kb_list_cmd,
+    kb_upload_cmd,
+)
 
 __all__ = [
     "help_cmd",
@@ -49,4 +55,8 @@ __all__ = [
     "ad_recall_off_cmd",
     "ad_keyword_cmd",
     "ad_status_cmd",
+    "kb_add_cmd",
+    "kb_del_cmd",
+    "kb_list_cmd",
+    "kb_upload_cmd",
 ]

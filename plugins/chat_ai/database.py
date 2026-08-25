@@ -79,6 +79,13 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS group_kb_config (
+                        group_id INTEGER PRIMARY KEY,
+                        kb_id TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 self._init_default_ad_keywords(conn)
                 logger.info("数据库初始化完成")
@@ -537,4 +544,66 @@ class Database:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"检查 AI 服务失败: {e}")
+            return False
+
+    # ==================== 知识库群配置管理 ====================
+
+    def get_all_kb_groups(self) -> dict[int, str]:
+        """获取所有开启知识库的群及其知识库ID"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT group_id, kb_id FROM group_kb_config")
+                return {row["group_id"]: row["kb_id"] for row in cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"获取知识库群列表失败: {e}")
+            return {}
+
+    def add_kb_group(self, group_id: int, kb_id: str) -> bool:
+        """添加群到知识库配置"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO group_kb_config (group_id, kb_id) VALUES (?, ?)",
+                    (group_id, kb_id),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"添加知识库群失败: {e}")
+            return False
+
+    def remove_kb_group(self, group_id: int) -> bool:
+        """从知识库配置移除群"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM group_kb_config WHERE group_id = ?", (group_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"移除知识库群失败: {e}")
+            return False
+
+    def get_kb_id_by_group(self, group_id: int) -> str | None:
+        """获取指定群的知识库ID"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT kb_id FROM group_kb_config WHERE group_id = ?", (group_id,)
+                )
+                row = cursor.fetchone()
+                return row["kb_id"] if row else None
+        except Exception as e:
+            logger.error(f"获取群知识库ID失败: {e}")
+            return None
+
+    def kb_group_exists(self, group_id: int) -> bool:
+        """检查群是否开启了知识库"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM group_kb_config WHERE group_id = ?", (group_id,)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"检查知识库群失败: {e}")
             return False

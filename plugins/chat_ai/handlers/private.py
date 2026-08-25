@@ -7,7 +7,7 @@ from nonebot.exception import FinishedException
 from ..config import Config
 from .. import state
 from ..state import db, user_histories, init_ai_service, get_user_history, set_user_history
-from ..utils.helpers import clean_history_images, get_keywords_prompt
+from ..utils.helpers import clean_history_images, get_keywords_prompt, get_time_hint
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
 private_msg = on_message(priority=10, block=True)
@@ -94,23 +94,26 @@ async def handle_private_msg(event: MessageEvent):
     await set_user_history(user_id, history)
 
     try:
-        # 调用 AI 服务（带关键词提示词）
+        # 调用 AI 服务（带关键词提示词 + 时间感知）
         keywords_prompt = get_keywords_prompt()
-        system_prompt = state.ai_service.system_prompt + keywords_prompt if keywords_prompt else None
-
-        # RAGFlow 知识库检索
-        rag_message = None
-        if state.ragflow_client and user_message:
-            rag_result = await state.ragflow_client.retrieve(user_message)
-            rag_message = state.ragflow_client.build_context_message(rag_result)
+        time_prompt = get_time_hint()
+        system_prompt = state.ai_service.system_prompt + keywords_prompt + time_prompt
 
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
-        reply = await state.ai_service.chat_with_history(
-            messages=cleaned_history,
-            system_prompt=system_prompt,
-            rag_message=rag_message,
-        )
+
+        # RAGFlow 知识库检索（由 AI 自主决定是否需要检索）
+        if state.ragflow_client and user_message:
+            reply = await state.ai_service.chat_with_rag(
+                messages=cleaned_history,
+                system_prompt=system_prompt,
+                rag_client=state.ragflow_client,
+            )
+        else:
+            reply = await state.ai_service.chat_with_history(
+                messages=cleaned_history,
+                system_prompt=system_prompt,
+            )
 
         # 添加助手回复到历史
         history.append({

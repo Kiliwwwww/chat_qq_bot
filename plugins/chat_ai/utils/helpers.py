@@ -1,4 +1,34 @@
+from datetime import datetime
+
 from ..state import db, group_recent_messages, group_last_repeated
+
+
+def get_time_period() -> str:
+    """根据当前时间返回时间段（清晨/上午/中午/下午/晚上/深夜）"""
+    hour = datetime.now().hour
+    if 5 <= hour < 8:
+        return "清晨"
+    if 8 <= hour < 11:
+        return "上午"
+    if 11 <= hour < 13:
+        return "中午"
+    if 13 <= hour < 18:
+        return "下午"
+    if 18 <= hour < 23:
+        return "晚上"
+    return "深夜"
+
+
+def get_time_hint() -> str:
+    """生成当前时间提示，拼接到系统提示词中让 AI 感知时间"""
+    now = datetime.now()
+    period = get_time_period()
+    return (
+        f"\n\n## 当前时间提示\n"
+        f"现在是 {now.year}年{now.month}月{now.day}日 {now.strftime('%H:%M')}，{period}。"
+        f"请自然地按时间段调整措辞：清晨可以说\"早啊\"，中午可以问吃饭，"
+        f"晚上可以说\"晚上好\"，深夜(凌晨)说话要轻一点、短一点、像还没睡的样子。"
+    )
 
 
 def clean_history_images(messages: list[dict]) -> list[dict]:

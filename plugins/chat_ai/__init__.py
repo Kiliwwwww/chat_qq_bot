@@ -26,7 +26,12 @@ from .commands import (
     ad_recall_off_cmd,
     ad_keyword_cmd,
     ad_status_cmd,
+    kb_add_cmd,
+    kb_del_cmd,
+    kb_list_cmd,
+    kb_upload_cmd,
 )
+from .commands.scheduler import daily_kb_upload
 from .handlers import private_msg, group_msg, reset_cmd, member_join
 
 # 初始化配置
@@ -57,6 +62,11 @@ __all__ = [
     "ad_recall_off_cmd",
     "ad_keyword_cmd",
     "ad_status_cmd",
+    "kb_add_cmd",
+    "kb_del_cmd",
+    "kb_list_cmd",
+    "kb_upload_cmd",
+    "daily_kb_upload",
     "private_msg",
     "group_msg",
     "reset_cmd",

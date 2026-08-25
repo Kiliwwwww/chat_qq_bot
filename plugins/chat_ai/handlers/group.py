@@ -2,6 +2,7 @@ import random
 import time
 import json
 import asyncio
+from datetime import datetime
 
 from nonebot import on_command, on_message, on_notice, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import (
@@ -20,11 +21,14 @@ from ..state import (
     group_histories,
     group_last_reply,
     group_last_repeated,
+    group_last_activity,
     group_welcome_messages,
     auto_emoji_users,
     auto_emoji_groups,
     auto_emoji_all_groups_users,
     ad_recall_groups,
+    kb_groups,
+    CHAT_LOG_DIR,
     init_ai_service,
     get_group_history,
     set_group_history,
@@ -35,11 +39,31 @@ from ..state import (
 from ..utils.helpers import (
     clean_history_images,
     get_keywords_prompt,
+    get_time_hint,
     check_repeater,
     update_recent_messages,
 )
 
 reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
+
+
+def save_chat_log(group_id: int, sender_name: str, user_id: int, message: str) -> None:
+    """保存群聊天记录到文件"""
+    if group_id not in kb_groups:
+        return
+    if not message:
+        return
+
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    log_path = CHAT_LOG_DIR / f"{group_id}_{date_str}.txt"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{timestamp}][{sender_name}][{user_id}] {message}\n"
+
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception as e:
+        logger.error(f"保存聊天记录失败: {e}")
 
 # 群消息处理器
 group_msg = on_message(priority=10, block=True)
@@ -234,6 +258,11 @@ async def handle_group_msg(event: MessageEvent):
             if image_url:
                 image_urls.append(image_url)
 
+    # 保存聊天记录到文件（仅对开启知识库的群）
+    sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
+    if user_message:
+        save_chat_log(group_id, sender_name, event.user_id, user_message)
+
     # 广告检测和撤回（在忽略空消息之前执行）
     from nonebot import get_bot
     bot = get_bot()
@@ -284,6 +313,9 @@ async def handle_group_msg(event: MessageEvent):
 
     # 更新最近消息记录（用于复读检测）
     update_recent_messages(group_id, event.user_id, user_message)
+
+    # 记录群最后活跃时间（用于主动冒泡判断）
+    group_last_activity[group_id] = time.time()
 
     # 群白名单检查（仅控制AI回复，不影响消息存储）
     if not db.group_exists(group_id):
@@ -345,21 +377,25 @@ async def handle_group_msg(event: MessageEvent):
         admin_maid_prompt = ""
         if is_at_me and event.user_id == config.admin_qq:
             admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
-        system_prompt = state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt if (keywords_prompt or admin_maid_prompt) else None
-
-        # RAGFlow 知识库检索
-        rag_message = None
-        if state.ragflow_client and user_message:
-            rag_result = await state.ragflow_client.retrieve(user_message)
-            rag_message = state.ragflow_client.build_context_message(rag_result)
+        # 时间感知提示词
+        time_prompt = get_time_hint()
+        system_prompt = state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt + time_prompt
 
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
-        reply = await state.ai_service.chat_with_history(
-            messages=cleaned_history,
-            system_prompt=system_prompt,
-            rag_message=rag_message,
-        )
+
+        # RAGFlow 知识库检索（由 AI 自主决定是否需要检索，以更好理解群友在说什么）
+        if state.ragflow_client and user_message:
+            reply = await state.ai_service.chat_with_rag(
+                messages=cleaned_history,
+                system_prompt=system_prompt,
+                rag_client=state.ragflow_client,
+            )
+        else:
+            reply = await state.ai_service.chat_with_history(
+                messages=cleaned_history,
+                system_prompt=system_prompt,
+            )
 
         history.append({
             "role": "assistant",

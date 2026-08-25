@@ -6,4 +6,5 @@ __pycache__/
 .venv/
 data/chat_ai/chat_ai.db
 data/xiuxian/
+data/chat_logs/
 log/

@@ -37,6 +37,8 @@ auto_emoji_groups: set[int] = set()
 user_histories: dict[int, list[dict[str, str]]] = {}
 group_histories: dict[int, list[dict[str, str]]] = {}
 group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
+group_last_bubble: dict[int, float] = {}  # 群最后主动冒泡时间戳
+group_last_activity: dict[int, float] = {}  # 群最后活跃时间戳（用于判断冷清）
 group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 [(user_id, message)]
 group_last_repeated: dict[int, str] = {}  # 群最后复读的消息内容
 ai_service: AIService = None
@@ -53,6 +55,13 @@ group_welcome_messages: dict[int, str] = db.get_all_welcome_messages()
 
 # 从数据库加载开启广告撤回的群集合
 ad_recall_groups: set[int] = db.get_all_ad_recall_groups()
+
+# 从数据库加载知识库群配置 {group_id: kb_id}
+kb_groups: dict[int, str] = db.get_all_kb_groups()
+
+# 聊天记录存储目录
+CHAT_LOG_DIR = Path(__file__).parent.parent.parent / "data" / "chat_logs"
+CHAT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def init_ai_service():

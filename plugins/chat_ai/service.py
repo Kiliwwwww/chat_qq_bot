@@ -4,6 +4,7 @@ from typing import Optional, Union
 from nonebot import logger
 import logging
 import json
+import re
 import time
 from datetime import datetime
 from loguru import logger as loguru_logger
@@ -27,6 +28,29 @@ ai_logger.add(
     compression="zip",
     encoding="utf-8",
 )
+
+# 知识库检索工具定义：由 AI 自主决定是否需要检索
+RAG_SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_knowledge_base",
+        "description": (
+            "在知识库中检索资料。知识库里包含群里的历史聊天记录（群友之前说过的话、讨论过的事）"
+            "以及游戏规则文档。当群友的话涉及游戏玩法、历史事件、之前聊过的内容，"
+            "或者你不确定群友在指什么、想更准确理解群友意思时，调用此工具检索相关资料。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "用于检索的搜索关键词，尽量提炼出核心名词",
+                }
+            },
+            "required": ["query"],
+        },
+    },
+}
 
 
 class AIService:
@@ -82,6 +106,9 @@ class AIService:
         self,
         user_message: str,
         system_prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
     ) -> str:
         """
         发送聊天消息并获取回复
@@ -89,6 +116,9 @@ class AIService:
         Args:
             user_message: 用户消息
             system_prompt: 系统提示词，如果为 None 则使用默认配置
+            model: 覆盖本次调用的模型，为 None 时使用实例默认模型
+            max_tokens: 覆盖本次调用的最大 token 数
+            temperature: 覆盖本次调用的采样温度
 
         Returns:
             AI 回复内容
@@ -118,10 +148,10 @@ class AIService:
         self.ai_logger.info(f"开始调用 API (chat)，model={self.model}")
         try:
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model=model or self.model,
                 messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature if temperature is not None else self.temperature,
                 top_p=self.top_p,
                 timeout=120.0,
             )
@@ -215,6 +245,139 @@ class AIService:
             raise ValueError(f"choices[0] 为 None: {response.choices}")
         
         return response.choices[0].message.content
+
+    async def chat_with_rag(
+        self,
+        messages: list[dict[str, Union[str, list]]],
+        system_prompt: Optional[str] = None,
+        rag_client=None,
+        max_tool_calls: int = 2,
+    ) -> str:
+        """
+        带知识库检索工具的聊天：由 AI 自主决定是否需要检索知识库
+
+        流程：
+        1. 携带工具调用一次 API，让 AI 决定直接回答还是检索知识库
+        2. 若 AI 决定检索（结构化 tool_calls 或文本形式 tool_call 均可），
+           提取关键词检索知识库，把结果作为参考资料再让 AI 生成最终回复
+        3. 若 AI 直接回答，或检索/工具调用失败，回退到普通对话
+
+        Args:
+            messages: 清理后的消息历史
+            system_prompt: 系统提示词
+            rag_client: RagFlow 客户端（用于检索知识库）
+            max_tool_calls: 最多处理的检索关键词数量
+
+        Returns:
+            AI 回复内容
+        """
+        base_messages = [
+            {
+                "role": "system",
+                "content": system_prompt or self.system_prompt,
+            },
+        ] + list(messages)
+
+        request_start = time.time()
+        self.ai_logger.info(f"开始调用 API (chat_with_rag)，model={self.model}")
+        try:
+            resp = await self.client.chat.completions.create(
+                model=self.model,
+                messages=base_messages,
+                tools=[RAG_SEARCH_TOOL],
+                tool_choice="auto",
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                timeout=120.0,
+            )
+        except Exception as e:
+            elapsed = time.time() - request_start
+            self.ai_logger.warning(f"带工具调用失败，回退普通对话，耗时 {elapsed:.2f}s: {e}")
+            return await self.chat_with_history(messages, system_prompt=system_prompt)
+
+        first_msg = resp.choices[0].message
+        content = first_msg.content or ""
+        tool_calls = getattr(first_msg, "tool_calls", None) or []
+
+        # 解析 AI 给出的检索关键词（兼容结构化 tool_calls 和文本形式 tool_call）
+        queries: list[str] = []
+        if tool_calls:
+            for tc in tool_calls[:max_tool_calls]:
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                    query = str(args.get("query") or "").strip()
+                except Exception:
+                    query = ""
+                if query:
+                    queries.append(query)
+
+        text_tool_call = "search_knowledge_base" in content
+
+        # 若结构化未给出关键词，尝试从文本形式的 tool_call 中提取
+        if not queries and text_tool_call:
+            queries = self._extract_query_from_tool_call(content)
+
+        # 不需要检索：直接返回 AI 的回复
+        if not queries:
+            if content.strip() and not text_tool_call:
+                self.ai_logger.info("AI 决定直接回复，未检索知识库")
+                return content
+            self.ai_logger.warning("AI 返回空回复或仅有工具调用文本，回退普通对话")
+            return await self.chat_with_history(messages, system_prompt=system_prompt)
+
+        # AI 决定检索知识库
+        self.ai_logger.info(f"AI 决定检索知识库: {queries}")
+        rag_result = await rag_client.retrieve(queries[0])
+        rag_message = rag_client.build_context_message(rag_result)
+
+        return await self.chat_with_history(
+            messages=messages,
+            system_prompt=system_prompt,
+            rag_message=rag_message,
+        )
+
+    @staticmethod
+    def _extract_query_from_tool_call(text: str) -> list[str]:
+        """
+        从文本形式的工具调用中提取检索关键词。
+
+        兼容常见格式，例如：
+        <tool_call><function=search_knowledge_base><parameter=query>蛊修 元婴</parameter>...
+        {"function": "search_knowledge_base", "query": "蛊修 元婴"}
+        """
+        queries: list[str] = []
+        if not text:
+            return queries
+
+        # 格式1: <parameter=query>xxx</parameter>
+        for m in re.finditer(r"<parameter=query[^>]*>(.*?)</parameter>", text, re.DOTALL):
+            q = m.group(1).strip()
+            if q and q not in queries:
+                queries.append(q)
+
+        # 格式2: JSON 文本 "query": "xxx"
+        if not queries:
+            for m in re.finditer(r"\"query\"\s*:\s*\"([^\"]+)\"", text):
+                q = m.group(1).strip()
+                if q and q not in queries:
+                    queries.append(q)
+
+        # 格式3: query 冒号/空格后直接跟关键词
+        if not queries:
+            for m in re.finditer(r"query[：:]\s*([^\n\"<>]+)", text):
+                q = m.group(1).strip()
+                if q and q not in queries:
+                    queries.append(q)
+
+        # 兜底：去掉 <tool_call> 标签等噪音后整句作为关键词
+        if not queries:
+            cleaned = re.sub(r"<[^>]+>", " ", text)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            if cleaned and "search_knowledge_base" not in cleaned:
+                queries.append(cleaned)
+
+        return queries[:3]
 
     def _save_request_to_file(self, messages: list[dict[str, Union[str, list]]]):
         """将请求内容追加写入文件"""

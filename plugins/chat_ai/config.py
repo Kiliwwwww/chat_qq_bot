@@ -34,7 +34,14 @@ class Config(BaseModel):
     
     # 全局贴表情的emoji_id
     global_emoji_id: int = 46
-    
+
+    # 主动冒泡配置
+    bubble_enabled: bool = True
+    bubble_idle_minutes: int = 30
+    bubble_cooldown_minutes: int = 180
+    bubble_chance: float = 0.5
+    bubble_ai_enabled: bool = True
+
     # 调试日志开关
     ai_debug_log: bool = False
     
@@ -51,6 +58,11 @@ class Config(BaseModel):
     ragflow_api_key: str = ""
     ragflow_kb_ids: list[str] = []
     ragflow_top_k: int = 5
+
+    # 知识库聊天记录总结配置
+    kb_summary_enabled: bool = True
+    kb_summary_max_chars: int = 4000
+    kb_summary_model: str = ""
     
     # 系统提示词
     ai_system_prompt: str = (
