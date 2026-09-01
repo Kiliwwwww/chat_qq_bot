@@ -30,6 +30,7 @@ from .kb_cmd import (
     kb_list_cmd,
     kb_upload_cmd,
 )
+from .stats_cmd import stats_cmd
 
 __all__ = [
     "help_cmd",
@@ -59,4 +60,5 @@ __all__ = [
     "kb_del_cmd",
     "kb_list_cmd",
     "kb_upload_cmd",
+    "stats_cmd",
 ]

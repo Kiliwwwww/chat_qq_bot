@@ -66,6 +66,7 @@ class AIService:
         top_p: float,
         system_prompt: str,
         debug_log: bool = False,
+        db=None,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -76,6 +77,7 @@ class AIService:
         self.system_prompt = system_prompt
         self.debug_log = debug_log
         self.ai_logger = ai_logger.bind(model=model)
+        self.db = db
 
         httpx_client = httpx.AsyncClient(
             timeout=httpx.Timeout(
@@ -164,6 +166,10 @@ class AIService:
         self.ai_logger.info(f"API 调用成功 (chat)，耗时 {elapsed:.2f}s")
         self._save_error_to_file(f"API 调用成功 (chat)，耗时 {elapsed:.2f}s")
         
+        # 统计AI请求次数
+        if self.db:
+            self.db.increment_stat("ai_request_count")
+        
         if response is None:
             raise ValueError("API 返回了 None 响应")
         
@@ -230,10 +236,36 @@ class AIService:
             elapsed = time.time() - request_start
             self.ai_logger.error(f"API 调用失败，耗时 {elapsed:.2f}s: {e}")
             self._save_error_to_file(f"API 调用失败，耗时 {elapsed:.2f}s: {e}")
-            raise
+            # 若因消息中图片过期/无法下载导致失败，去掉图片重试一次
+            if self._has_images(full_messages):
+                self.ai_logger.warning("检测到消息包含图片，可能是图片过期导致失败，去掉图片重试一次")
+                retry_messages = self._strip_images(full_messages)
+                try:
+                    response = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=retry_messages,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        top_p=self.top_p,
+                        timeout=120.0,
+                    )
+                    elapsed = time.time() - request_start
+                    self.ai_logger.info(f"去掉图片后重试成功，耗时 {elapsed:.2f}s")
+                    self._save_error_to_file(f"去掉图片后重试成功，耗时 {elapsed:.2f}s")
+                except Exception as e2:
+                    elapsed = time.time() - request_start
+                    self.ai_logger.error(f"去掉图片后重试仍失败，耗时 {elapsed:.2f}s: {e2}")
+                    self._save_error_to_file(f"去掉图片后重试仍失败，耗时 {elapsed:.2f}s: {e2}")
+                    raise
+            else:
+                raise
         elapsed = time.time() - request_start
         self.ai_logger.info(f"API 调用成功，耗时 {elapsed:.2f}s")
         self._save_error_to_file(f"API 调用成功，耗时 {elapsed:.2f}s")
+        
+        # 统计AI请求次数
+        if self.db:
+            self.db.increment_stat("ai_request_count")
         
         if response is None:
             raise ValueError("API 返回了 None 响应")
@@ -295,6 +327,10 @@ class AIService:
             elapsed = time.time() - request_start
             self.ai_logger.warning(f"带工具调用失败，回退普通对话，耗时 {elapsed:.2f}s: {e}")
             return await self.chat_with_history(messages, system_prompt=system_prompt)
+
+        # 统计AI请求次数（第一次调用）
+        if self.db:
+            self.db.increment_stat("ai_request_count")
 
         first_msg = resp.choices[0].message
         content = first_msg.content or ""
@@ -378,6 +414,33 @@ class AIService:
                 queries.append(cleaned)
 
         return queries[:3]
+
+    @staticmethod
+    def _has_images(messages: list[dict]) -> bool:
+        """判断消息列表里是否包含图片"""
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "image_url":
+                        return True
+        return False
+
+    @staticmethod
+    def _strip_images(messages: list[dict]) -> list[dict]:
+        """去掉消息列表中的所有图片，只保留文本（图片过期/无法下载时兜底使用）"""
+        cleaned = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                text_parts = [p for p in content if isinstance(p, dict) and p.get("type") == "text"]
+                if text_parts:
+                    cleaned.append({"role": msg["role"], "content": text_parts})
+                else:
+                    cleaned.append({"role": msg["role"], "content": "[图片消息]"})
+            else:
+                cleaned.append(msg)
+        return cleaned
 
     def _save_request_to_file(self, messages: list[dict[str, Union[str, list]]]):
         """将请求内容追加写入文件"""

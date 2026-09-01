@@ -86,6 +86,13 @@ class Database:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS statistics (
+                        key TEXT PRIMARY KEY,
+                        count INTEGER DEFAULT 0,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 self._init_default_ad_keywords(conn)
                 logger.info("数据库初始化完成")
@@ -607,3 +614,43 @@ class Database:
         except Exception as e:
             logger.error(f"检查知识库群失败: {e}")
             return False
+
+    # ==================== 统计计数管理 ====================
+
+    def increment_stat(self, key: str, amount: int = 1) -> bool:
+        """增加指定统计项的计数"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO statistics (key, count, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) "
+                    "ON CONFLICT(key) DO UPDATE SET count = count + ?, updated_at = CURRENT_TIMESTAMP",
+                    (key, amount, amount),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"增加统计计数失败: {e}")
+            return False
+
+    def get_stat(self, key: str) -> int:
+        """获取指定统计项的计数"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT count FROM statistics WHERE key = ?", (key,)
+                )
+                row = cursor.fetchone()
+                return row["count"] if row else 0
+        except Exception as e:
+            logger.error(f"获取统计计数失败: {e}")
+            return 0
+
+    def get_all_stats(self) -> dict[str, int]:
+        """获取所有统计数据"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT key, count FROM statistics")
+                return {row["key"]: row["count"] for row in cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"获取统计数据失败: {e}")
+            return {}

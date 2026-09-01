@@ -32,6 +32,7 @@ class RagFlowClient:
         kb_ids: list[str],
         top_k: int = 5,
         timeout: float = 10.0,
+        db=None,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -39,6 +40,7 @@ class RagFlowClient:
         self.top_k = top_k
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self.db = db
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -105,6 +107,10 @@ class RagFlowClient:
         except Exception as e:
             logger.error(f"RAGFlow 检索异常: {e}")
             return RagResult()
+        finally:
+            # 统计检索次数
+            if self.db:
+                self.db.increment_stat("kb_retrieve_count")
 
     def build_context_message(self, result: RagResult, max_length: int = 2000) -> dict | None:
         """
@@ -199,6 +205,9 @@ class RagFlowClient:
                     return None
 
                 logger.info(f"文档上传成功: {file_path.name} -> 知识库 {dataset_id}, 响应: {data}")
+                # 统计上传次数
+                if self.db:
+                    self.db.increment_stat("kb_upload_count")
                 return data.get("data")
 
             except (httpx.TimeoutException, httpx.TransportError) as e:
@@ -267,6 +276,9 @@ class RagFlowClient:
                     return False
 
                 logger.info(f"文档解析已触发: 知识库 {dataset_id}, 文档数 {len(document_ids)}")
+                # 统计解析次数
+                if self.db:
+                    self.db.increment_stat("kb_parse_count")
                 return True
 
             except (httpx.TimeoutException, httpx.TransportError) as e:

@@ -102,6 +102,7 @@ def init_ai_service():
             top_p=config.ai_top_p,
             system_prompt=system_prompt,
             debug_log=config.ai_debug_log,
+            db=db,
         )
         
         # 初始化 RAGFlow 客户端
@@ -111,6 +112,7 @@ def init_ai_service():
                 api_key=config.ragflow_api_key,
                 kb_ids=config.ragflow_kb_ids,
                 top_k=config.ragflow_top_k,
+                db=db,
             )
             logger.info(f"RAGFlow 客户端初始化完成，知识库数量: {len(config.ragflow_kb_ids)}")
         else:

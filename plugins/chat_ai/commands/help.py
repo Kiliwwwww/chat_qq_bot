@@ -49,5 +49,6 @@ async def handle_help(event: MessageEvent):
 /kb_upload <群号> [日期] - 上传指定群聊天记录
 /kb_summary - 生成今天的聊天记录总结并上传（管理员）
 /kb_summary <群号> [日期] - 生成指定群聊天记录总结并上传
-/kb_sync <群号> [日期] - 同步上传聊天记录并生成总结（管理员，日期默认今天）"""
+/kb_sync <群号> [日期] - 同步上传聊天记录并生成总结（管理员，日期默认今天）
+/stats 或 /统计 - 查看功能使用统计（检索/上传/解析/AI请求次数）"""
     await help_cmd.finish(help_text)

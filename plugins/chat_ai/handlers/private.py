@@ -115,6 +115,11 @@ async def handle_private_msg(event: MessageEvent):
                 system_prompt=system_prompt,
             )
 
+        # 空回复兜底：不发送、不写入历史（MiMo 偶发返回空内容）
+        if not reply or not reply.strip():
+            logger.warning(f"AI 返回空回复，静默跳过 用户:{user_id}")
+            await private_msg.finish()
+
         # 添加助手回复到历史
         history.append({
             "role": "assistant",

@@ -40,6 +40,8 @@ from ..utils.helpers import (
     clean_history_images,
     get_keywords_prompt,
     get_time_hint,
+    NO_META_RULE,
+    is_meta_decline,
     check_repeater,
     update_recent_messages,
 )
@@ -379,7 +381,10 @@ async def handle_group_msg(event: MessageEvent):
             admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
         # 时间感知提示词
         time_prompt = get_time_hint()
-        system_prompt = state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt + time_prompt
+        system_prompt = (
+            state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt
+            + time_prompt + NO_META_RULE
+        )
 
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
@@ -396,6 +401,18 @@ async def handle_group_msg(event: MessageEvent):
                 messages=cleaned_history,
                 system_prompt=system_prompt,
             )
+
+        # 空回复兜底：不发送、不写入历史（MiMo 偶发返回空内容）
+        if not reply or not reply.strip():
+            logger.warning(f"AI 返回空回复，静默跳过 群:{group_id}")
+            group_last_reply[group_id] = time.time()
+            await group_msg.finish()
+
+        # 拦截 AI 泄露的判断性回复（如"不用回复，跟我没关系"），静默不发送
+        if is_meta_decline(reply):
+            logger.info(f"AI 输出判断性回复，已拦截不发送 群:{group_id} 回复:{reply}")
+            group_last_reply[group_id] = time.time()
+            await group_msg.finish()
 
         history.append({
             "role": "assistant",

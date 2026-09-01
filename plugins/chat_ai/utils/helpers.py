@@ -31,19 +31,48 @@ def get_time_hint() -> str:
     )
 
 
+# 禁止输出判断过程的硬规则：防止模型把"该不该回复"的思考直接说出口
+NO_META_RULE = (
+    "\n\n## 最高优先级 · 禁止输出判断过程\n"
+    "你回复的每一句话都必须是铃月弥本人对群友说的自然聊天内容，绝不允许把判断、解释、分析说出口。\n"
+    "绝对禁止输出这类话：\"不用回复\"\"不用回答\"\"没必要回复\"\"跟我没关系\"\"跟我无关\""
+    "\"不关我事\"\"不是在跟我说话\"\"别抢答\"\"这是群友之间在闲聊\"等。\n"
+    "这类话是思考过程不是群聊内容，说出口非常出戏。\n"
+    "就算你觉得这条消息不是在跟你说话，也绝不能在回复里说出来——"
+    "你可以像看热闹的旁观者随口吐槽、接一句、发表简短看法，但永远不能说\"不用回复\"这类话。"
+)
+
+
+# AI 泄露判断性/拒绝回复的话（应拦截不发送）
+META_DECLINE_PATTERNS = (
+    "不用回复", "不用回答", "没必要回复", "不需要回复", "不用我回复",
+    "跟我没关系", "跟我无关", "不关我事", "跟我没什么关系",
+    "不是在跟我说话", "不是跟我说话", "不是在跟我说", "不是在跟我聊",
+    "不用抢答", "别抢答", "是群友之间", "没我什么事", "轮不到我",
+)
+
+
+def is_meta_decline(text: str) -> bool:
+    """判断是否为 AI 泄露的判断性/拒绝回复的话，命中则应拦截不发送"""
+    if not text:
+        return False
+    return any(p in text for p in META_DECLINE_PATTERNS)
+
+
 def clean_history_images(messages: list[dict]) -> list[dict]:
-    """清理历史记录中的图片，只保留最近3条消息的图片"""
+    """清理历史记录中的图片，只保留最新一条消息的图片（其URL最新），
+    历史消息的图片URL可能已过期，只保留文本，避免发给AI时下载失败"""
     if not messages:
         return messages
 
-    # 创建副本，避免修改原始数据
     cleaned = []
+    last_index = len(messages) - 1
     for i, msg in enumerate(messages):
         # 只处理用户消息
         if msg["role"] == "user" and isinstance(msg["content"], list):
-            # 最近3条消息保留图片，历史消息只保留文本
-            if i >= len(messages) - 6:
-                cleaned.append(msg)  # 最近6条消息完整保留
+            # 最新消息完整保留（图片URL刚生成未过期）
+            if i == last_index:
+                cleaned.append(msg)
             else:
                 # 历史消息只保留文本部分
                 text_parts = [item for item in msg["content"] if item.get("type") == "text"]
