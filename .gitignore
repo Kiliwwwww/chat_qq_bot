@@ -7,4 +7,5 @@ __pycache__/
 data/chat_ai/chat_ai.db
 data/xiuxian/
 data/chat_logs/
+data/pighub-img/
 log/

@@ -202,11 +202,11 @@ class AIService:
             },
         ]
         
-        # 知识库作为独立的 system message
+        full_messages += messages
+        
+        # 知识库放在历史消息之后，提高缓存命中率
         if rag_message:
             full_messages.append(rag_message)
-        
-        full_messages += messages
 
         # 记录请求内容
         request_log = {
