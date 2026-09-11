@@ -1,13 +1,15 @@
 import time
+import base64
 
 from nonebot import on_message, get_plugin_config, logger
-from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, PrivateMessageEvent
 from nonebot.exception import FinishedException
 
 from ..config import Config
 from .. import state
 from ..state import db, user_histories, init_ai_service, get_user_history, set_user_history
 from ..utils.helpers import clean_history_images, get_keywords_prompt, get_time_hint
+from ..utils.tts import synthesize
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
 private_msg = on_message(priority=10, block=True)
@@ -102,18 +104,37 @@ async def handle_private_msg(event: MessageEvent):
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
 
-        # RAGFlow 知识库检索（由 AI 自主决定是否需要检索）
-        if state.ragflow_client and user_message:
-            reply = await state.ai_service.chat_with_rag(
-                messages=cleaned_history,
-                system_prompt=system_prompt,
-                rag_client=state.ragflow_client,
+        # RAGFlow 检索 + 语音工具（AI 自主决定是否检索、是否用语音回复）
+        result = await state.ai_service.chat_with_tools(
+            messages=cleaned_history,
+            system_prompt=system_prompt,
+            rag_client=state.ragflow_client if user_message else None,
+            allow_voice=config.tts_enabled,
+        )
+
+        # AI 决定用语音回复：只发语音
+        if result.has_voice:
+            history.append({
+                "role": "assistant",
+                "content": result.voice_text,
+            })
+            if len(history) > config.ai_context_limit:
+                history = history[-config.ai_context_limit:]
+            await set_user_history(user_id, history)
+            try:
+                audio = await synthesize(
+                    result.voice_text,
+                    result.voice_instruct or config.tts_instruct,
+                )
+            except Exception as e:
+                logger.error(f"私聊语音生成失败，改为不发 用户:{user_id}: {e}")
+                await private_msg.finish()
+            logger.info(f"私聊语音回复 用户:{user_id} 内容:{result.voice_text[:20]}...")
+            await private_msg.finish(
+                MessageSegment.record(f"base64://{base64.b64encode(audio).decode()}")
             )
-        else:
-            reply = await state.ai_service.chat_with_history(
-                messages=cleaned_history,
-                system_prompt=system_prompt,
-            )
+
+        reply = result.text
 
         # 空回复兜底：不发送、不写入历史（MiMo 偶发返回空内容）
         if not reply or not reply.strip():

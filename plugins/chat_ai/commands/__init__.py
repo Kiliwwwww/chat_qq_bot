@@ -31,6 +31,8 @@ from .kb_cmd import (
     kb_upload_cmd,
 )
 from .stats_cmd import stats_cmd
+from .send_cmd import send_cmd
+from .tts_cmd import tts_cmd, send_voice_cmd, voice_style_cmd
 
 __all__ = [
     "help_cmd",
@@ -61,4 +63,8 @@ __all__ = [
     "kb_list_cmd",
     "kb_upload_cmd",
     "stats_cmd",
+    "send_cmd",
+    "tts_cmd",
+    "send_voice_cmd",
+    "voice_style_cmd",
 ]

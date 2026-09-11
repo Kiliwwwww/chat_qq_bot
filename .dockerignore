@@ -18,3 +18,4 @@ data/chat_ai/*.db
 Dockerfile
 docker-compose.yml
 restart.sh
+qwen-tts/

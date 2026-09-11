@@ -17,6 +17,37 @@ services:
     networks:
       - qqbot-network
 
+  qwen-tts:
+    build: ./qwen-tts
+    container_name: qwen-tts
+    restart: unless-stopped
+    gpus: all
+    environment:
+      - TZ=Asia/Shanghai
+      - HF_ENDPOINT=https://hf-mirror.com
+      - TTS_MODEL=Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+      - TTS_TOKENIZER=Qwen/Qwen3-TTS-Tokenizer-12Hz
+      - TTS_SPEAKER=Vivian
+      - TTS_LANGUAGE=Chinese
+      - TTS_DEVICE=cuda:0
+      - TTS_VOLUME_FILTER=loudnorm=I=-16:TP=-1.5:LRA=11
+      - TTS_TEMPERATURE=0.6
+      - TTS_TOP_P=0.85
+      - TTS_TOP_K=30
+      - TTS_SEED=42
+    volumes:
+      - ./qwen-tts/cache:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    networks:
+      - qqbot-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 1800s
+
 
 
 networks:

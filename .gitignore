@@ -9,3 +9,7 @@ data/xiuxian/
 data/chat_logs/
 data/pighub-img/
 log/
+qwen-tts/cache/
+qwen-tts/__pycache__/
+*.mp3
+*.wav

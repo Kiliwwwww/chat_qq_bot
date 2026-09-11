@@ -2,6 +2,7 @@ import random
 import time
 import json
 import asyncio
+import base64
 from datetime import datetime
 
 from nonebot import on_command, on_message, on_notice, get_plugin_config, logger
@@ -45,6 +46,7 @@ from ..utils.helpers import (
     check_repeater,
     update_recent_messages,
 )
+from ..utils.tts import synthesize
 
 reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
 
@@ -389,18 +391,37 @@ async def handle_group_msg(event: MessageEvent):
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
 
-        # RAGFlow 知识库检索（由 AI 自主决定是否需要检索，以更好理解群友在说什么）
-        if state.ragflow_client and user_message:
-            reply = await state.ai_service.chat_with_rag(
-                messages=cleaned_history,
-                system_prompt=system_prompt,
-                rag_client=state.ragflow_client,
-            )
-        else:
-            reply = await state.ai_service.chat_with_history(
-                messages=cleaned_history,
-                system_prompt=system_prompt,
-            )
+        # RAGFlow 检索 + 语音工具（由 AI 自主决定是否检索、是否用语音回复）
+        result = await state.ai_service.chat_with_tools(
+            messages=cleaned_history,
+            system_prompt=system_prompt,
+            rag_client=state.ragflow_client if user_message else None,
+            allow_voice=config.tts_enabled,
+        )
+
+        # AI 决定用语音回复：只发语音，不引用群友消息
+        if result.has_voice:
+            history.append({
+                "role": "assistant",
+                "content": result.voice_text,
+            })
+            if len(history) > config.ai_context_limit:
+                history = history[-config.ai_context_limit:]
+            await set_group_history(group_id, history)
+            group_last_reply[group_id] = time.time()
+            try:
+                audio = await synthesize(
+                    result.voice_text,
+                    result.voice_instruct or config.tts_instruct,
+                )
+            except Exception as e:
+                logger.error(f"语音生成失败，改为不发 群:{group_id}: {e}")
+                await group_msg.finish()
+            logger.info(f"AI 语音回复 群:{group_id} 内容:{result.voice_text[:20]}...")
+            record = MessageSegment.record(f"base64://{base64.b64encode(audio).decode()}")
+            await group_msg.finish(record)
+
+        reply = result.text
 
         # 空回复兜底：不发送、不写入历史（MiMo 偶发返回空内容）
         if not reply or not reply.strip():

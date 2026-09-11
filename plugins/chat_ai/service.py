@@ -36,8 +36,8 @@ RAG_SEARCH_TOOL = {
         "name": "search_knowledge_base",
         "description": (
             "在知识库中检索资料。知识库里包含群里的历史聊天记录（群友之前说过的话、讨论过的事）"
-            "以及游戏规则文档。当群友的话涉及游戏玩法、历史事件、之前聊过的内容，"
-            "或者你不确定群友在指什么、想更准确理解群友意思时，调用此工具检索相关资料。"
+            "以及游戏规则文档。一旦群友的话涉及具体人名、游戏名词、之前聊过的事、当前局势，"
+            "或者你拿不准群友在指什么、想补充细节把话接得更准，都请主动调用此工具检索相关资料。"
         ),
         "parameters": {
             "type": "object",
@@ -51,6 +51,48 @@ RAG_SEARCH_TOOL = {
         },
     },
 }
+
+# 语音回复工具：由 AI 自主决定是否用语音回复
+SEND_VOICE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "send_voice",
+        "description": (
+            "把你要说的话用语音（女声朗读）发出来。"
+            "当群友在攻击、辱骂、嘲讽、挑衅你，或者情绪很激烈、适合用语气（生气/委屈/嘲讽/得意）表达时，"
+            "请主动调用此工具，用语音回复更有冲击力。"
+            "调用后本轮不要再输出文字内容，直接用语音作为你的回复。"
+            "text 填你要说的完整口语内容（1~2 句，简短自然，不要写括号动作、表情符号、markdown）。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "要朗读的完整内容，口语化，1~2 句话",
+                },
+                "instruct": {
+                    "type": "string",
+                    "description": "语气指令，如：生气地、冷冷地、委屈、嘲讽、得意、温柔",
+                },
+            },
+            "required": ["text"],
+        },
+    },
+}
+
+
+class ChatResult:
+    """AI 一次回复的结果：文本 + 可选的语音请求"""
+
+    def __init__(self, text: str = "", voice_text: str = "", voice_instruct: str = ""):
+        self.text = text
+        self.voice_text = voice_text
+        self.voice_instruct = voice_instruct
+
+    @property
+    def has_voice(self) -> bool:
+        return bool(self.voice_text)
 
 
 class AIService:
@@ -372,6 +414,122 @@ class AIService:
             system_prompt=system_prompt,
             rag_message=rag_message,
         )
+
+    async def chat_with_tools(
+        self,
+        messages: list[dict[str, Union[str, list]]],
+        system_prompt: Optional[str] = None,
+        rag_client=None,
+        allow_voice: bool = True,
+        max_tool_calls: int = 2,
+    ) -> "ChatResult":
+        """
+        带工具调用（知识库检索 + 语音回复）的聊天：由 AI 自主决定是否检索、是否用语音回复。
+        """
+        base_messages = [
+            {
+                "role": "system",
+                "content": system_prompt or self.system_prompt,
+            },
+        ] + list(messages)
+
+        tools = [RAG_SEARCH_TOOL]
+        if allow_voice:
+            tools.append(SEND_VOICE_TOOL)
+
+        request_start = time.time()
+        self.ai_logger.info(f"开始调用 API (chat_with_tools)，model={self.model}")
+        try:
+            resp = await self.client.chat.completions.create(
+                model=self.model,
+                messages=base_messages,
+                tools=tools,
+                tool_choice="auto",
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                timeout=120.0,
+            )
+        except Exception as e:
+            elapsed = time.time() - request_start
+            self.ai_logger.warning(f"带工具调用失败，回退普通对话，耗时 {elapsed:.2f}s: {e}")
+            text = await self.chat_with_history(messages, system_prompt=system_prompt)
+            return ChatResult(text=text)
+
+        if self.db:
+            self.db.increment_stat("ai_request_count")
+
+        first_msg = resp.choices[0].message
+        content = first_msg.content or ""
+        voice_text, voice_instruct, queries = self._parse_tool_calls(
+            getattr(first_msg, "tool_calls", None) or [], content
+        )
+
+        # 需要检索：检索后再生成一次（仍带工具，允许模型继续决定语音）
+        if queries and rag_client is not None:
+            self.ai_logger.info(f"AI 决定检索知识库: {queries}")
+            try:
+                rag_result = await rag_client.retrieve(queries[0])
+                rag_message = rag_client.build_context_message(rag_result)
+                resp2 = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=base_messages + [rag_message],
+                    tools=tools,
+                    tool_choice="auto",
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    top_p=self.top_p,
+                    timeout=120.0,
+                )
+                if self.db:
+                    self.db.increment_stat("ai_request_count")
+                second_msg = resp2.choices[0].message
+                content = second_msg.content or ""
+                v2, i2, _ = self._parse_tool_calls(
+                    getattr(second_msg, "tool_calls", None) or [], content
+                )
+                if v2:
+                    voice_text, voice_instruct = v2, i2
+            except Exception as e:
+                self.ai_logger.warning(f"检索/二次生成失败，使用首次结果: {e}")
+
+        if voice_text:
+            self.ai_logger.info(
+                f"AI 决定语音回复: {voice_text[:30]} (instruct={voice_instruct or '默认'})"
+            )
+        return ChatResult(text=content, voice_text=voice_text, voice_instruct=voice_instruct)
+
+    @staticmethod
+    def _parse_tool_calls(tool_calls, content: str):
+        """解析工具调用，返回 (voice_text, voice_instruct, rag_queries)"""
+        voice_text = ""
+        voice_instruct = ""
+        queries: list[str] = []
+        for tc in tool_calls:
+            name = getattr(getattr(tc, "function", None), "name", "") or ""
+            try:
+                args = json.loads(getattr(tc.function, "arguments", "") or "{}")
+            except Exception:
+                args = {}
+            if name == "search_knowledge_base":
+                q = str(args.get("query") or "").strip()
+                if q:
+                    queries.append(q)
+            elif name == "send_voice":
+                t = str(args.get("text") or "").strip()
+                if t:
+                    voice_text = t
+                    voice_instruct = str(args.get("instruct") or "").strip()
+
+        # 兼容文本形式的 send_voice 调用
+        if not voice_text and "send_voice" in (content or ""):
+            m = re.search(r"\"text\"\s*:\s*\"([^\"]+)\"", content)
+            if m:
+                voice_text = m.group(1).strip()
+                mi = re.search(r"\"instruct\"\s*:\s*\"([^\"]+)\"", content)
+                if mi:
+                    voice_instruct = mi.group(1).strip()
+        return voice_text, voice_instruct, queries
 
     @staticmethod
     def _extract_query_from_tool_call(text: str) -> list[str]:

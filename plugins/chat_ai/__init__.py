@@ -30,6 +30,10 @@ from .commands import (
     kb_del_cmd,
     kb_list_cmd,
     kb_upload_cmd,
+    send_cmd,
+    tts_cmd,
+    send_voice_cmd,
+    voice_style_cmd,
 )
 from .commands.scheduler import daily_kb_upload
 from .handlers import private_msg, group_msg, reset_cmd, member_join
@@ -66,6 +70,10 @@ __all__ = [
     "kb_del_cmd",
     "kb_list_cmd",
     "kb_upload_cmd",
+    "send_cmd",
+    "tts_cmd",
+    "send_voice_cmd",
+    "voice_style_cmd",
     "daily_kb_upload",
     "private_msg",
     "group_msg",

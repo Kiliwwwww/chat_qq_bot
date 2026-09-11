@@ -63,6 +63,14 @@ class Config(BaseModel):
     kb_summary_enabled: bool = True
     kb_summary_max_chars: int = 4000
     kb_summary_model: str = ""
+
+    # TTS 语音朗读配置
+    tts_enabled: bool = True
+    tts_base_url: str = "http://qwen-tts:8000"
+    tts_speaker: str = "Vivian"
+    tts_language: str = "Chinese"
+    tts_instruct: str = "用温柔可爱的语气，说标准普通话"
+    tts_max_chars: int = 200
     
     # 系统提示词
     ai_system_prompt: str = (

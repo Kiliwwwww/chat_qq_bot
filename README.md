@@ -12,6 +12,8 @@
 | `daily_wife` | 今日老婆 / 原神家庭（头像合成图片） |
 | `xiuxian` | QQ 群修仙挂机游戏 |
 
+此外，项目内置一个基于 **Qwen3-TTS** 的本地语音合成服务 `qwen-tts`（独立 Docker 服务），提供语音朗读与 AI 自主语音回复能力，详见 [语音功能](#语音功能qwen3-tts)。
+
 ## 功能特性
 
 - **AI 对话**：接入 OpenAI 兼容 API，支持上下文记忆与多 AI 服务切换
@@ -31,6 +33,7 @@
 - **微博动态**：查看微博用户最新动态和图片
 - **今日老婆 / 原神家庭**：每日抽取 CP 并合成头像图片
 - **修仙游戏**：完整的挂机修仙玩法（灵修 + 蛊修）
+- **语音朗读**：本地 Qwen3-TTS 合成语音，支持 `/朗读`、定向群发语音；AI 可自主决定用语音回怼
 
 ## 快速开始
 
@@ -106,6 +109,9 @@ OneBot 反向 WebSocket 连接地址：`ws://localhost:8080/onebot/v11/ws`。
 | `/ai服务` | - | 查看 AI 服务列表 |
 | `/切换ai服务 <id>` | - | 切换 AI 服务（管理员） |
 | `/删除ai服务 <id>` | - | 删除 AI 服务（管理员） |
+| `/朗读 <内容>` | `/read` | 用当前音色朗读内容并发送语音 |
+| `/发语音 <群号> <内容> [语气]` | `/sendvoice` | 向指定群发送语音（管理员） |
+| `/音色 <描述>` | `/语气` | 设置全局语气/口音，`/音色 默认` 恢复（管理员） |
 
 ### 知识库管理（chat_ai，仅私聊）
 
@@ -155,6 +161,76 @@ OneBot 反向 WebSocket 连接地址：`ws://localhost:8080/onebot/v11/ws`。
 | `/修仙排行榜 <类型>` | 境界/战力/财富等排行 |
 | `/我要修蛊` | 创建蛊修角色（蛊修路线） |
 
+## 语音功能（Qwen3-TTS）
+
+机器人通过一个独立的本地语音合成服务 `qwen-tts`（基于 [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)，FastAPI + GPU）实现文字转语音，qqbot 通过 HTTP 调用，二者完全解耦。
+
+### 架构
+
+```
+qqbot ──HTTP POST /tts──▶ qwen-tts (FastAPI, GPU)
+      ◀──── audio/mpeg ───┘
+```
+
+### 启动
+
+`docker-compose.yml` 已内置 `qwen-tts` 服务（`gpus: all`），需要宿主机具备 NVIDIA GPU 及容器 GPU 直通能力：
+
+```bash
+docker-compose up -d qwen-tts
+docker-compose logs -f qwen-tts   # 首次启动会下载模型（约 5GB，缓存在 ./qwen-tts/cache）
+```
+
+服务就绪后访问 `http://127.0.0.1:8000/health`，返回 `{"status":"ok", ...}` 即正常。
+
+### 命令
+
+| 命令 | 别名 | 说明 |
+|------|------|------|
+| `/朗读 <内容>` | `/read` | 用当前音色朗读内容并发送语音 |
+| `/发语音 <群号> <内容> [语气指令]` | `/sendvoice` | 向指定群发送语音（管理员；内容含空格时用 `\|` 分隔语气） |
+| `/音色 <描述>` | `/语气` | 设置全局语气/口音（如「用台湾腔说话」），`/音色 默认` 恢复（管理员） |
+
+### AI 自主语音回复
+
+AI 通过 function calling 获得 `send_voice` 工具，可自主决定是否用语音回复（例如被攻击、辱骂、挑衅或情绪激烈时），此时**只发语音、不发文字**。语气（`instruct`）由 AI 根据对话上下文自行决定（如「嘲讽」「生气地」），若未给出则回退到默认语气。该能力受 `tts_enabled` 控制，关闭后仅文字回复。
+
+### 预置音色
+
+| 音色 | 描述 | 母语 |
+|------|------|------|
+| **Vivian** | 明亮、略带俏皮的少女音 | 中文 |
+| **Serena** | 温柔柔和的年轻女声 | 中文 |
+| **Ono_Anna** | 轻快俏皮的日语女声 | 日语 |
+| **Sohee** | 温暖富情感的韩语女声 | 韩语 |
+| Uncle_Fu | 沉稳低沉成熟男声 | 中文 |
+| Dylan | 清亮北京青年男声 | 中文（北京话） |
+| Eric | 活泼成都男声 | 中文（四川话） |
+| Ryan / Aiden | 动感 / 阳光美式男声 | 英文 |
+
+### 服务接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/health` | 健康检查（`loaded` 表示模型是否已加载到显存） |
+| GET | `/speakers` | 列出可用音色 |
+| POST | `/tts` | `{text, speaker?, language?, instruct?, temperature?, top_p?, top_k?, seed?}` → `audio/mpeg` |
+
+### 服务端环境变量（`docker-compose.yml` 中 qwen-tts 服务）
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `TTS_MODEL` | `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` | 模型（可换 `0.6B` 版本省显存） |
+| `TTS_TOKENIZER` | `Qwen/Qwen3-TTS-Tokenizer-12Hz` | 语音编解码器 |
+| `TTS_SPEAKER` | `Vivian` | 服务端默认音色 |
+| `TTS_LANGUAGE` | `Chinese` | 默认语言 |
+| `TTS_DEVICE` | `cuda:0` | 推理设备 |
+| `TTS_VOLUME_FILTER` | `loudnorm=I=-16:TP=-1.5:LRA=11` | ffmpeg 响度处理（调大音量） |
+| `TTS_TEMPERATURE` | `0.6` | 采样温度（越低越稳定） |
+| `TTS_TOP_P` | `0.85` | Top P 采样 |
+| `TTS_TOP_K` | `30` | Top K 采样 |
+| `TTS_SEED` | `42` | 随机种子（固定后同文本输出一致，留空则随机） |
+
 ## 配置说明
 
 在 `.env` 文件中配置以下参数：
@@ -202,6 +278,19 @@ OneBot 反向 WebSocket 连接地址：`ws://localhost:8080/onebot/v11/ws`。
 | `kb_summary_max_chars` | `4000` | 总结最大字符数 |
 | `kb_summary_model` | - | 总结使用的模型（留空用默认） |
 
+### 语音功能（chat_ai）
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `tts_enabled` | `true` | 是否启用语音功能（关闭后不做语音、AI 也不会发语音） |
+| `tts_base_url` | `http://qwen-tts:8000` | TTS 服务地址 |
+| `tts_speaker` | `Vivian` | 预置音色 |
+| `tts_language` | `Chinese` | 朗读语言 |
+| `tts_instruct` | `用温柔可爱的语气，说标准普通话` | 默认语气（AI 未指定情绪时使用） |
+| `tts_max_chars` | `200` | 单次朗读最大字数 |
+
+> 全局语气/口音通过 `/音色 <描述>` 命令设置，持久化在数据库中；设置后 AI 情绪后会追加该风格且不再强制标准普通话。
+
 ### Redis 配置
 
 排行榜、今日老婆、修仙插件均依赖 Redis（不可用时修仙插件降级为内存缓存）。各插件使用相同的前缀配置项：
@@ -226,11 +315,16 @@ qqbot/
 ├── data/
 │   ├── chat_ai/chat_ai.db  # SQLite 数据库（白名单、AI服务等）
 │   └── md/                 # 系统提示词与广告检测提示词
+├── qwen-tts/               # 本地 Qwen3-TTS 语音合成服务（独立容器）
+│   ├── server.py           # FastAPI 服务（/health、/speakers、/tts）
+│   ├── Dockerfile          # CUDA + qwen-tts 镜像
+│   ├── entrypoint.sh       # 预下载模型并启动服务
+│   └── cache/              # 模型缓存（已 gitignore）
 └── plugins/
     ├── chat_ai/            # AI 聊天插件
     │   ├── commands/       # 命令处理器
     │   ├── handlers/       # 私聊/群聊消息处理
-    │   ├── utils/          # 工具函数
+    │   ├── utils/          # 工具函数（含 tts.py 语音合成封装）
     │   ├── config.py       # 配置模型
     │   ├── database.py     # SQLite 数据库操作
     │   ├── state.py        # 全局状态与 Redis 管理
@@ -260,3 +354,4 @@ qqbot/
 - 微博功能仅支持私聊使用，需要用户在白名单中
 - 欢迎语功能需要机器人具有群成员加入通知权限
 - 修仙插件数据按群隔离存储于 SQLite，Redis 不可用时自动降级为内存缓存（重启后丢失）
+- 语音功能依赖本地 `qwen-tts` 服务（需 NVIDIA GPU 及容器 GPU 直通），首次启动下载约 5GB 模型到 `./qwen-tts/cache`；设置 `tts_enabled=false` 可禁用全部语音能力

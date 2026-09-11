@@ -4,6 +4,7 @@
 
 - Docker >= 20.10
 - Docker Compose >= 2.0
+- （可选）NVIDIA GPU + NVIDIA Container Toolkit：启用语音功能 `qwen-tts` 时必需
 
 ## 快速开始
 
@@ -72,6 +73,17 @@ docker-compose down -v
 - **端口**: 6379
 - **数据卷**: `redis-data`：Redis 持久化数据
 - **特性**: 开启 AOF 持久化，数据不会丢失
+
+### qwen-tts 服务（可选，语音功能）
+
+本地文字转语音服务，qqbot 通过 HTTP 调用。
+
+- **端口**: 8000
+- **镜像**: 本地构建（`./qwen-tts`，基于 CUDA + `qwen-tts`）
+- **数据卷**: `./qwen-tts/cache` → 模型缓存（首次启动约下载 5GB）
+- **依赖**: 宿主机 NVIDIA GPU 及容器 GPU 直通（compose 中 `gpus: all`）
+- **健康检查**: `http://localhost:8000/health`
+- **启动**: `docker-compose up -d qwen-tts`（日志 `docker-compose logs -f qwen-tts`）
 
 ## 常用命令
 
