@@ -287,10 +287,15 @@ async def handle_group_msg(event: MessageEvent):
     sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
     user_id = event.user_id
 
+    # 检测是否@了机器人，用于标记消息
+    is_at_me = event.is_tome()
+
     # 将用户消息加入历史（不管是否触发AI回复）
+    # 如果@了机器人，在消息中标记[@我]，让AI知道被@了
+    at_prefix = "[@我] " if is_at_me else ""
     if image_urls:
         user_content = []
-        text_with_name = f"[{sender_name}][{user_id}] {user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
+        text_with_name = f"[{sender_name}][{user_id}] {at_prefix}{user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
         user_content.append({"type": "text", "text": text_with_name})
         for img_url in image_urls:
             try:
@@ -305,7 +310,7 @@ async def handle_group_msg(event: MessageEvent):
     else:
         history.append({
             "role": "user",
-            "content": f"[{sender_name}][{user_id}] {user_message}",
+            "content": f"[{sender_name}][{user_id}] {at_prefix}{user_message}",
         })
 
     # 限制历史记录长度
@@ -356,9 +361,6 @@ async def handle_group_msg(event: MessageEvent):
         if repeat_msg:
             await group_msg.finish(repeat_msg)
 
-    # 判断是否被@：被@则立即回复，不受概率和冷却限制
-    is_at_me = event.is_tome()
-
     # 冷却检查：防止短时间内重复回复同一群（被@时跳过冷却检查）
     current_time = time.time()
     if not is_at_me and group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
@@ -391,12 +393,17 @@ async def handle_group_msg(event: MessageEvent):
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
 
-        # RAGFlow 检索 + 语音工具（由 AI 自主决定是否检索、是否用语音回复）
+        # RAGFlow 检索 + 联网搜索 + 语音工具（由 AI 自主决定是否检索、是否搜索、是否用语音回复）
+        # 群聊使用群绑定的知识库，不使用全局配置
+        group_kb_id = state.kb_groups.get(group_id)
+        group_kb_ids = [group_kb_id] if group_kb_id else None
         result = await state.ai_service.chat_with_tools(
             messages=cleaned_history,
             system_prompt=system_prompt,
             rag_client=state.ragflow_client if user_message else None,
             allow_voice=config.tts_enabled,
+            kb_ids=group_kb_ids,
+            web_search_client=state.web_search_client if user_message else None,
         )
 
         # AI 决定用语音回复：只发语音，不引用群友消息

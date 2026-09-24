@@ -55,23 +55,25 @@ class RagFlowClient:
             )
         return self._client
 
-    async def retrieve(self, question: str) -> RagResult:
+    async def retrieve(self, question: str, kb_ids: list[str] | None = None) -> RagResult:
         """
         从知识库检索相关内容
 
         Args:
             question: 用户问题
+            kb_ids: 可选的知识库ID列表，为None时使用默认的self.kb_ids
 
         Returns:
             RagResult 包含检索到的文本片段列表
         """
-        if not self.kb_ids:
+        dataset_ids = kb_ids if kb_ids is not None else self.kb_ids
+        if not dataset_ids:
             logger.warning("RAGFlow 知识库 ID 为空，跳过检索")
             return RagResult()
 
         payload = {
             "question": question,
-            "dataset_ids": self.kb_ids,
+            "dataset_ids": dataset_ids,
             "top_k": self.top_k,
         }
 

@@ -52,6 +52,12 @@ class Config(BaseModel):
     redis_password: str = ""
     redis_key_prefix: str = "chat_ai:"
     
+    # 联网搜索配置（博查 Bocha Web Search）
+    web_search_enabled: bool = True
+    web_search_api_key: str = ""
+    web_search_count: int = 5
+    web_search_max_length: int = 2000
+
     # RAGFlow 配置
     ragflow_enabled: bool = False
     ragflow_base_url: str = "http://127.0.0.1"

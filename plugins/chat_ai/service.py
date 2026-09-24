@@ -35,9 +35,10 @@ RAG_SEARCH_TOOL = {
     "function": {
         "name": "search_knowledge_base",
         "description": (
-            "在知识库中检索资料。知识库里包含群里的历史聊天记录（群友之前说过的话、讨论过的事）"
-            "以及游戏规则文档。一旦群友的话涉及具体人名、游戏名词、之前聊过的事、当前局势，"
-            "或者你拿不准群友在指什么、想补充细节把话接得更准，都请主动调用此工具检索相关资料。"
+            "在知识库中检索资料。知识库里包含群里的历史聊天记录（群友之前说过的人、事、梗、之前聊过的话题）"
+            "以及游戏规则文档。只要你说不准、记不清、听不懂群友在说什么，或者拿不准某个梗、某个人、某件事的细节，"
+            "都请主动调用此工具检索相关资料，不要凭印象瞎猜。"
+            "不需要很确定才调用——拿不准就搜，搜不到也没关系。"
         ),
         "parameters": {
             "type": "object",
@@ -45,6 +46,32 @@ RAG_SEARCH_TOOL = {
                 "query": {
                     "type": "string",
                     "description": "用于检索的搜索关键词，尽量提炼出核心名词",
+                }
+            },
+            "required": ["query"],
+        },
+    },
+}
+
+# 联网搜索工具定义：由 AI 自主决定是否需要搜索互联网实时信息
+WEB_SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "web_search",
+        "description": (
+            "联网搜索互联网上的实时公开信息。只要涉及你的训练数据之外、或者你需要实时、准确信息才能回答的问题，"
+            "都可以调用此工具，包括但不限于：天气、新闻时事、股价汇率、比赛比分、影视综艺、节日假期、"
+            "今天/现在/最新/最近发生的事情、具体的地点/人物/事件细节、以及任何你不知道、不确定、答不上来的问题。"
+            "原则：不知道就去搜，拿不准就去搜，不要凭空编造、不要硬答。"
+            "注意：search_knowledge_base 管的是群聊历史和游戏规则，"
+            "这个工具管的是互联网上的公开信息。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "搜索关键词，尽量具体，如：长沙今天天气、今日科技新闻、美元人民币汇率",
                 }
             },
             "required": ["query"],
@@ -422,9 +449,16 @@ class AIService:
         rag_client=None,
         allow_voice: bool = True,
         max_tool_calls: int = 2,
+        kb_ids: list[str] | None = None,
+        web_search_client=None,
     ) -> "ChatResult":
         """
-        带工具调用（知识库检索 + 语音回复）的聊天：由 AI 自主决定是否检索、是否用语音回复。
+        带工具调用（知识库检索 + 联网搜索 + 语音回复）的聊天：
+        由 AI 自主决定是否检索、是否联网搜索、是否用语音回复。
+
+        Args:
+            kb_ids: 可选的知识库ID列表，为None时使用默认配置
+            web_search_client: 可选的博查联网搜索客户端
         """
         base_messages = [
             {
@@ -434,6 +468,8 @@ class AIService:
         ] + list(messages)
 
         tools = [RAG_SEARCH_TOOL]
+        if web_search_client is not None:
+            tools.append(WEB_SEARCH_TOOL)
         if allow_voice:
             tools.append(SEND_VOICE_TOOL)
 
@@ -461,19 +497,41 @@ class AIService:
 
         first_msg = resp.choices[0].message
         content = first_msg.content or ""
-        voice_text, voice_instruct, queries = self._parse_tool_calls(
+        voice_text, voice_instruct, queries, web_queries = self._parse_tool_calls(
             getattr(first_msg, "tool_calls", None) or [], content
         )
 
-        # 需要检索：检索后再生成一次（仍带工具，允许模型继续决定语音）
+        # 构建参考资料：知识库检索 + 联网搜索
+        context_messages: list[dict] = []
         if queries and rag_client is not None:
             self.ai_logger.info(f"AI 决定检索知识库: {queries}")
             try:
-                rag_result = await rag_client.retrieve(queries[0])
+                rag_result = await rag_client.retrieve(queries[0], kb_ids=kb_ids)
                 rag_message = rag_client.build_context_message(rag_result)
+                if rag_message:
+                    context_messages.append(rag_message)
+            except Exception as e:
+                self.ai_logger.warning(f"知识库检索失败: {e}")
+
+        if web_queries and web_search_client is not None:
+            self.ai_logger.info(f"AI 决定联网搜索: {web_queries}")
+            try:
+                search_result = await web_search_client.search(web_queries[0])
+                search_message = web_search_client.build_context_message(
+                    search_result,
+                    max_length=getattr(web_search_client, "max_length", 2000),
+                )
+                if search_message:
+                    context_messages.append(search_message)
+            except Exception as e:
+                self.ai_logger.warning(f"联网搜索失败: {e}")
+
+        # 需要检索/搜索：补充资料后再生成一次（仍带工具，允许模型继续决定语音）
+        if context_messages:
+            try:
                 resp2 = await self.client.chat.completions.create(
                     model=self.model,
-                    messages=base_messages + [rag_message],
+                    messages=base_messages + context_messages,
                     tools=tools,
                     tool_choice="auto",
                     max_tokens=self.max_tokens,
@@ -485,13 +543,13 @@ class AIService:
                     self.db.increment_stat("ai_request_count")
                 second_msg = resp2.choices[0].message
                 content = second_msg.content or ""
-                v2, i2, _ = self._parse_tool_calls(
+                v2, i2, _, _ = self._parse_tool_calls(
                     getattr(second_msg, "tool_calls", None) or [], content
                 )
                 if v2:
                     voice_text, voice_instruct = v2, i2
             except Exception as e:
-                self.ai_logger.warning(f"检索/二次生成失败，使用首次结果: {e}")
+                self.ai_logger.warning(f"二次生成失败，使用首次结果: {e}")
 
         if voice_text:
             self.ai_logger.info(
@@ -501,10 +559,11 @@ class AIService:
 
     @staticmethod
     def _parse_tool_calls(tool_calls, content: str):
-        """解析工具调用，返回 (voice_text, voice_instruct, rag_queries)"""
+        """解析工具调用，返回 (voice_text, voice_instruct, rag_queries, web_queries)"""
         voice_text = ""
         voice_instruct = ""
         queries: list[str] = []
+        web_queries: list[str] = []
         for tc in tool_calls:
             name = getattr(getattr(tc, "function", None), "name", "") or ""
             try:
@@ -515,6 +574,10 @@ class AIService:
                 q = str(args.get("query") or "").strip()
                 if q:
                     queries.append(q)
+            elif name == "web_search":
+                q = str(args.get("query") or "").strip()
+                if q:
+                    web_queries.append(q)
             elif name == "send_voice":
                 t = str(args.get("text") or "").strip()
                 if t:
@@ -529,10 +592,16 @@ class AIService:
                 mi = re.search(r"\"instruct\"\s*:\s*\"([^\"]+)\"", content)
                 if mi:
                     voice_instruct = mi.group(1).strip()
-        return voice_text, voice_instruct, queries
+
+        # 兼容文本形式的 web_search 调用
+        if not web_queries and "web_search" in (content or ""):
+            web_queries = AIService._extract_query_from_tool_call(
+                content, tool_name="web_search"
+            )
+        return voice_text, voice_instruct, queries, web_queries
 
     @staticmethod
-    def _extract_query_from_tool_call(text: str) -> list[str]:
+    def _extract_query_from_tool_call(text: str, tool_name: str = "search_knowledge_base") -> list[str]:
         """
         从文本形式的工具调用中提取检索关键词。
 
@@ -568,7 +637,7 @@ class AIService:
         if not queries:
             cleaned = re.sub(r"<[^>]+>", " ", text)
             cleaned = re.sub(r"\s+", " ", cleaned).strip()
-            if cleaned and "search_knowledge_base" not in cleaned:
+            if cleaned and tool_name not in cleaned:
                 queries.append(cleaned)
 
         return queries[:3]

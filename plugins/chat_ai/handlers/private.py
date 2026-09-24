@@ -104,12 +104,13 @@ async def handle_private_msg(event: MessageEvent):
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
 
-        # RAGFlow 检索 + 语音工具（AI 自主决定是否检索、是否用语音回复）
+        # RAGFlow 检索 + 联网搜索 + 语音工具（AI 自主决定是否检索、是否搜索、是否用语音回复）
         result = await state.ai_service.chat_with_tools(
             messages=cleaned_history,
             system_prompt=system_prompt,
             rag_client=state.ragflow_client if user_message else None,
             allow_voice=config.tts_enabled,
+            web_search_client=state.web_search_client if user_message else None,
         )
 
         # AI 决定用语音回复：只发语音

@@ -7,6 +7,7 @@ from nonebot import logger
 from .config import Config
 from .service import AIService
 from .ragflow_client import RagFlowClient
+from .bocha_client import BochaWebSearchClient
 from .database import Database
 
 # 依赖 localstore 插件
@@ -43,6 +44,7 @@ group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 
 group_last_repeated: dict[int, str] = {}  # 群最后复读的消息内容
 ai_service: AIService = None
 ragflow_client: RagFlowClient = None
+web_search_client: BochaWebSearchClient = None
 
 # Redis 客户端
 redis_client: aioredis.Redis = None
@@ -66,7 +68,7 @@ CHAT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def init_ai_service():
     """初始化AI服务"""
-    global ai_service, ragflow_client, current_prompt_mode, redis_client
+    global ai_service, ragflow_client, web_search_client, current_prompt_mode, redis_client
     try:
         config = get_plugin_config(Config)
         # 从数据库读取人格模式
@@ -119,6 +121,18 @@ def init_ai_service():
             ragflow_client = None
             logger.info("RAGFlow 未启用或未配置 API Key，跳过初始化")
         
+        # 初始化联网搜索客户端（博查）
+        if config.web_search_enabled and config.web_search_api_key:
+            web_search_client = BochaWebSearchClient(
+                api_key=config.web_search_api_key,
+                count=config.web_search_count,
+                db=db,
+            )
+            logger.info("联网搜索客户端初始化完成 (Bocha)")
+        else:
+            web_search_client = None
+            logger.info("联网搜索未启用或未配置 API Key，跳过初始化")
+
         # 构建 Redis URL
         redis_url = f"redis://"
         if config.redis_password:
