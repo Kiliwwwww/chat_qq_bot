@@ -9,6 +9,7 @@ from ..config import Config
 from .. import state
 from ..state import db, user_histories, init_ai_service, get_user_history, set_user_history
 from ..utils.helpers import clean_history_images, get_keywords_prompt, get_time_hint
+from ..utils.forward import extract_forward_text
 from ..utils.tts import synthesize
 
 # 私聊消息处理器（优先级较低，在命令之后处理）
@@ -50,6 +51,15 @@ async def handle_private_msg(event: MessageEvent):
             image_url = segment.data.get("url", "")
             if image_url:
                 image_urls.append(image_url)
+
+    # 解析合并转发（聊天记录）消息
+    try:
+        forwarder = event.sender.nickname or str(event.user_id)
+        forward_text = await extract_forward_text(message, forwarder=forwarder)
+        if forward_text:
+            user_message = (user_message + "\n" if user_message else "") + forward_text
+    except Exception as e:
+        logger.warning(f"解析合并转发消息失败: {e}")
 
     # 忽略空消息或命令（没有文本也没有图片）
     if (not user_message or user_message.startswith("/")) and not image_urls:

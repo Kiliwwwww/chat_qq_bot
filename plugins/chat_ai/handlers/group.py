@@ -47,6 +47,7 @@ from ..utils.helpers import (
     update_recent_messages,
 )
 from ..utils.tts import synthesize
+from ..utils.forward import extract_forward_text
 
 reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
 
@@ -261,6 +262,15 @@ async def handle_group_msg(event: MessageEvent):
             image_url = segment.data.get("url", "")
             if image_url:
                 image_urls.append(image_url)
+
+    # 解析合并转发（聊天记录）消息
+    try:
+        forwarder = event.sender.card or event.sender.nickname or str(event.user_id)
+        forward_text = await extract_forward_text(message, forwarder=forwarder)
+        if forward_text:
+            user_message = (user_message + "\n" if user_message else "") + forward_text
+    except Exception as e:
+        logger.warning(f"解析合并转发消息失败: {e}")
 
     # 保存聊天记录到文件（仅对开启知识库的群）
     sender_name = event.sender.card or event.sender.nickname or str(event.user_id)
