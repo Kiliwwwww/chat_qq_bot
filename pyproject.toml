@@ -15,6 +15,7 @@ dependencies = [
     "openai>=1.0.0",
     "mcp-server-weibo>=0.1.0",
     "redis>=5.0.0",
+    "lunardate>=0.2.0",
 ]
 
 [tool.nonebot]
