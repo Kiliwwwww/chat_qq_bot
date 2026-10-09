@@ -109,13 +109,48 @@ SEND_VOICE_TOOL = {
 }
 
 
-class ChatResult:
-    """AI 一次回复的结果：文本 + 可选的语音请求"""
+# 连发消息工具：由 AI 自主决定是否在主回复之外再补发若干条消息
+SEND_FOLLOWUP_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "send_followup",
+        "description": (
+            "在回复完主消息之后，再补发一条独立的消息。"
+            "当你觉得一句话不够、想再追一句吐槽/接梗/补充，"
+            "或者想像真人一样连着发好几条消息时，调用此工具。"
+            "一次调用补发一条，可以连续调用多次来发多条；"
+            "主回复仍正常写在正文里，不要把主回复也塞进这个工具。"
+            "每条都要短（1 句话，口语化，不要标点、表情符号、markdown），"
+            "通常最多再补 2 条，别刷屏。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "要补发的这一条消息内容，简短口语，一句话",
+                },
+            },
+            "required": ["text"],
+        },
+    },
+}
 
-    def __init__(self, text: str = "", voice_text: str = "", voice_instruct: str = ""):
+
+class ChatResult:
+    """AI 一次回复的结果：文本 + 可选的语音请求 + 可选的连发消息"""
+
+    def __init__(
+        self,
+        text: str = "",
+        voice_text: str = "",
+        voice_instruct: str = "",
+        followups: Optional[list[str]] = None,
+    ):
         self.text = text
         self.voice_text = voice_text
         self.voice_instruct = voice_instruct
+        self.followups = followups or []
 
     @property
     def has_voice(self) -> bool:
@@ -448,17 +483,21 @@ class AIService:
         system_prompt: Optional[str] = None,
         rag_client=None,
         allow_voice: bool = True,
+        allow_followup: bool = True,
+        force_followup: int = 0,
         max_tool_calls: int = 2,
         kb_ids: list[str] | None = None,
         web_search_client=None,
     ) -> "ChatResult":
         """
-        带工具调用（知识库检索 + 联网搜索 + 语音回复）的聊天：
-        由 AI 自主决定是否检索、是否联网搜索、是否用语音回复。
+        带工具调用（知识库检索 + 联网搜索 + 语音回复 + 连发消息）的聊天：
+        由 AI 自主决定是否检索、是否联网搜索、是否用语音回复、是否多回几句。
 
         Args:
             kb_ids: 可选的知识库ID列表，为None时使用默认配置
             web_search_client: 可选的博查联网搜索客户端
+            allow_followup: 是否允许 AI 在主回复之外补发额外消息
+            force_followup: >0 时强制本轮消息总条数不少于该值（关键词触发）
         """
         base_messages = [
             {
@@ -472,6 +511,8 @@ class AIService:
             tools.append(WEB_SEARCH_TOOL)
         if allow_voice:
             tools.append(SEND_VOICE_TOOL)
+        if allow_followup:
+            tools.append(SEND_FOLLOWUP_TOOL)
 
         request_start = time.time()
         self.ai_logger.info(f"开始调用 API (chat_with_tools)，model={self.model}")
@@ -497,7 +538,7 @@ class AIService:
 
         first_msg = resp.choices[0].message
         content = first_msg.content or ""
-        voice_text, voice_instruct, queries, web_queries = self._parse_tool_calls(
+        voice_text, voice_instruct, queries, web_queries, followups = self._parse_tool_calls(
             getattr(first_msg, "tool_calls", None) or [], content
         )
 
@@ -543,27 +584,96 @@ class AIService:
                     self.db.increment_stat("ai_request_count")
                 second_msg = resp2.choices[0].message
                 content = second_msg.content or ""
-                v2, i2, _, _ = self._parse_tool_calls(
+                v2, i2, _, _, f2 = self._parse_tool_calls(
                     getattr(second_msg, "tool_calls", None) or [], content
                 )
                 if v2:
                     voice_text, voice_instruct = v2, i2
+                followups = f2
             except Exception as e:
                 self.ai_logger.warning(f"二次生成失败，使用首次结果: {e}")
+
+        # 关键词强制连发：用户明确要求多说几句时，补足消息条数（语音优先，不补）
+        if force_followup > 0 and not voice_text:
+            current_total = (1 if content.strip() else 0) + len(followups)
+            deficit = force_followup - current_total
+            if deficit > 0:
+                self.ai_logger.info(
+                    f"强制连发：目标 {force_followup} 条，当前 {current_total} 条，补充 {deficit} 条"
+                )
+                seed_messages = list(base_messages)
+                if content.strip():
+                    seed_messages = seed_messages + [{"role": "assistant", "content": content}]
+                extra_lines = await self._generate_followup_lines(
+                    seed_messages, deficit, system_prompt=system_prompt
+                )
+                followups.extend(extra_lines)
 
         if voice_text:
             self.ai_logger.info(
                 f"AI 决定语音回复: {voice_text[:30]} (instruct={voice_instruct or '默认'})"
             )
-        return ChatResult(text=content, voice_text=voice_text, voice_instruct=voice_instruct)
+        if followups:
+            self.ai_logger.info(f"AI 决定连发消息，共补发 {len(followups)} 条: {followups}")
+        return ChatResult(
+            text=content,
+            voice_text=voice_text,
+            voice_instruct=voice_instruct,
+            followups=followups,
+        )
+
+    async def _generate_followup_lines(
+        self,
+        messages: list[dict],
+        count: int,
+        system_prompt: Optional[str] = None,
+    ) -> list[str]:
+        """强制连发兜底：在已有回复基础上，让模型再补 count 句很短的话（每句一行）"""
+        if count <= 0:
+            return []
+        sys_prompt = (system_prompt or self.system_prompt) + (
+            f"\n\n## 补充消息\n"
+            f"用户要求你多说几句。请在已有回复的基础上，再用你的口吻补 {count} 句话，"
+            f"每句话单独占一行，每句都很短（15 字以内），"
+            f"不要编号、不要标点符号、不要解释、不要重复，也不要再接话头。"
+            f"直接输出这 {count} 行，不要输出其它内容。"
+        )
+        try:
+            resp = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "system", "content": sys_prompt}] + list(messages),
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                timeout=120.0,
+            )
+        except Exception as e:
+            self.ai_logger.warning(f"补充消息生成失败: {e}")
+            return []
+
+        if self.db:
+            self.db.increment_stat("ai_request_count")
+
+        text = (resp.choices[0].message.content or "").strip() if resp.choices else ""
+        lines: list[str] = []
+        for line in re.split(r"[\r\n]+", text):
+            line = line.strip().strip("，。！？、；：\"'（）【】《》 ")
+            line = re.sub(r"^\s*\d+[.、)]\s*", "", line)
+            if line:
+                lines.append(line)
+            if len(lines) >= count:
+                break
+        return lines
+
 
     @staticmethod
     def _parse_tool_calls(tool_calls, content: str):
-        """解析工具调用，返回 (voice_text, voice_instruct, rag_queries, web_queries)"""
+        """解析工具调用，返回 (voice_text, voice_instruct, rag_queries, web_queries, followups)"""
         voice_text = ""
         voice_instruct = ""
         queries: list[str] = []
         web_queries: list[str] = []
+        followups: list[str] = []
         for tc in tool_calls:
             name = getattr(getattr(tc, "function", None), "name", "") or ""
             try:
@@ -583,6 +693,10 @@ class AIService:
                 if t:
                     voice_text = t
                     voice_instruct = str(args.get("instruct") or "").strip()
+            elif name == "send_followup":
+                t = str(args.get("text") or "").strip()
+                if t:
+                    followups.append(t)
 
         # 兼容文本形式的 send_voice 调用
         if not voice_text and "send_voice" in (content or ""):
@@ -598,7 +712,20 @@ class AIService:
             web_queries = AIService._extract_query_from_tool_call(
                 content, tool_name="web_search"
             )
-        return voice_text, voice_instruct, queries, web_queries
+
+        # 兼容文本形式的 send_followup 调用
+        if not followups and "send_followup" in (content or ""):
+            for m in re.finditer(r"\"text\"\s*:\s*\"([^\"]+)\"", content):
+                t = m.group(1).strip()
+                if t:
+                    followups.append(t)
+            if not followups:
+                for m in re.finditer(r"<parameter=text[^>]*>(.*?)</parameter>", content, re.DOTALL):
+                    t = m.group(1).strip()
+                    if t:
+                        followups.append(t)
+
+        return voice_text, voice_instruct, queries, web_queries, followups
 
     @staticmethod
     def _extract_query_from_tool_call(text: str, tool_name: str = "search_knowledge_base") -> list[str]:

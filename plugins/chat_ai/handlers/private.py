@@ -1,5 +1,7 @@
 import time
 import base64
+import asyncio
+import random
 
 from nonebot import on_message, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, PrivateMessageEvent
@@ -8,7 +10,15 @@ from nonebot.exception import FinishedException
 from ..config import Config
 from .. import state
 from ..state import db, user_histories, init_ai_service, get_user_history, set_user_history
-from ..utils.helpers import clean_history_images, get_keywords_prompt, get_time_hint
+from ..utils.helpers import (
+    clean_history_images,
+    get_keywords_prompt,
+    get_time_hint,
+    MULTI_MESSAGE_HINT,
+    FORCE_MULTI_HINT,
+    should_force_multi_message,
+    is_meta_decline,
+)
 from ..utils.forward import extract_forward_text
 from ..utils.tts import synthesize
 
@@ -110,16 +120,36 @@ async def handle_private_msg(event: MessageEvent):
         keywords_prompt = get_keywords_prompt()
         time_prompt = get_time_hint()
         system_prompt = state.ai_service.system_prompt + keywords_prompt + time_prompt
+        if config.multi_message_enabled:
+            system_prompt += MULTI_MESSAGE_HINT
+
+        # 关键词强制连发：用户明确要求"多说几句"
+        force_trigger = (
+            config.multi_message_enabled
+            and config.multi_message_force_enabled
+            and should_force_multi_message(user_message)
+        )
+        force_target = 0
+        if force_trigger:
+            force_target = random.randint(
+                min(config.multi_message_force_min, config.multi_message_force_max),
+                max(config.multi_message_force_min, config.multi_message_force_max),
+            )
+            force_target = max(2, min(force_target, config.multi_message_max))
+            system_prompt += FORCE_MULTI_HINT.format(n=max(1, force_target - 1))
+            logger.info(f"关键词触发强制连发 用户:{user_id} 目标条数:{force_target}")
 
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
 
-        # RAGFlow 检索 + 联网搜索 + 语音工具（AI 自主决定是否检索、是否搜索、是否用语音回复）
+        # RAGFlow 检索 + 联网搜索 + 语音 + 连发消息（AI 自主决定）
         result = await state.ai_service.chat_with_tools(
             messages=cleaned_history,
             system_prompt=system_prompt,
             rag_client=state.ragflow_client if user_message else None,
-            allow_voice=config.tts_enabled,
+            allow_voice=config.tts_enabled and not force_trigger,
+            allow_followup=config.multi_message_enabled,
+            force_followup=force_target,
             web_search_client=state.web_search_client if user_message else None,
         )
 
@@ -147,16 +177,33 @@ async def handle_private_msg(event: MessageEvent):
 
         reply = result.text
 
+        # 连发消息：正文之外，AI 可主动补发若干条（过滤空内容和判断性回复）
+        extra_messages: list[str] = []
+        if config.multi_message_enabled:
+            for extra in result.followups:
+                extra = (extra or "").strip()
+                if not extra or is_meta_decline(extra):
+                    continue
+                extra_messages.append(extra)
+            extra_messages = extra_messages[: max(0, config.multi_message_max - 1)]
+
         # 空回复兜底：不发送、不写入历史（MiMo 偶发返回空内容）
-        if not reply or not reply.strip():
+        if (not reply or not reply.strip()) and not extra_messages:
             logger.warning(f"AI 返回空回复，静默跳过 用户:{user_id}")
             await private_msg.finish()
 
-        # 添加助手回复到历史
-        history.append({
-            "role": "assistant",
-            "content": reply,
-        })
+        # 组装本轮要发送的所有消息
+        messages_to_send = ([reply.strip()] if reply and reply.strip() else []) + extra_messages
+        if not messages_to_send:
+            logger.warning(f"AI 回复全部无效，静默跳过 用户:{user_id}")
+            await private_msg.finish()
+
+        # 逐条写入历史
+        for m in messages_to_send:
+            history.append({
+                "role": "assistant",
+                "content": m,
+            })
 
         # 限制历史记录长度
         if len(history) > config.ai_context_limit:
@@ -165,8 +212,14 @@ async def handle_private_msg(event: MessageEvent):
         # AI 回复后更新缓存
         await set_user_history(user_id, history)
 
-        logger.info(f"私聊回复 用户:{user_id} 回复:{reply}")
-        await private_msg.finish(reply)
+        logger.info(
+            f"私聊回复 用户:{user_id} 共 {len(messages_to_send)} 条 回复:{messages_to_send}"
+        )
+        await private_msg.send(messages_to_send[0])
+        for extra in messages_to_send[1:]:
+            await asyncio.sleep(random.uniform(0.6, 1.4))
+            await private_msg.send(extra)
+        await private_msg.finish()
 
     except FinishedException:
         raise

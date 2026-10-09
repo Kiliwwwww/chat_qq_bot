@@ -42,6 +42,9 @@ from ..utils.helpers import (
     get_keywords_prompt,
     get_time_hint,
     NO_META_RULE,
+    MULTI_MESSAGE_HINT,
+    FORCE_MULTI_HINT,
+    should_force_multi_message,
     is_meta_decline,
     check_repeater,
     update_recent_messages,
@@ -79,7 +82,11 @@ member_join = on_notice()
 
 @reset_cmd.handle()
 async def handle_reset(event: MessageEvent):
-    """重置对话历史"""
+    """重置对话历史（仅管理员可用）"""
+    config = get_plugin_config(Config)
+    if event.user_id != config.admin_qq:
+        return
+
     user_id = event.user_id
     reset_anything = False
 
@@ -371,6 +378,13 @@ async def handle_group_msg(event: MessageEvent):
         if repeat_msg:
             await group_msg.finish(repeat_msg)
 
+    # 关键词强制连发：仅作为"已决定回复"之后的增强，不单独召唤机器人
+    force_trigger = (
+        config.multi_message_enabled
+        and config.multi_message_force_enabled
+        and should_force_multi_message(user_message)
+    )
+
     # 冷却检查：防止短时间内重复回复同一群（被@时跳过冷却检查）
     current_time = time.time()
     if not is_at_me and group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
@@ -399,11 +413,24 @@ async def handle_group_msg(event: MessageEvent):
             state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt
             + time_prompt + NO_META_RULE
         )
+        if config.multi_message_enabled:
+            system_prompt += MULTI_MESSAGE_HINT
+
+        # 关键词强制连发：计算本轮目标条数
+        force_target = 0
+        if force_trigger:
+            force_target = random.randint(
+                min(config.multi_message_force_min, config.multi_message_force_max),
+                max(config.multi_message_force_min, config.multi_message_force_max),
+            )
+            force_target = max(2, min(force_target, config.multi_message_max))
+            system_prompt += FORCE_MULTI_HINT.format(n=max(1, force_target - 1))
+            logger.info(f"关键词触发强制连发 群:{group_id} 目标条数:{force_target}")
 
         # 清理历史记录中的图片，只保留最新消息的图片
         cleaned_history = clean_history_images(history)
 
-        # RAGFlow 检索 + 联网搜索 + 语音工具（由 AI 自主决定是否检索、是否搜索、是否用语音回复）
+        # RAGFlow 检索 + 联网搜索 + 语音 + 连发消息（由 AI 自主决定）
         # 群聊使用群绑定的知识库，不使用全局配置
         group_kb_id = state.kb_groups.get(group_id)
         group_kb_ids = [group_kb_id] if group_kb_id else None
@@ -411,7 +438,9 @@ async def handle_group_msg(event: MessageEvent):
             messages=cleaned_history,
             system_prompt=system_prompt,
             rag_client=state.ragflow_client if user_message else None,
-            allow_voice=config.tts_enabled,
+            allow_voice=config.tts_enabled and not force_trigger,
+            allow_followup=config.multi_message_enabled,
+            force_followup=force_target,
             kb_ids=group_kb_ids,
             web_search_client=state.web_search_client if user_message else None,
         )
@@ -440,22 +469,41 @@ async def handle_group_msg(event: MessageEvent):
 
         reply = result.text
 
+        # 连发消息：正文之外，AI 可主动补发若干条（过滤空内容和判断性回复）
+        extra_messages: list[str] = []
+        if config.multi_message_enabled:
+            for extra in result.followups:
+                extra = (extra or "").strip()
+                if not extra or is_meta_decline(extra):
+                    continue
+                extra_messages.append(extra)
+            # 单轮总条数上限（含主回复）
+            extra_messages = extra_messages[: max(0, config.multi_message_max - 1)]
+
         # 空回复兜底：不发送、不写入历史（MiMo 偶发返回空内容）
-        if not reply or not reply.strip():
+        if (not reply or not reply.strip()) and not extra_messages:
             logger.warning(f"AI 返回空回复，静默跳过 群:{group_id}")
             group_last_reply[group_id] = time.time()
             await group_msg.finish()
 
         # 拦截 AI 泄露的判断性回复（如"不用回复，跟我没关系"），静默不发送
-        if is_meta_decline(reply):
+        if reply and is_meta_decline(reply):
             logger.info(f"AI 输出判断性回复，已拦截不发送 群:{group_id} 回复:{reply}")
+            reply = ""
+
+        # 组装本轮要发送的所有消息
+        messages_to_send = ([reply.strip()] if reply and reply.strip() else []) + extra_messages
+        if not messages_to_send:
+            logger.warning(f"AI 回复全部无效，静默跳过 群:{group_id}")
             group_last_reply[group_id] = time.time()
             await group_msg.finish()
 
-        history.append({
-            "role": "assistant",
-            "content": reply,
-        })
+        # 逐条写入历史
+        for m in messages_to_send:
+            history.append({
+                "role": "assistant",
+                "content": m,
+            })
 
         # 限制历史记录长度
         if len(history) > config.ai_context_limit:
@@ -466,13 +514,21 @@ async def handle_group_msg(event: MessageEvent):
 
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
-        logger.info(f"群消息已回复 群:{group_id} 消息:{user_message[:20]}... 回复:{reply}")
+        logger.info(
+            f"群消息已回复 群:{group_id} 消息:{user_message[:20]}... "
+            f"共 {len(messages_to_send)} 条 回复:{messages_to_send}"
+        )
 
-        # 被@时回复原消息
+        # 被@时第一条引用原消息，其余作为连续补发的消息
+        first_reply = messages_to_send[0]
         if is_at_me:
-            await group_msg.finish(MessageSegment.reply(event.message_id) + reply)
+            await group_msg.send(MessageSegment.reply(event.message_id) + first_reply)
         else:
-            await group_msg.finish(reply)
+            await group_msg.send(first_reply)
+        for extra in messages_to_send[1:]:
+            await asyncio.sleep(random.uniform(0.6, 1.4))
+            await group_msg.send(extra)
+        await group_msg.finish()
 
     except FinishedException:
         raise

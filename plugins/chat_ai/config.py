@@ -29,6 +29,16 @@ class Config(BaseModel):
     # 随机复读群友消息概率 (0.0~1.0)
     random_repeat_chance: float = 0.03
     
+    # 连发消息：允许 AI 判断是否需要多回几句（在主回复之外补发消息）
+    multi_message_enabled: bool = True
+    # 连发时单轮最多发送的消息总条数（含主回复）
+    multi_message_max: int = 3
+    # 关键词强制连发：群友明确要求"多说几句"时固定连发
+    multi_message_force_enabled: bool = True
+    # 强制连发时的随机条数范围（含主回复）
+    multi_message_force_min: int = 2
+    multi_message_force_max: int = 3
+    
     # 全体贴表情概率 (0.0~1.0)
     group_emoji_chance: float = 0.3
     
