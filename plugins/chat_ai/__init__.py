@@ -31,11 +31,12 @@ from .commands import (
     kb_list_cmd,
     kb_upload_cmd,
     send_cmd,
+    today_news_cmd,
     tts_cmd,
     send_voice_cmd,
     voice_style_cmd,
 )
-from .commands.scheduler import daily_kb_upload
+from .commands.scheduler import daily_kb_upload, daily_news_push
 from .handlers import private_msg, group_msg, reset_cmd, member_join
 
 # 初始化配置
@@ -71,10 +72,12 @@ __all__ = [
     "kb_list_cmd",
     "kb_upload_cmd",
     "send_cmd",
+    "today_news_cmd",
     "tts_cmd",
     "send_voice_cmd",
     "voice_style_cmd",
     "daily_kb_upload",
+    "daily_news_push",
     "private_msg",
     "group_msg",
     "reset_cmd",

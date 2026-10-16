@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import asyncio
 import random
@@ -12,6 +13,7 @@ from plugins.meme_sync import meme_library
 
 from ..config import Config
 from .. import state
+from ..news import fetch_news, format_news_text, send_news_to_all_groups
 from ..state import (
     db,
     CHAT_LOG_DIR,
@@ -21,6 +23,9 @@ from ..state import (
 )
 from ..utils.helpers import get_time_period
 from ..summarizer import generate_summary
+
+# 模块级配置：定时任务在注册时就要读到时间等参数
+plugin_config = get_plugin_config(Config)
 
 # 各时间段预设冒泡语（带铃月弥口语风格，无标点）
 BUBBLE_PRESET_LINES = {
@@ -224,3 +229,42 @@ async def group_bubble_check():
                     await bot.send_group_msg(group_id=group_id, message=meme_seg)
                 except Exception as e:
                     logger.warning(f"冒泡后发送表情包失败 群:{group_id} 图片:{meme_name}: {e}")
+
+
+@scheduler.scheduled_job(
+    "cron",
+    hour=plugin_config.daily_news_hour,
+    minute=plugin_config.daily_news_minute,
+    timezone=ZoneInfo(plugin_config.daily_news_timezone),
+    id="daily_news_push",
+    coalesce=True,
+    max_instances=1,
+    misfire_grace_time=3600,
+)
+async def daily_news_push():
+    """每天早上定时把微博热搜 + 知乎热榜推送到 groupsettings 里的所有群"""
+    if not plugin_config.daily_news_enabled:
+        return
+
+    logger.info(
+        "开始执行今日新闻推送"
+        f"（{plugin_config.daily_news_timezone} "
+        f"{plugin_config.daily_news_hour:02d}:{plugin_config.daily_news_minute:02d}）"
+    )
+
+    try:
+        weibo, zhihu = await fetch_news(
+            plugin_config.daily_news_weibo_count,
+            plugin_config.daily_news_zhihu_count,
+        )
+        if not weibo and not zhihu:
+            logger.error("今日新闻：微博热搜和知乎热榜都没抓到数据，跳过本次推送")
+            return
+
+        text = format_news_text(weibo, zhihu)
+        ok, fail = await send_news_to_all_groups(text)
+    except Exception as e:  # noqa: BLE001 - 定时任务不能把异常抛给调度器
+        logger.error(f"今日新闻推送失败: {e}")
+        return
+
+    logger.info(f"今日新闻推送完成：成功 {ok} 个群，失败 {fail} 个群")

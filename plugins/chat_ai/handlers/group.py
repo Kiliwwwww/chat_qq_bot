@@ -429,15 +429,19 @@ async def handle_group_msg(event: MessageEvent):
             system_prompt += FORCE_MULTI_HINT.format(n=max(1, force_target - 1))
             logger.info(f"关键词触发强制连发 群:{group_id} 目标条数:{force_target}")
 
-        # 清理历史记录中的图片，只保留最新消息的图片
-        cleaned_history = clean_history_images(history)
+        # 历史记录中的图片默认保留（最近 ai_context_limit 条里的图都会发给 AI），
+        # 需要退回旧的"只保留最新一条消息的图片"行为时把开关打开
+        if config.history_image_clean_enabled:
+            request_history = clean_history_images(history)
+        else:
+            request_history = history
 
         # RAGFlow 检索 + 联网搜索 + 语音 + 连发消息（由 AI 自主决定）
         # 群聊使用群绑定的知识库，不使用全局配置
         group_kb_id = state.kb_groups.get(group_id)
         group_kb_ids = [group_kb_id] if group_kb_id else None
         result = await state.ai_service.chat_with_tools(
-            messages=cleaned_history,
+            messages=request_history,
             system_prompt=system_prompt,
             rag_client=state.ragflow_client if user_message else None,
             allow_voice=config.tts_enabled and not force_trigger,

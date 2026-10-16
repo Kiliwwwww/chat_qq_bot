@@ -101,7 +101,11 @@ def is_meta_decline(text: str) -> bool:
 
 def clean_history_images(messages: list[dict]) -> list[dict]:
     """清理历史记录中的图片，只保留最新一条消息的图片（其URL最新），
-    历史消息的图片URL可能已过期，只保留文本，避免发给AI时下载失败"""
+    历史消息的图片URL可能已过期，只保留文本，避免发给AI时下载失败。
+
+    默认不再调用（图片会随 ai_context_limit 条历史一起发给 AI），
+    只有把 history_image_clean_enabled 打开时才启用。
+    """
     if not messages:
         return messages
 

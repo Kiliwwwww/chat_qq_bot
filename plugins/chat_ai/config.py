@@ -16,6 +16,11 @@ class Config(BaseModel):
     
     # 上下文历史记录条数
     ai_context_limit: int = 50
+
+    # 历史记录里的图片是否清理
+    # False（默认）：最近 ai_context_limit 条消息里的图片都保留并发给 AI
+    # True：只保留最新一条消息的图片，更早的图片退化成纯文本
+    history_image_clean_enabled: bool = False
     
     # 管理员QQ号
     admin_qq: int = 1154798056
@@ -51,6 +56,16 @@ class Config(BaseModel):
     bubble_cooldown_minutes: int = 180
     bubble_chance: float = 0.5
     bubble_ai_enabled: bool = True
+
+    # 今日新闻（微博热搜 + 知乎热榜，推送到 groupsettings 里的所有群）
+    daily_news_enabled: bool = True
+    # 每天早上几点几分推送（按 daily_news_timezone 计时）
+    daily_news_hour: int = 9
+    daily_news_minute: int = 0
+    daily_news_timezone: str = "Asia/Shanghai"
+    # 两个榜单分别取前几条
+    daily_news_weibo_count: int = 5
+    daily_news_zhihu_count: int = 5
 
     # 调试日志开关
     ai_debug_log: bool = False
