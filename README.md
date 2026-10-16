@@ -12,6 +12,7 @@
 | `daily_wife` | 今日老婆 / 原神家庭（头像合成图片） |
 | `tarot` | 今日运势（塔罗 / 小六壬，基于 QQ+日期的确定性占卜） |
 | `lottery` | 补给箱开箱抽奖（网页高保真 GIF、每日三次、结果查询） |
+| `meme_sync` | 奶-hub 表情包每日自动同步（增量下载、已存在跳过） |
 | `xiuxian` | QQ 群修仙挂机游戏 |
 
 此外，项目内置一个基于 **Qwen3-TTS** 的本地语音合成服务 `qwen-tts`（独立 Docker 服务），提供语音朗读与 AI 自主语音回复能力，详见 [语音功能](#语音功能qwen3-tts)。
@@ -36,6 +37,7 @@
 - **今日老婆 / 原神家庭**：每日抽取 CP 并合成头像图片
 - **今日运势**：以 QQ 号+日期为种子确定性占卜，支持塔罗牌（现状/挑战/指引）与小六壬（六宫排盘）
 - **补给箱开箱**：使用网页高保真截图生成 GIF，每个 QQ 号每天最多抽三次，并保存今日物品与价值
+- **表情包自动同步**：每天定时拉取 [奶-hub](https://nai-hub.com/) 最新表情包，增量下载并自动跳过已有文件
 - **修仙游戏**：完整的挂机修仙玩法（灵修 + 蛊修）
 - **语音朗读**：本地 Qwen3-TTS 合成语音，支持 `/朗读`、定向群发语音；AI 可自主决定用语音回怼
 
@@ -171,6 +173,14 @@ OneBot 反向 WebSocket 连接地址：`ws://localhost:8080/onebot/v11/ws`。
 
 抽奖规则与 `data/lottery.html` 一致：按稀有度概率抽取、每次乱序展示、避免连续抽到同一物品。同一个 QQ 号每天全局最多三次，按 `Asia/Shanghai` 日期重置；结果保存在 SQLite，GIF 保存在 `data/lottery/gifs/`。
 
+### 表情包同步（meme_sync）
+
+| 命令 | 别名 | 说明 |
+|------|------|------|
+| `/同步表情包` | `/表情包同步` | 立即同步一次奶-hub 表情包（仅管理员） |
+
+每天 0 点（可配置）自动从 [奶-hub](https://nai-hub.com/) 拉取最新表情包，已下载过的文件直接跳过，只补新增内容，因此不会重复占空间。图片按「角色 / 分类」存放到 `data/naihub-img/`，并生成 `_index.json` 记录每张图的标题、分类、标签与来源。下载优先直连 GitHub，连不上时自动切换到镜像加速入口。
+
 ### 修仙游戏（xiuxian）
 
 发送 `/我要修仙` 开启仙途，`/灵修帮助` 或 `/蛊修帮助` 查看完整玩法说明。常用命令：
@@ -281,6 +291,23 @@ AI 通过 function calling 获得 `send_voice` 工具，可自主决定是否用
 | `ai_debug_log` | `false` | 是否启用 AI 调试日志 |
 | `NICKNAME` | `[]` | 机器人昵称（建议留空） |
 
+### 表情包同步（meme_sync）
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `meme_sync_enabled` | `true` | 是否开启每日自动同步 |
+| `meme_sync_hour` | `0` | 每天执行的小时（24 小时制） |
+| `meme_sync_minute` | `0` | 每天执行的分钟 |
+| `meme_sync_timezone` | `Asia/Shanghai` | 定时所用时区 |
+| `meme_sync_workers` | `8` | 并发下载数 |
+| `meme_sync_timeout` | `30` | 单张图片超时秒数 |
+| `meme_sync_route` | `auto` | 下载入口：`auto` 自动探测 / `direct` 直连 / `p0` `p1` `p2` 指定镜像 |
+| `meme_sync_chars` | 空 | 只同步指定角色，逗号分隔（`naiwa,naidan,nai-emblem,others`），留空为全部 |
+| `meme_sync_subs` | 空 | 只同步指定分类，逗号分隔（`animated,static`），留空为全部 |
+| `meme_sync_out_dir` | `data/naihub-img` | 图片保存目录 |
+
+以上配置都有默认值，不写也能正常工作；需要改时间或筛选时才加到 `.env`。
+
 ### 主动冒泡（chat_ai）
 
 | 配置项 | 默认值 | 说明 |
@@ -365,6 +392,10 @@ qqbot/
     │   ├── tarot_deck.py   # 78 张牌组与确定性抽牌
     │   ├── xiaoliuren.py   # 小六壬六宫推演
     │   └── calendar_util.py# 阳历/农历日期格式化
+    ├── meme_sync/          # 奶-hub 表情包每日同步插件
+    │   ├── __init__.py     # 定时任务与管理员手动命令
+    │   ├── naihub.py       # 清单解析与增量下载核心（纯标准库）
+    │   └── config.py       # 配置模型
     └── xiuxian/            # 修仙挂机游戏插件
         ├── commands/       # 指令层
         ├── services/       # 业务逻辑层
@@ -385,4 +416,5 @@ qqbot/
 - 微博功能仅支持私聊使用，需要用户在白名单中
 - 欢迎语功能需要机器人具有群成员加入通知权限
 - 修仙插件数据按群隔离存储于 SQLite，Redis 不可用时自动降级为内存缓存（重启后丢失）
+- 表情包同步默认每天 0 点自动执行，下载的是第三方仓库的公开表情图，请遵守原仓库的许可与使用范围
 - 语音功能依赖本地 `qwen-tts` 服务（需 NVIDIA GPU 及容器 GPU 直通），首次启动下载约 5GB 模型到 `./qwen-tts/cache`；设置 `tts_enabled=false` 可禁用全部语音能力

@@ -15,6 +15,7 @@ data/lottery/*.db
 data/lottery/*.db-wal
 data/lottery/*.db-shm
 data/lottery/gifs/
+data/naihub-img/
 .DS_Store
 *.md
 !README.md
