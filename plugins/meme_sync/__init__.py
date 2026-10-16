@@ -114,6 +114,7 @@ async def _handle_sync_cmd(event: MessageEvent) -> None:
 meme_on_cmd = on_command("开启奶龙", priority=5, block=True)
 meme_off_cmd = on_command("关闭奶龙", priority=5, block=True)
 meme_status_cmd = on_command("奶龙状态", priority=5, block=True)
+today_meme_cmd = on_command("今日奶龙", priority=5, block=True)
 
 
 def _group_scope(event: MessageEvent) -> int | None:
@@ -160,3 +161,18 @@ async def _handle_meme_status(event: MessageEvent) -> None:
         f"奶龙表情包：{state_text}；表情库 {count} 张；"
         f"每次回复后单独发一张的概率 {meme_library.reply_meme_chance():.0%}"
     )
+
+
+@today_meme_cmd.handle()
+async def _handle_today_meme(event: MessageEvent) -> None:
+    """群成员发送 /今日奶龙，随机回一张表情包（不引用、不 @ 任何人）。"""
+    if not isinstance(event, GroupMessageEvent):
+        await today_meme_cmd.finish("这个只能在群里玩哦")
+    if not meme_library.is_group_enabled(event.group_id):
+        await today_meme_cmd.finish("本群还没开启奶龙表情包，管理员发 /开启奶龙 就能打开")
+    picked = await meme_library.random_image_segment()
+    if picked is None:
+        await today_meme_cmd.finish("表情库还是空的，等同步完成后再试试")
+    meme_seg, meme_name = picked
+    logger.info(f"今日奶龙 群:{event.group_id} 用户:{event.user_id} 图片:{meme_name}")
+    await today_meme_cmd.finish(meme_seg)
