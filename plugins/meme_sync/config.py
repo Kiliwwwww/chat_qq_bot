@@ -24,5 +24,16 @@ class Config(BaseModel):
     meme_sync_subs: str = ""
     # 图片保存位置
     meme_sync_out_dir: Path = DATA_DIR / "naihub-img"
+
+    # 开启奶龙表情包功能的群号（也可在群里用 /开启奶龙 动态开关）
+    meme_group_ids: list[int] = []
+    # AI 回复附带一张随机表情包的概率（1.0 表示每条都带）
+    meme_attach_chance: float = 1.0
+    # 回复群友之后，额外单独发一张表情包的概率（不回复任何人，直接发群里）
+    meme_standalone_chance: float = 0.2
+    # 主动冒泡消息是否也附带表情包
+    meme_bubble_attach: bool = True
+    # 群开关状态文件
+    meme_groups_file: Path = DATA_DIR / "meme_sync" / "groups.json"
     # 手动触发同步的管理员 QQ
     admin_qq: int = 1154798056

@@ -51,6 +51,8 @@ from ..utils.helpers import (
 )
 from ..utils.tts import synthesize
 from ..utils.forward import extract_forward_text
+# 奶龙表情包（本地表情库 + 群开关），详见 plugins/meme_sync
+from plugins.meme_sync import meme_library
 
 reset_cmd = on_command("reset", aliases={"重置对话"}, priority=5, block=True)
 
@@ -519,15 +521,31 @@ async def handle_group_msg(event: MessageEvent):
             f"共 {len(messages_to_send)} 条 回复:{messages_to_send}"
         )
 
+        # 奶龙表情包：开启了该功能的群里，AI 回复会带一张随机表情包
+        meme_on = meme_library.is_group_enabled(group_id)
+
         # 被@时第一条引用原消息，其余作为连续补发的消息
         first_reply = messages_to_send[0]
+        first_msg = Message(first_reply)
         if is_at_me:
-            await group_msg.send(MessageSegment.reply(event.message_id) + first_reply)
-        else:
-            await group_msg.send(first_reply)
+            first_msg = MessageSegment.reply(event.message_id) + first_msg
+        if meme_on and random.random() < meme_library.attach_chance():
+            meme_seg = meme_library.random_image_segment()
+            if meme_seg is not None:
+                first_msg += meme_seg
+                logger.info(f"AI 回复附带表情包 群:{group_id} 图片:{meme_seg.data.get('file')}")
+        await group_msg.send(first_msg)
         for extra in messages_to_send[1:]:
             await asyncio.sleep(random.uniform(0.6, 1.4))
             await group_msg.send(extra)
+
+        # 一定概率额外单独甩一张表情包（不回复任何人，直接发群里）
+        if meme_on and random.random() < meme_library.standalone_chance():
+            meme_seg = meme_library.random_image_segment()
+            if meme_seg is not None:
+                await asyncio.sleep(random.uniform(0.8, 1.6))
+                await group_msg.send(meme_seg)
+                logger.info(f"单独发送表情包 群:{group_id} 图片:{meme_seg.data.get('file')}")
         await group_msg.finish()
 
     except FinishedException:

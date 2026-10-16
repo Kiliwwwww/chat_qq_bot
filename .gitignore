@@ -15,3 +15,4 @@ qwen-tts/__pycache__/
 *.wav
 data/naihub-img/
 data/lottery/
+data/meme_sync/

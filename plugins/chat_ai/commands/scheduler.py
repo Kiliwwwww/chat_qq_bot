@@ -6,7 +6,10 @@ import random
 import time
 
 from nonebot import get_plugin_config, require, logger, get_bot
+from nonebot.adapters.onebot.v11 import Message
 from nonebot_plugin_apscheduler import scheduler
+
+from plugins.meme_sync import meme_library
 
 from ..config import Config
 from .. import state
@@ -206,7 +209,13 @@ async def group_bubble_check():
 
         content = await _generate_bubble(group_id)
         try:
-            await bot.send_group_msg(group_id=group_id, message=content)
+            bubble_msg = Message(content)
+            # 奶龙表情包：开启该功能的群里，冒泡消息也带一张随机表情包
+            if meme_library.is_group_enabled(group_id) and meme_library.bubble_attach_enabled():
+                meme_seg = meme_library.random_image_segment()
+                if meme_seg is not None:
+                    bubble_msg += meme_seg
+            await bot.send_group_msg(group_id=group_id, message=bubble_msg)
             group_last_bubble[group_id] = time.time()
             logger.info(f"主动冒泡 群:{group_id} 内容:{content}")
         except Exception as e:
