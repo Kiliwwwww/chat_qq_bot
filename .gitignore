@@ -13,3 +13,5 @@ qwen-tts/cache/
 qwen-tts/__pycache__/
 *.mp3
 *.wav
+data/naihub-img/
+data/lottery/

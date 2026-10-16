@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>补给箱开箱抽奖</title>
+  <style>
+    :root {
+      --bg: #070a0f;
+      --panel: rgba(12, 18, 27, .94);
+      --panel-2: rgba(17, 25, 36, .96);
+      --line: rgba(148, 169, 192, .16);
+      --text: #edf4fb;
+      --muted: #91a0b2;
+      --accent: #f3a62b;
+      --accent-2: #ef7e20;
+      --rarity-color: #e7edf5;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% -15%, rgba(54, 86, 123, .24), transparent 42%),
+        linear-gradient(180deg, #080c12 0%, #06090e 100%);
+      font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .34;
+      background-image:
+        linear-gradient(rgba(132, 154, 181, .07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(132, 154, 181, .07) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(to bottom, #000 0%, transparent 86%);
+    }
+
+    button { font: inherit; }
+
+    .app {
+      width: min(1480px, calc(100% - 34px));
+      margin: 0 auto;
+      padding: 28px 0 34px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: #7e91a7;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 38px);
+      line-height: 1.1;
+      letter-spacing: .03em;
+    }
+
+    .odds {
+      max-width: 600px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(12, 18, 27, .72);
+      color: #9eacbc;
+      font-size: 12px;
+      line-height: 1.7;
+      text-align: right;
+    }
+
+    .odds strong { color: #dfe9f3; font-weight: 700; }
+
+    .reel-panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(149, 174, 202, .22);
+      border-radius: 22px;
+      background:
+        linear-gradient(180deg, rgba(18, 27, 40, .97), rgba(8, 13, 20, .98));
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .36), inset 0 1px 0 rgba(255, 255, 255, .035);
+    }
+
+    .reel-panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(5, 8, 12, .88), transparent 17%, transparent 83%, rgba(5, 8, 12, .88));
+      z-index: 4;
+    }
+
+    .reel-viewport {
+      height: 214px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+
+    .reel-track {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 0;
+      will-change: transform;
+      transform: translate3d(0, 0, 0);
+      transition: transform var(--draw-duration, 4.7s) cubic-bezier(.1, .77, .12, 1);
+    }
+
+    .reel-card {
+      --rarity-color: #e7edf5;
+      flex: 0 0 154px;
+      height: 178px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 17px 10px 15px;
+      overflow: hidden;
+      border: 1px solid rgba(155, 177, 201, .2);
+      border-radius: 17px;
+      background:
+        linear-gradient(180deg, rgba(31, 43, 59, .96), rgba(14, 21, 31, .98));
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .25);
+      transition: transform .32s ease, border-color .32s ease, box-shadow .32s ease, filter .32s ease;
+    }
+
+    .reel-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--rarity-color) 15%, transparent), transparent 57%);
+      opacity: .75;
+      pointer-events: none;
+    }
+
+    .reel-card::after {
+      content: "";
+      position: absolute;
+      left: 13px;
+      right: 13px;
+      bottom: 0;
+      height: 4px;
+      border-radius: 5px 5px 0 0;
+      background: var(--rarity-color);
+      box-shadow: 0 0 13px color-mix(in srgb, var(--rarity-color) 68%, transparent);
+    }
+
+    .reel-card img {
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+      position: relative;
+      z-index: 1;
+      filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .44));
+    }
+
+    .reel-card .card-name {
+      position: relative;
+      z-index: 1;
+      max-width: 100%;
+      color: #d9e3ed;
+      font-size: 14px;
+      line-height: 1.3;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .reel-card.is-winner {
+      z-index: 5;
+      border-color: var(--rarity-color);
+      box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--rarity-color) 65%, transparent),
+        0 0 30px color-mix(in srgb, var(--rarity-color) 52%, transparent),
+        0 14px 30px rgba(0, 0, 0, .34);
+      transform: translateY(-5px) scale(1.035);
+      filter: brightness(1.12);
+    }
+
+    .marker {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 50%;
+      z-index: 6;
+      width: 2px;
+      transform: translateX(-50%);
+      pointer-events: none;
+      background: linear-gradient(180deg, #f7bd49, #f28f27 50%, #f7bd49);
+      box-shadow: 0 0 10px rgba(246, 163, 49, .55);
+    }
+
+    .marker::before,
+    .marker::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      width: 0;
+      height: 0;
+      transform: translateX(-50%);
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+    }
+
+    .marker::before {
+      top: -1px;
+      border-top: 14px solid #f6b33e;
+    }
+
+    .marker::after {
+      bottom: -1px;
+      border-bottom: 14px solid #f6b33e;
+    }
+
+    .center-halo {
+      position: absolute;
+      top: 14px;
+      bottom: 14px;
+      left: 50%;
+      z-index: 3;
+      width: 174px;
+      transform: translateX(-50%);
+      border: 1px solid rgba(244, 177, 65, .7);
+      border-radius: 21px;
+      pointer-events: none;
+      box-shadow: 0 0 24px rgba(244, 177, 65, .17), inset 0 0 24px rgba(244, 177, 65, .08);
+    }
+
+
+    .result-card {
+      --rarity-color: #e7edf5;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 132px;
+      margin-top: 18px;
+      padding: 17px 20px;
+      border: 1px solid color-mix(in srgb, var(--rarity-color) 52%, transparent);
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 0% 50%, color-mix(in srgb, var(--rarity-color) 13%, transparent), transparent 36%),
+        linear-gradient(180deg, rgba(15, 25, 34, .97), rgba(9, 15, 23, .97));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03);
+      transition: opacity .25s ease, border-color .35s ease, transform .35s ease;
+    }
+
+    .result-card.is-rolling {
+      opacity: .56;
+      transform: translateY(-2px);
+      filter: saturate(.75);
+    }
+
+    .result-art {
+      width: 94px;
+      height: 94px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      padding: 8px;
+      border: 1px solid color-mix(in srgb, var(--rarity-color) 58%, transparent);
+      border-radius: 15px;
+      background: rgba(7, 12, 18, .76);
+      box-shadow: 0 0 24px color-mix(in srgb, var(--rarity-color) 14%, transparent);
+    }
+
+    .result-art img {
+      width: 82px;
+      height: 82px;
+      object-fit: contain;
+      filter: drop-shadow(0 7px 9px rgba(0, 0, 0, .42));
+    }
+
+    .result-copy { min-width: 0; }
+
+    .result-title-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 7px;
+    }
+
+    .result-title {
+      margin: 0;
+      color: var(--rarity-color);
+      font-size: clamp(20px, 2.3vw, 28px);
+      line-height: 1.2;
+      font-weight: 800;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #df4d54;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .03em;
+    }
+
+    .badge.is-owned {
+      background: rgba(145, 160, 178, .18);
+      color: #bdc9d7;
+    }
+
+    .badge.is-pending {
+      background: rgba(244, 177, 65, .18);
+      color: #f5c66a;
+    }
+
+    .result-value {
+      margin: 0;
+      color: var(--rarity-color);
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .result-sub {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+
+    .draw-btn {
+      width: 100%;
+      margin-top: 13px;
+      padding: 19px 22px;
+      border: 0;
+      border-radius: 17px;
+      color: #291705;
+      background: linear-gradient(100deg, #f7b637 0%, #ef8a21 55%, #e9781c 100%);
+      box-shadow: 0 14px 34px rgba(239, 126, 32, .24), inset 0 1px 0 rgba(255, 255, 255, .3);
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+    }
+
+    .draw-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      filter: brightness(1.06);
+      box-shadow: 0 18px 38px rgba(239, 126, 32, .3), inset 0 1px 0 rgba(255, 255, 255, .3);
+    }
+
+    .draw-btn:active:not(:disabled) { transform: translateY(1px); }
+
+    .draw-btn:disabled {
+      cursor: not-allowed;
+      opacity: .52;
+      filter: grayscale(.58);
+      box-shadow: none;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 20;
+      padding: 10px 16px;
+      border: 1px solid rgba(244, 177, 65, .42);
+      border-radius: 999px;
+      background: rgba(12, 18, 27, .94);
+      color: #f5c66a;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, .34);
+      opacity: 0;
+      transform: translate(-50%, 14px);
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease;
+      font-size: 14px;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 760px) {
+      .app { width: min(100% - 20px, 680px); padding-top: 18px; }
+      .topbar { display: block; }
+      .odds { margin-top: 13px; text-align: left; }
+      .reel-viewport { height: 190px; }
+      .reel-track { gap: 11px; }
+      .reel-card { flex-basis: 136px; height: 164px; padding-top: 14px; }
+      .reel-card img { width: 88px; height: 88px; }
+      .center-halo { width: 154px; }
+      .result-card { align-items: flex-start; padding: 15px; gap: 13px; }
+      .result-art { width: 76px; height: 76px; }
+      .result-art img { width: 66px; height: 66px; }
+      .result-title { font-size: 20px; }
+      .result-value { font-size: 15px; }
+      .draw-btn { font-size: 17px; padding: 17px; }
+    }
+    @media (max-width: 520px) {
+      html, body { min-height: 300px; }
+      body {
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: geometricPrecision;
+      }
+
+      .app {
+        width: 480px;
+        height: 300px;
+        min-height: 300px;
+        margin: 0 auto;
+        padding: 10px 0;
+        overflow: hidden;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .eyebrow {
+        margin: 0 0 3px;
+        font-size: 9px;
+        line-height: 1;
+        letter-spacing: .12em;
+      }
+
+      h1 {
+        font-size: 24px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .odds {
+        flex: 1;
+        min-width: 0;
+        max-width: none;
+        margin: 0;
+        padding: 7px 9px;
+        border-radius: 9px;
+        font-size: 9px;
+        line-height: 1.35;
+        text-align: left;
+      }
+
+      .reel-panel { border-radius: 16px; }
+      .reel-viewport { height: 230px; }
+      .reel-track { gap: 10px; padding: 7px 0; }
+
+      .reel-card {
+        flex: 0 0 132px;
+        height: 216px;
+        justify-content: center;
+        gap: 12px;
+        padding: 14px 8px 12px;
+        border-radius: 16px;
+      }
+
+      .reel-card img {
+        width: 112px;
+        height: 112px;
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+      }
+
+      .reel-card .card-name {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .reel-card::after {
+        left: 12px;
+        right: 12px;
+        height: 4px;
+      }
+
+      .center-halo {
+        top: 7px;
+        bottom: 7px;
+        width: 132px;
+        border-radius: 16px;
+      }
+
+      .reel-card.is-winner {
+        transform: none;
+      }
+
+      .marker {
+        top: 5px;
+        bottom: 5px;
+        width: 2px;
+      }
+
+      .marker::before,
+      .marker::after {
+        border-left-width: 10px;
+        border-right-width: 10px;
+      }
+
+      .marker::before { border-top-width: 12px; }
+      .marker::after { border-bottom-width: 12px; }
+
+      .result-card,
+      .draw-btn,
+      .toast {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SUPPLY DROP / 开箱系统</p>
+        <h1>补给箱抽奖</h1>
+      </div>
+      <div class="odds" id="oddsText"></div>
+    </header>
+
+    <section class="reel-panel" aria-label="抽奖滚动区域">
+      <div class="reel-viewport" id="reelViewport">
+        <div class="reel-track" id="reelTrack"></div>
+        <div class="center-halo" aria-hidden="true"></div>
+        <div class="marker" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section class="result-card" id="resultCard" data-rarity="绿色">
+      <div class="result-art">
+        <img id="resultImage" alt="">
+      </div>
+      <div class="result-copy">
+        <div class="result-title-row">
+          <h2 class="result-title" id="resultTitle">等待开启</h2>
+          <span class="badge is-pending" id="resultBadge">待抽取</span>
+        </div>
+        <p class="result-value" id="resultValue">点击下方按钮开始抽奖</p>
+        <p class="result-sub" id="resultSub">每次抽取都会获得不同物品，结果将存入仓库。</p>
+      </div>
+    </section>
+
+
+    <button class="draw-btn" id="drawBtn">开启补给箱</button>
+    <div class="toast" id="toast"></div>
+  </main>
+
+  <script>
+    const ITEMS = [{"item_name":"锈蚀电池","image_name":"001_rusty_battery.png","rarity":"白色","price":100},{"item_name":"报纸","image_name":"002_newspaper.png","rarity":"白色","price":60},{"item_name":"罐头","image_name":"003_tin_can.png","rarity":"白色","price":150},{"item_name":"螺母螺栓","image_name":"004_nuts_and_bolts.png","rarity":"白色","price":80},{"item_name":"手电筒","image_name":"005_flashlight.png","rarity":"白色","price":280},{"item_name":"钳子","image_name":"007_pliers.png","rarity":"白色","price":300},{"item_name":"纱布卷","image_name":"008_gauze_roll.png","rarity":"白色","price":180},{"item_name":"文件","image_name":"018_documents.png","rarity":"白色","price":120},{"item_name":"证件牌","image_name":"029_id_badge.png","rarity":"白色","price":100},{"item_name":"齿轮零件","image_name":"031_gear_parts.png","rarity":"白色","price":250},{"item_name":"急救包","image_name":"034_first_aid_kit.png","rarity":"白色","price":350},{"item_name":"医疗箱","image_name":"036_medical_case.png","rarity":"白色","price":400},{"item_name":"打火机","image_name":"006_lighter.png","rarity":"绿色","price":550},{"item_name":"铜线圈","image_name":"009_copper_coil.png","rarity":"绿色","price":700},{"item_name":"指南针","image_name":"010_compass.png","rarity":"绿色","price":800},{"item_name":"对讲机","image_name":"011_walkie_talkie.png","rarity":"绿色","price":900},{"item_name":"密码锁","image_name":"014_keypad_lock.png","rarity":"绿色","price":650},{"item_name":"设备箱","image_name":"030_equipment_case.png","rarity":"绿色","price":850},{"item_name":"弹药箱","image_name":"032_ammo_box.png","rarity":"绿色","price":750},{"item_name":"黑色对讲机","image_name":"033_black_walkie_talkie.png","rarity":"绿色","price":950},{"item_name":"能量笔","image_name":"035_energy_pen.png","rarity":"绿色","price":1000},{"item_name":"手表","image_name":"012_wristwatch.png","rarity":"蓝色","price":1800},{"item_name":"银币","image_name":"013_silver_coins.png","rarity":"蓝色","price":1200},{"item_name":"望远镜","image_name":"015_binoculars.png","rarity":"蓝色","price":1500},{"item_name":"怀表","image_name":"017_pocket_watch.png","rarity":"蓝色","price":2200},{"item_name":"青铜器","image_name":"020_bronze_vessel.png","rarity":"蓝色","price":2000},{"item_name":"卷轴画","image_name":"024_scroll_painting.png","rarity":"蓝色","price":1600},{"item_name":"匕首","image_name":"025_dagger.png","rarity":"蓝色","price":1900},{"item_name":"玉镯","image_name":"022_jade_bracelet.png","rarity":"紫色","price":4500},{"item_name":"黄金面具","image_name":"023_gold_mask.png","rarity":"紫色","price":5000},{"item_name":"玉龙摆件","image_name":"027_jade_dragon.png","rarity":"紫色","price":4800},{"item_name":"权杖","image_name":"028_scepter.png","rarity":"紫色","price":4200},{"item_name":"金色票券","image_name":"038_gold_ticket.png","rarity":"紫色","price":3500},{"item_name":"金条","image_name":"016_gold_bar.png","rarity":"金色","price":9000},{"item_name":"珍珠项链","image_name":"019_pearl_necklace.png","rarity":"金色","price":7500},{"item_name":"钻石胸针","image_name":"021_diamond_brooch.png","rarity":"金色","price":10000},{"item_name":"金币","image_name":"037_gold_coin.png","rarity":"金色","price":8000},{"item_name":"皇冠","image_name":"026_crown.png","rarity":"红色","price":15000}];
+    const RARITY_WEIGHTS = {
+      "白色": 60,
+      "绿色": 24,
+      "蓝色": 10,
+      "紫色": 4,
+      "金色": 1.5,
+      "红色": 0.5
+    };
+    const RARITY_COLORS = {
+      "白色": "#e7edf5",
+      "绿色": "#48e28d",
+      "蓝色": "#4da7ff",
+      "紫色": "#c177ff",
+      "金色": "#f5bd42",
+      "红色": "#ff5b63"
+    };
+    const REPEATS = 18;
+
+    const track = document.getElementById("reelTrack");
+    const viewport = document.getElementById("reelViewport");
+    const drawBtn = document.getElementById("drawBtn");
+    const resultCard = document.getElementById("resultCard");
+    const resultImage = document.getElementById("resultImage");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultBadge = document.getElementById("resultBadge");
+    const resultValue = document.getElementById("resultValue");
+    const resultSub = document.getElementById("resultSub");
+    const toast = document.getElementById("toast");
+
+    const state = {
+      currentPos: 0,
+      targetPos: 0,
+      lastItem: null,
+      rolling: false,
+      owned: new Set(),
+      winnerIndex: -1,
+      displayOrder: [],
+      forcedResultName: null,
+      drawDurationMs: 4700
+    };
+
+    function rarityStyle(rarity) {
+      return `--rarity-color:${RARITY_COLORS[rarity] || RARITY_COLORS["白色"]}`;
+    }
+
+    function createCard(item) {
+      const card = document.createElement("article");
+      card.className = "reel-card";
+      card.style.cssText = rarityStyle(item.rarity);
+      card.dataset.image = item.image_name;
+      card.innerHTML = `
+        <img src="sprite_objects/${item.image_name}" alt="${item.item_name}">
+        <div class="card-name">${item.item_name}</div>
+      `;
+      return card;
+    }
+
+    function shuffleItems() {
+      const shuffled = ITEMS.slice();
+      for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+      }
+      return shuffled;
+    }
+
+    function buildTrack() {
+      const fragment = document.createDocumentFragment();
+      for (let repeat = 0; repeat < REPEATS; repeat += 1) {
+        state.displayOrder.forEach(item => fragment.appendChild(createCard(item)));
+      }
+      track.appendChild(fragment);
+    }
+
+    function getStep() {
+      const firstCard = track.querySelector(".reel-card");
+      if (!firstCard) return 168;
+      const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap || "0") || 0;
+      return firstCard.getBoundingClientRect().width + gap;
+    }
+
+    function setTrackPosition(index, animate = false) {
+      const step = getStep();
+      const cardWidth = track.querySelector(".reel-card").getBoundingClientRect().width;
+      const offset = viewport.clientWidth / 2 - cardWidth / 2 - index * step;
+      if (!animate) {
+        track.style.transition = "none";
+      }
+      track.style.transform = `translate3d(${offset}px, 0, 0)`;
+      if (!animate) {
+        void track.offsetWidth;
+        track.style.transition = "";
+      }
+    }
+
+    function weightedRarity() {
+      const entries = Object.entries(RARITY_WEIGHTS);
+      const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+      let cursor = Math.random() * total;
+      for (const [rarity, weight] of entries) {
+        cursor -= weight;
+        if (cursor <= 0) return rarity;
+      }
+      return entries[0][0];
+    }
+
+    function pickResult(excludeName) {
+      if (state.forcedResultName) {
+        const forcedItem = ITEMS.find(item => item.item_name === state.forcedResultName);
+        if (forcedItem) return forcedItem;
+      }
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const rarity = weightedRarity();
+        const candidates = ITEMS.filter(item => item.rarity === rarity && item.item_name !== excludeName);
+        if (candidates.length) {
+          return candidates[Math.floor(Math.random() * candidates.length)];
+        }
+      }
+      return ITEMS.find(item => item.item_name !== excludeName) || ITEMS[0];
+    }
+
+    function findTargetPosition(item, cycles) {
+      const poolLength = state.displayOrder.length;
+      const desiredIndex = state.displayOrder.findIndex(entry => entry.image_name === item.image_name);
+      const base = state.currentPos + poolLength * cycles;
+      const desiredOffset = ((desiredIndex - (base % poolLength)) + poolLength) % poolLength;
+      return base + desiredOffset;
+    }
+
+    function prepareForNextSpin() {
+      state.displayOrder = shuffleItems();
+      track.replaceChildren();
+      buildTrack();
+      state.currentPos = 0;
+      state.targetPos = 0;
+      state.winnerIndex = -1;
+      setTrackPosition(0, false);
+    }
+
+
+    function renderResult(item, options = {}) {
+      const { badge = "待抽取", badgeClass = "is-pending", value = "点击下方按钮开始抽奖", sub = "每次抽取都会获得不同物品，结果将存入仓库。" } = options;
+      resultCard.style.cssText = rarityStyle(item.rarity);
+      resultCard.dataset.rarity = item.rarity;
+      resultImage.src = `sprite_objects/${item.image_name}`;
+      resultImage.alt = item.item_name;
+      resultTitle.textContent = `[${item.rarity}] ${item.item_name}`;
+      resultBadge.textContent = badge;
+      resultBadge.className = `badge ${badgeClass}`;
+      resultValue.textContent = value;
+      resultSub.textContent = sub;
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    function markWinner(index) {
+      if (state.winnerIndex >= 0 && track.children[state.winnerIndex]) {
+        track.children[state.winnerIndex].classList.remove("is-winner");
+      }
+      const card = track.children[index];
+      if (card) card.classList.add("is-winner");
+      state.winnerIndex = index;
+    }
+
+    function centerWinner(index) {
+      const card = track.children[index];
+      if (!card) return;
+
+      const viewportRect = viewport.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const delta = (
+        viewportRect.left + viewportRect.width / 2
+      ) - (
+        cardRect.left + cardRect.width / 2
+      );
+      const transform = getComputedStyle(track).transform;
+      const matrix = transform === "none"
+        ? new DOMMatrixReadOnly()
+        : new DOMMatrixReadOnly(transform);
+
+      track.style.transition = "none";
+      track.style.transform = `translate3d(${matrix.m41 + delta}px, 0, 0)`;
+      void track.offsetWidth;
+      track.style.transition = "";
+    }
+
+    function finishSpin(result, target) {
+      state.currentPos = target;
+      markWinner(target);
+      centerWinner(target);
+
+      const isNew = !state.owned.has(result.item_name);
+      state.owned.add(result.item_name);
+      state.lastItem = result;
+      state.rolling = false;
+
+      const priceText = `${Number(result.price).toLocaleString("en-US")} 哈夫币`;
+      renderResult(result, {
+        badge: isNew ? "新收藏" : "已收藏",
+        badgeClass: isNew ? "" : "is-owned",
+        value: `价值 ${priceText}，已存入仓库`,
+        sub: isNew ? "这件物品第一次被你抽到。" : "这件物品已经在你的仓库中。"
+      });
+
+      drawBtn.disabled = false;
+      drawBtn.textContent = "开启补给箱";
+      showToast(isNew ? `获得新物品：${result.item_name}` : `获得：${result.item_name}`);
+    }
+
+    function startDraw() {
+      if (state.rolling) return;
+
+      prepareForNextSpin();
+      const result = pickResult(state.lastItem && state.lastItem.item_name);
+      const cycles = 5 + Math.floor(Math.random() * 3);
+      const target = findTargetPosition(result, cycles);
+
+      state.rolling = true;
+      state.targetPos = target;
+      drawBtn.disabled = true;
+      drawBtn.textContent = "滚动中…";
+      resultCard.classList.add("is-rolling");
+      markWinner(-1);
+
+      requestAnimationFrame(() => {
+        setTrackPosition(target, true);
+      });
+
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        finishSpin(result, target);
+      };
+
+      track.addEventListener("transitionend", event => {
+        if (event.propertyName === "transform") finish();
+      }, { once: true });
+      window.setTimeout(finish, state.drawDurationMs + 700);
+    }
+
+
+    state.displayOrder = shuffleItems();
+    buildTrack();
+    setTrackPosition(0, false);
+
+    const initial = ITEMS.find(item => item.image_name.includes("copper_coil")) || ITEMS[0];
+    renderResult(initial);
+
+    const oddsText = Object.entries(RARITY_WEIGHTS)
+      .map(([rarity, weight]) => `<strong>${rarity}</strong> ${weight}%`)
+      .join(" · ");
+    document.getElementById("oddsText").innerHTML = `抽取概率：${oddsText}`;
+
+    window.__lotteryBridge = {
+      configure(itemName, durationMs) {
+        state.forcedResultName = itemName || null;
+        state.drawDurationMs = Math.max(1200, Number(durationMs) || 4700);
+        document.documentElement.style.setProperty("--draw-duration", `${state.drawDurationMs}ms`);
+      },
+      start() {
+        startDraw();
+      },
+      isRolling() {
+        return state.rolling;
+      }
+    };
+
+    drawBtn.addEventListener("click", startDraw);
+    window.addEventListener("resize", () => {
+      if (state.winnerIndex >= 0) {
+        centerWinner(state.winnerIndex);
+      } else {
+        setTrackPosition(state.currentPos, false);
+      }
+    });
+  </script>
+</body>
+</html>

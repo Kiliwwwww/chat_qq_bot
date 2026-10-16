@@ -1,7 +1,11 @@
 
 services:
   qqbot:
-    build: .
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: "${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}"
+        PLAYWRIGHT_DOWNLOAD_HOST: "${PLAYWRIGHT_DOWNLOAD_HOST:-https://npmmirror.com/mirrors/playwright/}"
     container_name: qqbot
     restart: unless-stopped
     ports:

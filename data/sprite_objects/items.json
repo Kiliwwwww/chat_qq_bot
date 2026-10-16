@@ -1,0 +1,230 @@
+[
+  {
+    "item_name": "锈蚀电池",
+    "image_name": "001_rusty_battery.png",
+    "rarity": "白色",
+    "price": 100
+  },
+  {
+    "item_name": "报纸",
+    "image_name": "002_newspaper.png",
+    "rarity": "白色",
+    "price": 60
+  },
+  {
+    "item_name": "罐头",
+    "image_name": "003_tin_can.png",
+    "rarity": "白色",
+    "price": 150
+  },
+  {
+    "item_name": "螺母螺栓",
+    "image_name": "004_nuts_and_bolts.png",
+    "rarity": "白色",
+    "price": 80
+  },
+  {
+    "item_name": "手电筒",
+    "image_name": "005_flashlight.png",
+    "rarity": "白色",
+    "price": 280
+  },
+  {
+    "item_name": "钳子",
+    "image_name": "007_pliers.png",
+    "rarity": "白色",
+    "price": 300
+  },
+  {
+    "item_name": "纱布卷",
+    "image_name": "008_gauze_roll.png",
+    "rarity": "白色",
+    "price": 180
+  },
+  {
+    "item_name": "文件",
+    "image_name": "018_documents.png",
+    "rarity": "白色",
+    "price": 120
+  },
+  {
+    "item_name": "证件牌",
+    "image_name": "029_id_badge.png",
+    "rarity": "白色",
+    "price": 100
+  },
+  {
+    "item_name": "齿轮零件",
+    "image_name": "031_gear_parts.png",
+    "rarity": "白色",
+    "price": 250
+  },
+  {
+    "item_name": "急救包",
+    "image_name": "034_first_aid_kit.png",
+    "rarity": "白色",
+    "price": 350
+  },
+  {
+    "item_name": "医疗箱",
+    "image_name": "036_medical_case.png",
+    "rarity": "白色",
+    "price": 400
+  },
+  {
+    "item_name": "打火机",
+    "image_name": "006_lighter.png",
+    "rarity": "绿色",
+    "price": 550
+  },
+  {
+    "item_name": "铜线圈",
+    "image_name": "009_copper_coil.png",
+    "rarity": "绿色",
+    "price": 700
+  },
+  {
+    "item_name": "指南针",
+    "image_name": "010_compass.png",
+    "rarity": "绿色",
+    "price": 800
+  },
+  {
+    "item_name": "对讲机",
+    "image_name": "011_walkie_talkie.png",
+    "rarity": "绿色",
+    "price": 900
+  },
+  {
+    "item_name": "密码锁",
+    "image_name": "014_keypad_lock.png",
+    "rarity": "绿色",
+    "price": 650
+  },
+  {
+    "item_name": "设备箱",
+    "image_name": "030_equipment_case.png",
+    "rarity": "绿色",
+    "price": 850
+  },
+  {
+    "item_name": "弹药箱",
+    "image_name": "032_ammo_box.png",
+    "rarity": "绿色",
+    "price": 750
+  },
+  {
+    "item_name": "黑色对讲机",
+    "image_name": "033_black_walkie_talkie.png",
+    "rarity": "绿色",
+    "price": 950
+  },
+  {
+    "item_name": "能量笔",
+    "image_name": "035_energy_pen.png",
+    "rarity": "绿色",
+    "price": 1000
+  },
+  {
+    "item_name": "手表",
+    "image_name": "012_wristwatch.png",
+    "rarity": "蓝色",
+    "price": 1800
+  },
+  {
+    "item_name": "银币",
+    "image_name": "013_silver_coins.png",
+    "rarity": "蓝色",
+    "price": 1200
+  },
+  {
+    "item_name": "望远镜",
+    "image_name": "015_binoculars.png",
+    "rarity": "蓝色",
+    "price": 1500
+  },
+  {
+    "item_name": "怀表",
+    "image_name": "017_pocket_watch.png",
+    "rarity": "蓝色",
+    "price": 2200
+  },
+  {
+    "item_name": "青铜器",
+    "image_name": "020_bronze_vessel.png",
+    "rarity": "蓝色",
+    "price": 2000
+  },
+  {
+    "item_name": "卷轴画",
+    "image_name": "024_scroll_painting.png",
+    "rarity": "蓝色",
+    "price": 1600
+  },
+  {
+    "item_name": "匕首",
+    "image_name": "025_dagger.png",
+    "rarity": "蓝色",
+    "price": 1900
+  },
+  {
+    "item_name": "玉镯",
+    "image_name": "022_jade_bracelet.png",
+    "rarity": "紫色",
+    "price": 4500
+  },
+  {
+    "item_name": "黄金面具",
+    "image_name": "023_gold_mask.png",
+    "rarity": "紫色",
+    "price": 5000
+  },
+  {
+    "item_name": "玉龙摆件",
+    "image_name": "027_jade_dragon.png",
+    "rarity": "紫色",
+    "price": 4800
+  },
+  {
+    "item_name": "权杖",
+    "image_name": "028_scepter.png",
+    "rarity": "紫色",
+    "price": 4200
+  },
+  {
+    "item_name": "金色票券",
+    "image_name": "038_gold_ticket.png",
+    "rarity": "紫色",
+    "price": 3500
+  },
+  {
+    "item_name": "金条",
+    "image_name": "016_gold_bar.png",
+    "rarity": "金色",
+    "price": 9000
+  },
+  {
+    "item_name": "珍珠项链",
+    "image_name": "019_pearl_necklace.png",
+    "rarity": "金色",
+    "price": 7500
+  },
+  {
+    "item_name": "钻石胸针",
+    "image_name": "021_diamond_brooch.png",
+    "rarity": "金色",
+    "price": 10000
+  },
+  {
+    "item_name": "金币",
+    "image_name": "037_gold_coin.png",
+    "rarity": "金色",
+    "price": 8000
+  },
+  {
+    "item_name": "皇冠",
+    "image_name": "026_crown.png",
+    "rarity": "红色",
+    "price": 15000
+  }
+]

@@ -151,6 +151,23 @@ docker-compose logs -f redis
 2. 检查 Redis 日志：`docker-compose logs redis`
 3. 测试 Redis 连接：`docker-compose exec redis redis-cli ping`
 
+### Docker 构建下载慢
+
+`Dockerfile` 默认使用国内镜像加速：
+
+- Python 包：腾讯云 PyPI
+- Playwright Chromium：npmmirror
+- Debian 系统包：腾讯云 Debian 镜像
+
+可在 `.env` 中覆盖构建源：
+
+```env
+PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
+PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/
+```
+
+首次构建仍需下载 Chromium，之后 Docker 会缓存依赖层，再次运行 `restart.bat` 通常不会重新下载。
+
 ### 端口冲突
 
 如果 8080 或 6379 端口被占用，修改 `docker-compose.yml` 中的端口映射：

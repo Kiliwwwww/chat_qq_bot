@@ -11,6 +11,10 @@ dist
 build
 log/
 data/chat_ai/*.db
+data/lottery/*.db
+data/lottery/*.db-wal
+data/lottery/*.db-shm
+data/lottery/gifs/
 .DS_Store
 *.md
 !README.md
