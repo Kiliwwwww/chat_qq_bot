@@ -33,6 +33,8 @@ class Config(BaseModel):
     meme_standalone_chance: float = 0.2
     # 主动冒泡消息是否也附带表情包
     meme_bubble_attach: bool = True
+    # 单张表情包体积上限（字节），超过则不进候选池，避免超大图发送失败
+    meme_max_bytes: int = 8 * 1024 * 1024
     # 群开关状态文件
     meme_groups_file: Path = DATA_DIR / "meme_sync" / "groups.json"
     # 手动触发同步的管理员 QQ

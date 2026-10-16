@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import random
 import threading
@@ -39,15 +40,34 @@ def _out_dir() -> Path:
     return Path(config.meme_sync_out_dir)
 
 
+def max_bytes() -> int:
+    """单张表情包的体积上限，0 表示不限制。"""
+    try:
+        return max(0, int(config.meme_max_bytes))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _scan() -> list[Path]:
     root = _out_dir()
     if not root.exists():
         return []
-    return sorted(
-        path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
-    )
+    limit = max_bytes()
+    paths: list[Path] = []
+    skipped = 0
+    for path in root.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        try:
+            if limit and path.stat().st_size > limit:
+                skipped += 1
+                continue
+        except OSError:
+            continue
+        paths.append(path)
+    if skipped:
+        logger.debug(f"[表情包同步] 跳过 {skipped} 张超过 {limit / 1024 / 1024:.0f} MB 的图片")
+    return sorted(paths)
 
 
 def refresh() -> int:
@@ -89,12 +109,22 @@ def pick_random() -> Path | None:
     return choice
 
 
-def random_image_segment() -> MessageSegment | None:
-    """随机取一张图片的消息段落，库里没有图片时返回 None。"""
+async def random_image_segment() -> tuple[MessageSegment, str] | None:
+    """随机取一张表情包，返回 (消息段落, 文件名)；库为空或读取失败时返回 None。
+
+    图片以 base64 内嵌发送，不能传本地路径：机器人在容器里，QQ 框架在容器外，
+    对方按容器内的路径找不到文件，会导致整条消息发送失败。
+    """
     path = pick_random()
     if path is None:
         return None
-    return MessageSegment.image(path)
+    try:
+        # 大图 base64 编码有一定耗时，放到线程里做，别卡住事件循环
+        data = await asyncio.to_thread(path.read_bytes)
+    except OSError as exc:
+        logger.warning(f"[表情包同步] 表情包读取失败 {path}: {exc}")
+        return None
+    return MessageSegment.image(data), path.name
 
 
 # --------------------------------------------------------------------------

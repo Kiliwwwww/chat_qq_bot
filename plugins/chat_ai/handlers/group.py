@@ -526,26 +526,45 @@ async def handle_group_msg(event: MessageEvent):
 
         # 被@时第一条引用原消息，其余作为连续补发的消息
         first_reply = messages_to_send[0]
-        first_msg = Message(first_reply)
+        text_msg = Message(first_reply)
         if is_at_me:
-            first_msg = MessageSegment.reply(event.message_id) + first_msg
+            text_msg = MessageSegment.reply(event.message_id) + text_msg
+        first_msg = text_msg
+        meme_name = ""
         if meme_on and random.random() < meme_library.attach_chance():
-            meme_seg = meme_library.random_image_segment()
-            if meme_seg is not None:
-                first_msg += meme_seg
-                logger.info(f"AI 回复附带表情包 群:{group_id} 图片:{meme_seg.data.get('file')}")
-        await group_msg.send(first_msg)
+            picked = await meme_library.random_image_segment()
+            if picked is not None:
+                meme_seg, meme_name = picked
+                first_msg = first_msg + meme_seg
+        try:
+            await group_msg.send(first_msg)
+        except Exception as exc:
+            if not meme_name:
+                raise
+            # 表情包出问题时退回纯文本重发，别让整条回复一起丢掉
+            logger.warning(
+                f"带表情包发送失败，改为只发文本 群:{group_id} 图片:{meme_name} 原因:{exc}"
+            )
+            await group_msg.send(text_msg)
+        else:
+            if meme_name:
+                logger.info(f"AI 回复附带表情包 群:{group_id} 图片:{meme_name}")
         for extra in messages_to_send[1:]:
             await asyncio.sleep(random.uniform(0.6, 1.4))
             await group_msg.send(extra)
 
         # 一定概率额外单独甩一张表情包（不回复任何人，直接发群里）
         if meme_on and random.random() < meme_library.standalone_chance():
-            meme_seg = meme_library.random_image_segment()
-            if meme_seg is not None:
+            picked = await meme_library.random_image_segment()
+            if picked is not None:
+                meme_seg, meme_name = picked
                 await asyncio.sleep(random.uniform(0.8, 1.6))
-                await group_msg.send(meme_seg)
-                logger.info(f"单独发送表情包 群:{group_id} 图片:{meme_seg.data.get('file')}")
+                try:
+                    await group_msg.send(meme_seg)
+                except Exception as exc:
+                    logger.warning(f"单独发送表情包失败 群:{group_id} 图片:{meme_name} 原因:{exc}")
+                else:
+                    logger.info(f"单独发送表情包 群:{group_id} 图片:{meme_name}")
         await group_msg.finish()
 
     except FinishedException:

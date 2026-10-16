@@ -208,15 +208,28 @@ async def group_bubble_check():
             continue
 
         content = await _generate_bubble(group_id)
+        bubble_msg = Message(content)
+        meme_name = ""
+        # 奶龙表情包：开启该功能的群里，冒泡消息也带一张随机表情包
+        if meme_library.is_group_enabled(group_id) and meme_library.bubble_attach_enabled():
+            picked = await meme_library.random_image_segment()
+            if picked is not None:
+                meme_seg, meme_name = picked
+                bubble_msg = bubble_msg + meme_seg
+        sent = False
         try:
-            bubble_msg = Message(content)
-            # 奶龙表情包：开启该功能的群里，冒泡消息也带一张随机表情包
-            if meme_library.is_group_enabled(group_id) and meme_library.bubble_attach_enabled():
-                meme_seg = meme_library.random_image_segment()
-                if meme_seg is not None:
-                    bubble_msg += meme_seg
             await bot.send_group_msg(group_id=group_id, message=bubble_msg)
-            group_last_bubble[group_id] = time.time()
-            logger.info(f"主动冒泡 群:{group_id} 内容:{content}")
+            sent = True
         except Exception as e:
-            logger.error(f"冒泡发送失败 群:{group_id}: {e}")
+            logger.warning(f"冒泡发送失败 群:{group_id}: {e}")
+        # 表情包出问题时退回纯文本，别整条冒泡都发不出去
+        if not sent and meme_name:
+            try:
+                await bot.send_group_msg(group_id=group_id, message=content)
+                sent = True
+            except Exception as e:
+                logger.error(f"冒泡纯文本重试仍失败 群:{group_id}: {e}")
+        if not sent:
+            continue
+        group_last_bubble[group_id] = time.time()
+        logger.info(f"主动冒泡 群:{group_id} 内容:{content}")
