@@ -187,9 +187,9 @@ OneBot 反向 WebSocket 连接地址：`ws://localhost:8080/onebot/v11/ws`。
 
 开启功能的群里，机器人会这样使用表情包：
 
-- **AI 回复带图**：每次回复群友时在正文后附带一张随机表情包（默认每条都带，可用 `meme_attach_chance` 调整概率）
-- **单独甩图**：回复之后按 `meme_standalone_chance`（默认 20%）的概率再单独发一张，不引用、不 @ 任何人，直接发到群里
-- **冒泡带图**：主动冒泡暖场时也会附带一张（可用 `meme_bubble_attach=false` 关掉）
+- **回复后跟图**：AI 回复完之后，单独再发一条图片消息；图片不引用、不 @ 任何人，是独立的一条消息（类似「文字一条 + 图片一条」）
+- **概率控制**：默认每次回复都会跟一张（`meme_attach_chance=1.0`）。`meme_attach_chance` 与 `meme_standalone_chance` 描述的是同一件事，代码取两者较大值，因此不会出现同一次回复连发两张的情况；想让跟图变成偶发，把两个值都调小即可
+- **冒泡跟图**：主动冒泡暖场之后也会单独跟一条图片消息（可用 `meme_bubble_attach=false` 关掉）
 
 群开关既可以在 `.env` 的 `meme_group_ids` 里预先指定，也可以由管理员在群里用 `/开启奶龙`、`/关闭奶龙` 动态调整；动态调整的结果不会与 `.env` 冲突，且 `/关闭奶龙` 的优先级更高。
 
@@ -318,9 +318,9 @@ AI 通过 function calling 获得 `send_voice` 工具，可自主决定是否用
 | `meme_sync_subs` | 空 | 只同步指定分类，逗号分隔（`animated,static`），留空为全部 |
 | `meme_sync_out_dir` | `data/naihub-img` | 图片保存目录 |
 | `meme_group_ids` | `[]` | 开启奶龙表情包功能的群号，例如 `[123456789]` |
-| `meme_attach_chance` | `1.0` | AI 回复附带一张表情包的概率（1.0 表示每条都带） |
-| `meme_standalone_chance` | `0.2` | 回复群友后额外单独发一张表情包的概率 |
-| `meme_bubble_attach` | `true` | 主动冒泡消息是否也附带表情包 |
+| `meme_attach_chance` | `1.0` | 回复后单独跟一条表情包的概率（1.0 表示每条回复都跟一张） |
+| `meme_standalone_chance` | `0.2` | 同义概率，与上一项取较大值生效 |
+| `meme_bubble_attach` | `true` | 主动冒泡之后是否也单独跟一条表情包 |
 | `meme_max_bytes` | `8388608` | 单张表情包体积上限，超过的图片不进候选池 |
 
 以上配置都有默认值，不写也能正常工作；需要改时间或筛选时才加到 `.env`。

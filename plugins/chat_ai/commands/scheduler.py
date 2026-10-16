@@ -6,7 +6,6 @@ import random
 import time
 
 from nonebot import get_plugin_config, require, logger, get_bot
-from nonebot.adapters.onebot.v11 import Message
 from nonebot_plugin_apscheduler import scheduler
 
 from plugins.meme_sync import meme_library
@@ -208,28 +207,20 @@ async def group_bubble_check():
             continue
 
         content = await _generate_bubble(group_id)
-        bubble_msg = Message(content)
-        meme_name = ""
-        # 奶龙表情包：开启该功能的群里，冒泡消息也带一张随机表情包
+        try:
+            await bot.send_group_msg(group_id=group_id, message=content)
+        except Exception as e:
+            logger.error(f"冒泡发送失败 群:{group_id}: {e}")
+            continue
+        group_last_bubble[group_id] = time.time()
+        logger.info(f"主动冒泡 群:{group_id} 内容:{content}")
+
+        # 奶龙表情包：冒泡之后再单独跟一条图片消息
         if meme_library.is_group_enabled(group_id) and meme_library.bubble_attach_enabled():
             picked = await meme_library.random_image_segment()
             if picked is not None:
                 meme_seg, meme_name = picked
-                bubble_msg = bubble_msg + meme_seg
-        sent = False
-        try:
-            await bot.send_group_msg(group_id=group_id, message=bubble_msg)
-            sent = True
-        except Exception as e:
-            logger.warning(f"冒泡发送失败 群:{group_id}: {e}")
-        # 表情包出问题时退回纯文本，别整条冒泡都发不出去
-        if not sent and meme_name:
-            try:
-                await bot.send_group_msg(group_id=group_id, message=content)
-                sent = True
-            except Exception as e:
-                logger.error(f"冒泡纯文本重试仍失败 群:{group_id}: {e}")
-        if not sent:
-            continue
-        group_last_bubble[group_id] = time.time()
-        logger.info(f"主动冒泡 群:{group_id} 内容:{content}")
+                try:
+                    await bot.send_group_msg(group_id=group_id, message=meme_seg)
+                except Exception as e:
+                    logger.warning(f"冒泡后发送表情包失败 群:{group_id} 图片:{meme_name}: {e}")

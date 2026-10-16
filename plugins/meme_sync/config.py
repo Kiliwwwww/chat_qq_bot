@@ -27,11 +27,11 @@ class Config(BaseModel):
 
     # 开启奶龙表情包功能的群号（也可在群里用 /开启奶龙 动态开关）
     meme_group_ids: list[int] = []
-    # AI 回复附带一张随机表情包的概率（1.0 表示每条都带）
+    # 回复结束后单独跟一条表情包消息的概率（1.0 表示每条回复都跟一张）
     meme_attach_chance: float = 1.0
-    # 回复群友之后，额外单独发一张表情包的概率（不回复任何人，直接发群里）
+    # 同义概率：与上面取较大值生效，避免两条概率各自命中时连发两张
     meme_standalone_chance: float = 0.2
-    # 主动冒泡消息是否也附带表情包
+    # 主动冒泡之后是否也单独跟一条表情包消息
     meme_bubble_attach: bool = True
     # 单张表情包体积上限（字节），超过则不进候选池，避免超大图发送失败
     meme_max_bytes: int = 8 * 1024 * 1024

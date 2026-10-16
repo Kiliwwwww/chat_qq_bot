@@ -2,7 +2,8 @@
 
 每天 0 点（可配置）自动拉取站点最新表情包，已下载过的文件自动跳过；
 管理员也可以用 /同步表情包 手动触发一次。
-开启功能的群里，AI 回复会带上一张随机表情包，详见 meme_library.py 与 chat_ai。
+开启功能的群里，AI 回复结束后会再单独跟一条随机表情包消息（两条独立消息），
+详见 meme_library.py 与 chat_ai。
 """
 
 from __future__ import annotations
@@ -157,6 +158,5 @@ async def _handle_meme_status(event: MessageEvent) -> None:
     state_text = "已开启" if enabled else "未开启"
     await meme_status_cmd.finish(
         f"奶龙表情包：{state_text}；表情库 {count} 张；"
-        f"AI 回复附带概率 {meme_library.attach_chance():.0%}，"
-        f"额外单发概率 {meme_library.standalone_chance():.0%}"
+        f"每次回复后单独发一张的概率 {meme_library.reply_meme_chance():.0%}"
     )

@@ -208,3 +208,12 @@ def standalone_chance() -> float:
 def bubble_attach_enabled() -> bool:
     """主动冒泡消息是否也附带表情包。"""
     return bool(config.meme_bubble_attach)
+
+
+def reply_meme_chance() -> float:
+    """AI 回复结束后，单独跟一条图片消息的概率。
+
+    attach 与 standalone 描述的都是「回复后跟一张图」这件事，取两者较大值，
+    避免两条概率各自命中时在同一次回复后连发两张图。
+    """
+    return max(attach_chance(), standalone_chance())
