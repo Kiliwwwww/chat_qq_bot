@@ -165,11 +165,12 @@ async def _handle_meme_status(event: MessageEvent) -> None:
 
 @today_meme_cmd.handle()
 async def _handle_today_meme(event: MessageEvent) -> None:
-    """群成员发送 /今日奶龙，随机回一张表情包（不引用、不 @ 任何人）。"""
+    """群成员发送 /今日奶龙，随机回一张表情包（不引用、不 @ 任何人）。
+
+    不受群奶龙开关影响：没开奶龙的群也能点播，只要表情库里有图。
+    """
     if not isinstance(event, GroupMessageEvent):
         await today_meme_cmd.finish("这个只能在群里玩哦")
-    if not meme_library.is_group_enabled(event.group_id):
-        await today_meme_cmd.finish("本群还没开启奶龙表情包，管理员发 /开启奶龙 就能打开")
     picked = await meme_library.random_image_segment()
     if picked is None:
         await today_meme_cmd.finish("表情库还是空的，等同步完成后再试试")
