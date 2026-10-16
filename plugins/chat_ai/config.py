@@ -30,6 +30,14 @@ class Config(BaseModel):
     
     # 群消息回复概率 (0.0~1.0)
     group_reply_chance: float = 0.05
+
+    # 对话延续：机器人刚说完话，被它搭话的人紧接着直接回一句（既没@、也没引用），
+    # 中间也没被群里其他人插话，就按"在跟机器人说话"处理，不用每次重新@
+    group_follow_up_enabled: bool = True
+    # 延续判定时间窗口（秒）
+    group_follow_up_window: float = 60.0
+    # 延续消息的回复概率 (0.0~1.0)，1.0 表示一定接话
+    group_follow_up_chance: float = 1.0
     
     # 随机复读群友消息概率 (0.0~1.0)
     random_repeat_chance: float = 0.03

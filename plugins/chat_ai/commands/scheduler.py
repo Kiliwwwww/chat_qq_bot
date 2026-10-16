@@ -21,7 +21,7 @@ from ..state import (
     group_last_bubble,
     group_recent_messages,
 )
-from ..utils.helpers import get_time_period
+from ..utils.helpers import get_time_period, mark_bot_talked
 from ..summarizer import generate_summary
 
 # 模块级配置：定时任务在注册时就要读到时间等参数
@@ -218,6 +218,8 @@ async def group_bubble_check():
             logger.error(f"冒泡发送失败 群:{group_id}: {e}")
             continue
         group_last_bubble[group_id] = time.time()
+        # 冒泡是在主动搭话（面向全群），之后谁接话都算延续，不用@机器人
+        mark_bot_talked(group_id, 0)
         logger.info(f"主动冒泡 群:{group_id} 内容:{content}")
 
         # 奶龙表情包：冒泡之后再单独跟一条图片消息

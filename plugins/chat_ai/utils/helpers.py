@@ -1,6 +1,12 @@
+import time
 from datetime import datetime
 
-from ..state import db, group_recent_messages, group_last_repeated
+from ..state import (
+    db,
+    group_recent_messages,
+    group_last_repeated,
+    group_pending_follow_up,
+)
 
 
 def get_time_period() -> str:
@@ -97,6 +103,42 @@ def is_meta_decline(text: str) -> bool:
     if not text:
         return False
     return any(p in text for p in META_DECLINE_PATTERNS)
+
+
+def mark_bot_talked(group_id: int, target_user_id: int = 0) -> None:
+    """记录机器人刚在群里说了话，用于识别"紧接着接我话"的后续消息
+
+    target_user_id: 这次搭话的对象；0 表示面向全群（如主动冒泡），谁的接话都算
+    """
+    group_pending_follow_up[group_id] = (time.time(), target_user_id)
+
+
+def clear_bot_talked(group_id: int) -> None:
+    """清掉"机器人刚说完话"的记录，之后的群消息不再按接话处理"""
+    group_pending_follow_up.pop(group_id, None)
+
+
+def check_follow_up(group_id: int, user_id: int, window: float) -> bool:
+    """判断这条消息算不算在与机器人对话的延续
+
+    条件：机器人刚在群里说完话（window 秒内），这条是它搭话的那个人回过来的，
+    并且中间没有被群里其他人插话打断——被插话说明话题已经转走，就不再算接话。
+    """
+    pending = group_pending_follow_up.get(group_id)
+    if not pending:
+        return False
+
+    ts, target = pending
+    if time.time() - ts > window:
+        group_pending_follow_up.pop(group_id, None)
+        return False
+
+    if target == 0 or target == user_id:
+        return True
+
+    # 机器人搭话的是别人：对话已被打断，清掉记录
+    group_pending_follow_up.pop(group_id, None)
+    return False
 
 
 def clean_history_images(messages: list[dict]) -> list[dict]:

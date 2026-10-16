@@ -40,6 +40,9 @@ group_histories: dict[int, list[dict[str, str]]] = {}
 group_last_reply: dict[int, float] = {}  # 群最后回复时间戳
 group_last_bubble: dict[int, float] = {}  # 群最后主动冒泡时间戳
 group_last_activity: dict[int, float] = {}  # 群最后活跃时间戳（用于判断冷清）
+# 机器人刚在群里说完话的追踪：{group_id: (时间戳, 搭话的目标用户ID)}
+# 目标用户为 0 表示面向全群（如主动冒泡），谁的接话都算
+group_pending_follow_up: dict[int, tuple[float, int]] = {}
 group_recent_messages: dict[int, list[tuple[int, str]]] = {}  # 群最近消息 [(user_id, message)]
 group_last_repeated: dict[int, str] = {}  # 群最后复读的消息内容
 ai_service: AIService = None

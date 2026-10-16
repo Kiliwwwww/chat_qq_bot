@@ -94,7 +94,11 @@ async def meme_sync_daily() -> None:
             logger.warning(f"  失败：{item['title']}（{item['error']}）")
 
 
-sync_cmd = on_command("同步表情包", aliases={"表情包同步"}, priority=15, block=False)
+# 优先级必须高于 10：chat_ai 的私聊/群聊处理器是 priority=10、block=True，
+# 它们在遇到 "/" 开头的命令时会 skip()，而 NoneBot 2.5 里 block=True 的
+# 匹配器一旦运行（哪怕 handler 里 skip 了）就会阻断更低优先级的匹配器，
+# 放在 15 的话这条命令永远跑不到。
+sync_cmd = on_command("同步表情包", aliases={"表情包同步"}, priority=5, block=True)
 
 
 @sync_cmd.handle()

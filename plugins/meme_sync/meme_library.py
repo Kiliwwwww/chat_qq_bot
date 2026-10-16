@@ -40,6 +40,11 @@ def _out_dir() -> Path:
     return Path(config.meme_sync_out_dir)
 
 
+def library_root() -> Path:
+    """表情库根目录：/今日奶龙、开启奶龙后的 AI 跟图都从这里取图。"""
+    return _out_dir()
+
+
 def max_bytes() -> int:
     """单张表情包的体积上限，0 表示不限制。"""
     try:

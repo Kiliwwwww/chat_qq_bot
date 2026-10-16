@@ -48,6 +48,9 @@ from ..utils.helpers import (
     is_meta_decline,
     check_repeater,
     update_recent_messages,
+    mark_bot_talked,
+    clear_bot_talked,
+    check_follow_up,
 )
 from ..utils.tts import synthesize
 from ..utils.forward import extract_forward_text
@@ -309,9 +312,22 @@ async def handle_group_msg(event: MessageEvent):
     # 检测是否@了机器人，用于标记消息
     is_at_me = event.is_tome()
 
+    # 对话延续：机器人刚说完话，它搭话的那个人紧接着回了一句（没被群里其他人插话打断）
+    # 这种"顺口接话"不@也算是在跟机器人说话，不用逼着群友每次都@一次
+    follow_up = (
+        config.group_follow_up_enabled
+        and not is_at_me
+        and check_follow_up(group_id, user_id, config.group_follow_up_window)
+    )
+
     # 将用户消息加入历史（不管是否触发AI回复）
-    # 如果@了机器人，在消息中标记[@我]，让AI知道被@了
-    at_prefix = "[@我] " if is_at_me else ""
+    # 在消息里标明这条是不是冲着机器人来的，让AI知道该不该接
+    if is_at_me:
+        at_prefix = "[@我] "
+    elif follow_up:
+        at_prefix = "[接着我说话] "
+    else:
+        at_prefix = ""
     if image_urls:
         user_content = []
         text_with_name = f"[{sender_name}][{user_id}] {at_prefix}{user_message}" if user_message else f"[{sender_name}][{user_id}] 发送了一张图片"
@@ -387,13 +403,22 @@ async def handle_group_msg(event: MessageEvent):
         and should_force_multi_message(user_message)
     )
 
-    # 冷却检查：防止短时间内重复回复同一群（被@时跳过冷却检查）
+    # 冷却检查：防止短时间内重复回复同一群（被@或接着我说话时跳过冷却检查）
     current_time = time.time()
-    if not is_at_me and group_id in group_last_reply and current_time - group_last_reply[group_id] < 3:
+    if (
+        not is_at_me
+        and not follow_up
+        and group_id in group_last_reply
+        and current_time - group_last_reply[group_id] < 3
+    ):
         await group_msg.skip()
 
-    # 未被@时，进行概率检查
-    if not is_at_me and random.random() > config.group_reply_chance:
+    # 未被@也没接着我说话时，进行概率检查
+    if not is_at_me and not follow_up and random.random() > config.group_reply_chance:
+        await group_msg.skip()
+
+    # 接话单独用一套概率（默认 1.0：既然在跟机器人聊，就接住，别晾着）
+    if follow_up and random.random() > config.group_follow_up_chance:
         await group_msg.skip()
 
     if not state.ai_service:
@@ -461,6 +486,8 @@ async def handle_group_msg(event: MessageEvent):
                 history = history[-config.ai_context_limit:]
             await set_group_history(group_id, history)
             group_last_reply[group_id] = time.time()
+            # 语音也是一次搭话，之后对方顺口接话同样算延续
+            mark_bot_talked(group_id, user_id)
             try:
                 audio = await synthesize(
                     result.voice_text,
@@ -490,6 +517,8 @@ async def handle_group_msg(event: MessageEvent):
         if (not reply or not reply.strip()) and not extra_messages:
             logger.warning(f"AI 返回空回复，静默跳过 群:{group_id}")
             group_last_reply[group_id] = time.time()
+            # 这轮没说话，对话延续的窗口就此关掉，别让后续消息反复触发
+            clear_bot_talked(group_id)
             await group_msg.finish()
 
         # 拦截 AI 泄露的判断性回复（如"不用回复，跟我没关系"），静默不发送
@@ -502,6 +531,7 @@ async def handle_group_msg(event: MessageEvent):
         if not messages_to_send:
             logger.warning(f"AI 回复全部无效，静默跳过 群:{group_id}")
             group_last_reply[group_id] = time.time()
+            clear_bot_talked(group_id)
             await group_msg.finish()
 
         # 逐条写入历史
@@ -520,6 +550,8 @@ async def handle_group_msg(event: MessageEvent):
 
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
+        # 记住这次搭话的对象：对方紧接着顺口接话时，不必再@一次
+        mark_bot_talked(group_id, user_id)
         logger.info(
             f"群消息已回复 群:{group_id} 消息:{user_message[:20]}... "
             f"共 {len(messages_to_send)} 条 回复:{messages_to_send}"
@@ -562,6 +594,8 @@ async def handle_group_msg(event: MessageEvent):
         await set_group_history(group_id, original_history)
         # 更新最后回复时间戳
         group_last_reply[group_id] = time.time()
+        # 这轮没回出去，关掉对话延续窗口，避免后续消息反复触发失败的调用
+        clear_bot_talked(group_id)
         # 高风险内容拦截
         if "high risk" in str(e).lower():
             await group_msg.finish("别发些奇奇怪怪的东西！")
