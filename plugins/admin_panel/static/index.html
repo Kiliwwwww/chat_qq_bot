@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QQ Bot 管理面板</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/admin/assets/app.css">
+</head>
+<body>
+  <div id="loginView" class="login-view hidden">
+    <div class="login-card">
+      <div class="brand-mark">QQ BOT</div>
+      <h1>管理面板</h1>
+      <p id="loginHint" class="muted">请输入管理密码</p>
+      <form id="loginForm" class="login-form">
+        <label class="field">
+          <span>密码</span>
+          <input id="loginPassword" type="password" autocomplete="current-password" required>
+        </label>
+        <button id="loginBtn" class="btn primary" type="submit">登录</button>
+        <p id="loginError" class="error-text"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="appView" class="app-view hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <strong>QQ Bot</strong>
+          <small>管理面板</small>
+        </div>
+      </div>
+      <nav id="nav" class="nav">
+        <button class="nav-item active" data-tab="overview">运行概览</button>
+        <button class="nav-item" data-tab="checks">API Key 体检</button>
+        <button class="nav-item" data-tab="services">AI 服务</button>
+        <button class="nav-item" data-tab="business">业务数据</button>
+        <button class="nav-item" data-tab="logs">日志与记录</button>
+        <button class="nav-item" data-tab="tasks">任务与表情包</button>
+        <button class="nav-item" data-tab="config">配置与备份</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="connState" class="conn-state">
+          <span class="dot"></span>
+          <span>未连接</span>
+        </div>
+        <button id="logoutBtn" class="btn ghost small" type="button">退出登录</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">运行概览</h1>
+          <p id="pageSubtitle" class="muted">机器人、系统与外部服务状态</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="refreshBtn" class="btn ghost" type="button">刷新</button>
+        </div>
+      </header>
+
+      <div id="toast" class="toast hidden"></div>
+
+      <section id="tab-overview" class="tab-panel active">
+        <div id="overviewCards" class="cards"></div>
+        <div class="grid two">
+          <div class="panel">
+            <div class="panel-head"><h2>系统资源</h2></div>
+            <div id="resourceList" class="kv-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>连接与统计</h2></div>
+            <div id="overviewMeta" class="kv-list"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>最近日志</h2>
+            <button class="link-btn" data-jump="logs" type="button">查看全部</button>
+          </div>
+          <pre id="overviewLog" class="log-preview">加载中...</pre>
+        </div>
+      </section>
+
+      <section id="tab-checks" class="tab-panel">
+        <div class="toolbar">
+          <button id="runAllChecks" class="btn primary" type="button">开始检测</button>
+          <span id="checksSummary" class="muted"></span>
+        </div>
+        <div class="panel">
+          <div id="checkTable" class="table-wrap"><p class="empty">尚未检测</p></div>
+        </div>
+        <p class="hint">检测 AI 服务时会优先请求模型列表接口；如果接口不支持，会退回到一次最小的对话请求（可能产生极少量 token 费用）。</p>
+      </section>
+
+      <section id="tab-services" class="tab-panel">
+        <div class="grid two">
+          <div class="panel">
+            <div class="panel-head"><h2 id="serviceFormTitle">新增 AI 服务</h2></div>
+            <form id="serviceForm" class="form-grid">
+              <label class="field"><span>名称</span><input id="svcName" required placeholder="例如：小米 AI"></label>
+              <label class="field"><span>API Key</span><input id="svcKey" type="password" autocomplete="off" placeholder="编辑时留空保持不变"></label>
+              <label class="field"><span>接口地址</span><input id="svcBase" required placeholder="https://api.example.com/v1"></label>
+              <label class="field"><span>模型</span><input id="svcModel" required placeholder="mimo-v2.5"></label>
+              <div class="form-actions">
+                <button class="btn primary" type="submit">保存</button>
+                <button id="svcCancel" class="btn ghost hidden" type="button">取消编辑</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>当前使用</h2></div>
+            <div id="activeService" class="active-service"><span class="muted">加载中...</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>服务列表</h2></div>
+          <div id="serviceList" class="table-wrap"></div>
+        </div>
+        <p class="hint">切换后机器人会立即重新初始化 AI 服务，不需要重启进程。</p>
+      </section>
+
+      <section id="tab-business" class="tab-panel">
+        <div id="businessRoot" class="business-root"><p class="empty">加载中...</p></div>
+      </section>
+
+      <section id="tab-logs" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>日志查看</h2>
+            <div class="segmented" id="logSourceSwitch">
+              <button data-source="logs" class="active" type="button">运行日志</button>
+              <button data-source="chatlogs" type="button">聊天记录</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="field grow">
+              <span>文件筛选</span>
+              <input id="logSearch" placeholder="输入文件名筛选">
+            </label>
+            <label class="field grow">
+              <span>文件</span>
+              <select id="logFile"></select>
+            </label>
+            <label class="field narrow">
+              <span>行数</span>
+              <input id="logLines" type="number" min="1" max="2000" value="200">
+            </label>
+            <label class="field">
+              <span>关键字</span>
+              <input id="logKeyword" placeholder="可选">
+            </label>
+            <label class="field narrow" id="logLevelWrap">
+              <span>级别</span>
+              <select id="logLevel">
+                <option value="">全部</option>
+                <option value="ERROR">ERROR</option>
+                <option value="WARNING">WARNING</option>
+                <option value="INFO">INFO</option>
+              </select>
+            </label>
+            <button id="loadLogBtn" class="btn primary" type="button">加载</button>
+          </div>
+          <p id="logMeta" class="muted"></p>
+          <pre id="logContent" class="log-view">选择文件后点击加载</pre>
+        </div>
+        <p class="hint">运行日志来自 log 目录；聊天记录来自 data/chat_logs。文件较大时只读取末尾约 512KB。</p>
+      </section>
+
+      <section id="tab-tasks" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head"><h2>手动操作</h2></div>
+          <div id="actionCards" class="cards actions"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>定时任务</h2></div>
+          <div id="schedulerList" class="table-wrap"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>表情包库</h2></div>
+          <div id="memeStats" class="grid two"></div>
+        </div>
+      </section>
+
+      <section id="tab-config" class="tab-panel">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>配置速览</h2>
+            <span class="muted">只读，修改 .env 后需重启</span>
+          </div>
+          <div id="configRoot"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>数据备份</h2></div>
+          <p class="muted">备份 SQLite 数据库和少量业务 JSON，不包含 .env、日志和表情包图片。</p>
+          <button id="backupBtn" class="btn primary" type="button">下载备份 ZIP</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/admin/assets/app.js"></script>
+</body>
+</html>

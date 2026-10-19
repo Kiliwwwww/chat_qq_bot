@@ -15,6 +15,7 @@
 | `meme_sync` | 奶-hub 表情包每日自动同步 + 群内 AI 陪伴表情包（增量下载、已存在跳过） |
 | `save_meme` | 存表情：管理员私聊批量收图，直接进奶龙表情库 |
 | `xiuxian` | QQ 群修仙挂机游戏 |
+| `admin_panel` | `/admin` 可视化管理面板（运行状态、Key 体检、配置与数据管理） |
 
 此外，项目内置一个基于 **Qwen3-TTS** 的本地语音合成服务 `qwen-tts`（独立 Docker 服务），提供语音朗读与 AI 自主语音回复能力，详见 [语音功能](#语音功能qwen3-tts)。
 
@@ -89,6 +90,18 @@ python bot.py
 启动后访问 http://localhost:8080/website/ 查看 API 文档。
 
 OneBot 反向 WebSocket 连接地址：`ws://localhost:8080/onebot/v11/ws`。
+
+### 5. 可视化管理面板
+
+在 `.env` 中设置管理密码后重启，访问 http://localhost:8080/admin/ ：
+
+```env
+admin_panel_enabled=true
+admin_panel_password=你的管理密码
+admin_panel_session_hours=12
+```
+
+面板包含运行概览、API Key 体检、AI 服务增删改切换、白名单/欢迎语/广告词/知识库群/提示词管理、日志与聊天记录查看、定时任务手动触发、表情包库统计、配置速览和数据备份。API Key 只以脱敏形式展示，登录后才能访问。
 
 > 使用 Docker 部署请参考 [DEPLOY.md](./DEPLOY.md)。
 

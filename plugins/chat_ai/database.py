@@ -470,6 +470,50 @@ class Database:
             logger.error(f"添加 AI 服务失败: {e}")
             return False
 
+    def get_ai_service(self, service_id: int) -> Optional[dict]:
+        """获取指定 AI 服务配置"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT id, name, api_key, base_url, model, is_active FROM ai_services WHERE id = ?",
+                    (service_id,),
+                )
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "id": row["id"],
+                        "name": row["name"],
+                        "api_key": row["api_key"],
+                        "base_url": row["base_url"],
+                        "model": row["model"],
+                        "is_active": bool(row["is_active"]),
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"获取 AI 服务失败: {e}")
+            return None
+
+    def update_ai_service(
+        self,
+        service_id: int,
+        name: str,
+        api_key: str,
+        base_url: str,
+        model: str,
+    ) -> bool:
+        """更新 AI 服务配置"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "UPDATE ai_services SET name = ?, api_key = ?, base_url = ?, model = ? WHERE id = ?",
+                    (name, api_key, base_url, model, service_id),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"更新 AI 服务失败: {e}")
+            return False
+
     def remove_ai_service(self, service_id: int) -> bool:
         """删除 AI 服务配置"""
         try:
