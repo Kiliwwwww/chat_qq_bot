@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import time
 import zipfile
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -154,6 +155,10 @@ def _safe_file(base: Path, name: str) -> Path:
     return path
 
 
+def resolve_file(base: Path, name: str) -> Path:
+    return _safe_file(base, name)
+
+
 def _tail_text(path: Path, max_bytes: int = 512 * 1024) -> tuple[str, bool]:
     size = path.stat().st_size
     with path.open("rb") as handle:
@@ -185,23 +190,57 @@ def list_files(base: Path, suffixes: set[str], limit: int = 500) -> list[dict[st
     return files[:limit]
 
 
+def _search_file(
+    path: Path,
+    name: str,
+    limit: int,
+    keyword: str,
+    level: str,
+) -> dict[str, Any]:
+    matched: deque[str] = deque(maxlen=limit)
+    total = 0
+    with path.open("rb") as handle:
+        for raw in handle:
+            line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+            if level and level not in line.upper():
+                continue
+            if keyword and keyword not in line.lower():
+                continue
+            total += 1
+            matched.append(line)
+    selected = list(matched)
+    return {
+        "name": name,
+        "content": "\n".join(selected),
+        "returned_lines": len(selected),
+        "matched_lines": total,
+        "truncated": total > len(selected),
+        "mode": "search",
+        "size": path.stat().st_size,
+    }
+
+
 def read_tail_file(
     base: Path,
     name: str,
     lines: int = 200,
     keyword: str = "",
     level: str = "",
+    full: bool = False,
 ) -> dict[str, Any]:
     path = _safe_file(base, name)
+    lines = max(1, min(lines, 5000))
+    keyword = keyword.strip()
+    level = level.strip().upper()
+    if full and (keyword or level):
+        return _search_file(path, name, lines, keyword.lower(), level)
+
     text, truncated = _tail_text(path)
     all_lines = text.splitlines()
-    keyword = keyword.strip().lower()
-    level = level.strip().upper()
     if level:
         all_lines = [line for line in all_lines if level in line.upper()]
     if keyword:
-        all_lines = [line for line in all_lines if keyword in line.lower()]
-    lines = max(1, min(lines, 2000))
+        all_lines = [line for line in all_lines if keyword.lower() in line.lower()]
     selected = all_lines[-lines:]
     return {
         "name": name,
@@ -209,6 +248,7 @@ def read_tail_file(
         "returned_lines": len(selected),
         "matched_lines": len(all_lines),
         "truncated": truncated,
+        "mode": "tail",
         "size": path.stat().st_size,
     }
 

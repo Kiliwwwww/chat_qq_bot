@@ -24,6 +24,7 @@ from .actions import (
     get_scheduler_jobs,
     list_files,
     read_tail_file,
+    resolve_file,
     start_action,
 )
 from .auth import (
@@ -36,6 +37,7 @@ from .auth import (
 )
 from .checks import get_check_targets, mask_key, run_checks
 from .config import Config
+from .log_stream import stream_log_file
 from .runtime import STARTED_AT
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -522,11 +524,34 @@ async def log_files():
 
 
 @router.get("/api/logs/file/{name}", dependencies=AUTH)
-async def log_file(name: str, lines: int = 200, keyword: str = "", level: str = ""):
+async def log_file(
+    name: str,
+    lines: int = 200,
+    keyword: str = "",
+    level: str = "",
+    full: bool = False,
+):
     try:
-        return read_tail_file(LOG_DIR, name, lines, keyword, level)
+        return await asyncio.to_thread(
+            read_tail_file,
+            LOG_DIR,
+            name,
+            lines,
+            keyword,
+            level,
+            full,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/api/logs/stream/{name}", dependencies=AUTH)
+async def log_stream(request: Request, name: str, initial_lines: int = 100):
+    try:
+        path = resolve_file(LOG_DIR, name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return await stream_log_file(request, path, initial_lines)
 
 
 @router.get("/api/chatlogs/files", dependencies=AUTH)
@@ -535,11 +560,34 @@ async def chat_log_files():
 
 
 @router.get("/api/chatlogs/file/{name}", dependencies=AUTH)
-async def chat_log_file(name: str, lines: int = 200, keyword: str = ""):
+async def chat_log_file(
+    name: str,
+    lines: int = 200,
+    keyword: str = "",
+    level: str = "",
+    full: bool = False,
+):
     try:
-        return read_tail_file(CHAT_LOG_DIR, name, lines, keyword, "")
+        return await asyncio.to_thread(
+            read_tail_file,
+            CHAT_LOG_DIR,
+            name,
+            lines,
+            keyword,
+            level,
+            full,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/api/chatlogs/stream/{name}", dependencies=AUTH)
+async def chat_log_stream(request: Request, name: str, initial_lines: int = 100):
+    try:
+        path = resolve_file(CHAT_LOG_DIR, name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return await stream_log_file(request, path, initial_lines)
 
 
 @router.get("/api/actions", dependencies=AUTH)

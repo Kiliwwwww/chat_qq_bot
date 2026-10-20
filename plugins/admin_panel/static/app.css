@@ -700,6 +700,44 @@ td.mono {
 }
 
 /* Logs */
+.log-head-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.log-toolbar #logMeta {
+  margin: 0;
+}
+
+.check {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--text-soft);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+
 .log-view,
 .log-preview {
   overflow: auto;
@@ -722,6 +760,29 @@ td.mono {
 .log-view {
   min-height: 260px;
   max-height: 62vh;
+  white-space: normal;
+}
+
+.log-line {
+  min-height: 1.65em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.log-line mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: #9e6a03;
+  color: #fff8e5;
+}
+
+.log-line.system {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .meta-line {
@@ -891,6 +952,10 @@ td.mono {
 
   .topbar {
     align-items: center;
+  }
+
+  .log-head-tools {
+    justify-content: flex-start;
   }
 }
 

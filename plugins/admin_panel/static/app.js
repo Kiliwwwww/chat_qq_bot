@@ -13,8 +13,15 @@
     editingService: null,
     business: null,
     logSource: "logs",
+    logMode: "live",
     logFiles: [],
     selectedLog: "",
+    logBuffer: [],
+    logStream: null,
+    logKeyword: "",
+    logLevel: "",
+    logRetryTimer: null,
+    logFilterTimer: null,
     tasks: null,
     taskTimer: null,
     toastTimer: null,
@@ -219,6 +226,7 @@
 
   function showLogin() {
     clearTimeout(state.taskTimer);
+    stopLogStream();
     $("#appView").classList.add("hidden");
     $("#loginView").classList.remove("hidden");
     const session = state.session || {};
@@ -252,6 +260,9 @@
   function switchTab(tab) {
     const meta = TAB_META[tab];
     if (!meta) return;
+    if (state.currentTab === "logs" && tab !== "logs") {
+      stopLogStream();
+    }
     state.currentTab = tab;
     document.querySelectorAll(".nav-item").forEach((item) => {
       item.classList.toggle("active", item.dataset.tab === tab);
@@ -815,21 +826,125 @@
     toast("已移除", "ok");
   }
 
+  function setLogStatus(status, text) {
+    const badge = $("#logLiveStatus");
+    if (!badge) return;
+    badge.className = `badge ${status}`;
+    badge.textContent = text;
+  }
+
+  function stopLogStream() {
+    if (state.logStream) {
+      state.logStream.close();
+      state.logStream = null;
+    }
+    clearTimeout(state.logRetryTimer);
+    state.logRetryTimer = null;
+    setLogStatus("idle", "未连接");
+  }
+
+  function logFilterValues() {
+    return {
+      keyword: $("#logKeyword").value.trim(),
+      level: state.logSource === "logs" ? $("#logLevel").value : "",
+    };
+  }
+
+  function highlightInto(container, text, keyword) {
+    if (!keyword) {
+      container.textContent = text;
+      return;
+    }
+    const lowerText = text.toLowerCase();
+    const lowerKeyword = keyword.toLowerCase();
+    let start = 0;
+    let index = lowerText.indexOf(lowerKeyword);
+    while (index !== -1) {
+      if (index > start) container.appendChild(document.createTextNode(text.slice(start, index)));
+      const mark = document.createElement("mark");
+      mark.textContent = text.slice(index, index + keyword.length);
+      container.appendChild(mark);
+      start = index + keyword.length;
+      index = lowerText.indexOf(lowerKeyword, start);
+    }
+    if (start < text.length) container.appendChild(document.createTextNode(text.slice(start)));
+  }
+
+  function renderLogBuffer(metaText = "") {
+    const content = $("#logContent");
+    if (!content) return;
+    const { keyword, level } = logFilterValues();
+    const lowerKeyword = keyword.toLowerCase();
+    const filtered = state.logBuffer.filter((line) => {
+      if (level && !line.toUpperCase().includes(level)) return false;
+      if (lowerKeyword && !line.toLowerCase().includes(lowerKeyword)) return false;
+      return true;
+    });
+    const display = filtered.slice(-2000);
+    const nearBottom = content.scrollHeight - content.scrollTop - content.clientHeight < 60;
+    const fragment = document.createDocumentFragment();
+    if (display.length) {
+      display.forEach((line) => {
+        const row = document.createElement("div");
+        row.className = "log-line";
+        highlightInto(row, line, keyword);
+        fragment.appendChild(row);
+      });
+    } else {
+      const row = document.createElement("div");
+      row.className = "log-line system";
+      row.textContent = state.logBuffer.length
+        ? "当前过滤条件下没有匹配的日志"
+        : state.logMode === "live"
+          ? "等待新日志输出..."
+          : "(空)";
+      fragment.appendChild(row);
+    }
+    content.innerHTML = "";
+    content.appendChild(fragment);
+    if ($("#logAutoScroll").checked && nearBottom) {
+      content.scrollTop = content.scrollHeight;
+    }
+
+    if (metaText) {
+      $("#logMeta").textContent = metaText;
+      return;
+    }
+    const mode = state.logMode === "live" ? "实时" : "全文";
+    const suffix = filtered.length > display.length ? ` · 仅显示最近 ${display.length} 行` : "";
+    const name = state.selectedLog || "未选择文件";
+    $("#logMeta").textContent = `${name} · ${mode} · 匹配 ${filtered.length} 行 / 缓存 ${state.logBuffer.length} 行${suffix}`;
+  }
+
+  function updateLogModeUI() {
+    const live = state.logMode === "live";
+    $("#logLinesLabel").textContent = live ? "初始行数" : "行数";
+    $("#loadLogBtn").textContent = live ? "开始实时" : "加载全文";
+    $("#stopLogBtn").classList.toggle("hidden", !live);
+    $("#logAutoScroll").closest(".check").classList.toggle("hidden", !live);
+  }
+
   async function loadLogsTab() {
+    updateLogModeUI();
     if (!state.logFiles.length) {
       await loadLogFiles();
     } else {
       renderLogFileOptions();
+      if (state.logMode === "live" && !state.logStream) {
+        startLogStream();
+      }
     }
   }
 
   async function loadLogFiles() {
     const source = state.logSource;
+    stopLogStream();
     const data = await api(`/admin/api/${source}/files`);
     state.logFiles = data.files || [];
     state.selectedLog = "";
     renderLogFileOptions();
-    $("#logContent").textContent = "选择文件后点击加载";
+    state.logBuffer = [];
+    $("#logContent").innerHTML = "";
     $("#logMeta").textContent = "";
     if (state.selectedLog) {
       await loadLog();
@@ -847,30 +962,139 @@
     );
     $("#logFile").innerHTML = options.join("") || '<option value="">无文件</option>';
     $("#logFile").value = state.selectedLog;
-    $("#logMeta").textContent = state.logFiles.length
-      ? `共 ${state.logFiles.length} 个文件，当前显示 ${files.length} 个`
-      : "暂无文件";
   }
 
-  async function loadLog() {
+  function startLogStream() {
+    stopLogStream();
     const name = $("#logFile").value || state.selectedLog;
     if (!name) {
-      $("#logContent").textContent = "没有可加载的文件";
+      $("#logContent").innerHTML = "";
+      renderLogBuffer("没有可实时读取的文件");
       return;
     }
     state.selectedLog = name;
-    const lines = Math.max(1, Math.min(2000, Number($("#logLines").value) || 200));
-    const keyword = $("#logKeyword").value.trim();
-    const level = state.logSource === "logs" ? $("#logLevel").value : "";
+    state.logBuffer = [];
+    $("#logContent").innerHTML = "";
+    setLogStatus("running", "连接中");
+    const lines = Math.max(1, Math.min(5000, Number($("#logLines").value) || 200));
+    const source = state.logSource;
+    const query = new URLSearchParams({ initial_lines: String(lines) });
+    const stream = new EventSource(`/admin/api/${source}/stream/${encodeURIComponent(name)}?${query.toString()}`);
+    state.logStream = stream;
+
+    stream.addEventListener("ready", () => {
+      setLogStatus("ok", "实时中");
+      state.logBuffer = [];
+      $("#logContent").innerHTML = "";
+    });
+    stream.addEventListener("initial", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        state.logBuffer = Array.isArray(data.lines) ? data.lines : [];
+        renderLogBuffer();
+      } catch (error) {
+        setLogStatus("fail", "数据异常");
+      }
+    });
+    stream.addEventListener("lines", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (Array.isArray(data.lines) && data.lines.length) {
+          state.logBuffer.push(...data.lines);
+          if (state.logBuffer.length > 5000) {
+            state.logBuffer = state.logBuffer.slice(-5000);
+          }
+          renderLogBuffer();
+        }
+      } catch (error) {
+        setLogStatus("fail", "数据异常");
+      }
+    });
+    stream.addEventListener("reset", (event) => {
+      state.logBuffer = [];
+      $("#logContent").innerHTML = "";
+      try {
+        const data = JSON.parse(event.data);
+        toast(data.message || "日志文件已切换", "info");
+      } catch (error) {
+        toast("日志文件已切换", "info");
+      }
+    });
+    stream.addEventListener("error", (event) => {
+      if (state.logStream !== stream) return;
+      let message = "日志流已断开，正在尝试重连";
+      if (event.data) {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.message) message = data.message;
+        } catch (error) {
+          // ignore
+        }
+      }
+      setLogStatus("fail", "连接中断");
+      $("#logMeta").textContent = message;
+      clearTimeout(state.logRetryTimer);
+      state.logRetryTimer = setTimeout(async () => {
+        if (state.logStream !== stream) return;
+        try {
+          const session = await fetchSession();
+          if (!session.authenticated) {
+            state.session = session;
+            showLogin();
+          }
+        } catch (error) {
+          // ignore
+        }
+      }, 1500);
+    });
+  }
+
+  async function loadFullLog() {
+    stopLogStream();
+    const name = $("#logFile").value || state.selectedLog;
+    if (!name) {
+      state.logBuffer = [];
+      renderLogBuffer("没有可加载的文件");
+      return;
+    }
+    state.selectedLog = name;
+    const lines = Math.max(1, Math.min(5000, Number($("#logLines").value) || 200));
+    const { keyword, level } = logFilterValues();
     const source = state.logSource;
     const query = new URLSearchParams({
       lines: String(lines),
       keyword,
       level,
+      full: "true",
     });
-    const data = await api(`/admin/api/${source}/file/${encodeURIComponent(name)}?${query.toString()}`);
-    $("#logMeta").textContent = `${name} · 显示 ${data.returned_lines} 行 · 匹配 ${data.matched_lines} 行${data.truncated ? " · 已截取末尾 512KB" : ""}`;
-    $("#logContent").textContent = data.content || "(空)";
+    setLogStatus("running", "读取中");
+    $("#logMeta").textContent = keyword || level ? "正在全文件搜索..." : "正在读取文件末尾...";
+    try {
+      const data = await api(`/admin/api/${source}/file/${encodeURIComponent(name)}?${query.toString()}`);
+      state.logBuffer = data.content ? data.content.split("\n") : [];
+      if (state.logBuffer.length && state.logBuffer[state.logBuffer.length - 1] === "") {
+        state.logBuffer.pop();
+      }
+      const modeText = data.mode === "search" ? "全文搜索" : "全文";
+      let truncatedText = "";
+      if (data.mode === "search" && data.truncated) {
+        truncatedText = ` · 仅显示最近 ${data.returned_lines} 条匹配`;
+      } else if (data.mode !== "search" && data.truncated) {
+        truncatedText = " · 已截取末尾 512KB";
+      }
+      const meta = `${name} · ${modeText} · 显示 ${data.returned_lines} 行 · 匹配 ${data.matched_lines} 行${truncatedText}`;
+      renderLogBuffer(meta);
+    } finally {
+      setLogStatus("idle", "未连接");
+    }
+  }
+
+  async function loadLog() {
+    if (state.logMode === "live") {
+      startLogStream();
+      return;
+    }
+    await loadFullLog();
   }
 
   async function loadTasks() {
@@ -1005,6 +1229,19 @@
     $("#businessRoot").addEventListener("submit", (event) => run(handleBusinessSubmit(event)));
     $("#businessRoot").addEventListener("click", (event) => run(handleBusinessClick(event)));
 
+    $("#logModeSwitch").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-mode]");
+      if (!button) return;
+      state.logMode = button.dataset.mode;
+      $("#logModeSwitch").querySelectorAll("button").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+      updateLogModeUI();
+      state.logBuffer = [];
+      $("#logContent").innerHTML = "";
+      stopLogStream();
+      run(state.logMode === "live" ? startLogStream() : loadFullLog());
+    });
     $("#logSourceSwitch").addEventListener("click", (event) => {
       const button = event.target.closest("[data-source]");
       if (!button) return;
@@ -1024,6 +1261,32 @@
       run(loadLog());
     });
     $("#loadLogBtn").addEventListener("click", () => run(loadLog()));
+    $("#stopLogBtn").addEventListener("click", () => {
+      stopLogStream();
+      $("#logMeta").textContent = "已停止实时读取";
+    });
+    $("#clearLogBtn").addEventListener("click", () => {
+      state.logBuffer = [];
+      $("#logContent").innerHTML = "";
+      renderLogBuffer();
+    });
+    $("#logKeyword").addEventListener("input", () => {
+      clearTimeout(state.logFilterTimer);
+      state.logFilterTimer = setTimeout(() => {
+        if (state.logMode === "full" && state.selectedLog) {
+          run(loadFullLog());
+        } else {
+          renderLogBuffer();
+        }
+      }, state.logMode === "full" ? 450 : 120);
+    });
+    $("#logLevel").addEventListener("change", () => {
+      if (state.logMode === "full" && state.selectedLog) {
+        run(loadFullLog());
+      } else {
+        renderLogBuffer();
+      }
+    });
 
     $("#actionCards").addEventListener("click", (event) => {
       const button = event.target.closest("[data-action]");

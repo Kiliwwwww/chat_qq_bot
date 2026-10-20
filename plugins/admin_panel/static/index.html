@@ -131,9 +131,16 @@
         <div class="panel">
           <div class="panel-head">
             <h2>日志查看</h2>
-            <div class="segmented" id="logSourceSwitch">
-              <button data-source="logs" class="active" type="button">运行日志</button>
-              <button data-source="chatlogs" type="button">聊天记录</button>
+            <div class="log-head-tools">
+              <span id="logLiveStatus" class="badge idle">未连接</span>
+              <div class="segmented" id="logModeSwitch">
+                <button data-mode="live" class="active" type="button">实时</button>
+                <button data-mode="full" type="button">全文</button>
+              </div>
+              <div class="segmented" id="logSourceSwitch">
+                <button data-source="logs" class="active" type="button">运行日志</button>
+                <button data-source="chatlogs" type="button">聊天记录</button>
+              </div>
             </div>
           </div>
           <div class="form-row">
@@ -146,12 +153,12 @@
               <select id="logFile"></select>
             </label>
             <label class="field narrow">
-              <span>行数</span>
-              <input id="logLines" type="number" min="1" max="2000" value="200">
+              <span id="logLinesLabel">初始行数</span>
+              <input id="logLines" type="number" min="1" max="5000" value="200">
             </label>
             <label class="field">
-              <span>关键字</span>
-              <input id="logKeyword" placeholder="可选">
+              <span>搜索关键字</span>
+              <input id="logKeyword" placeholder="实时模式即时过滤，支持高亮">
             </label>
             <label class="field narrow" id="logLevelWrap">
               <span>级别</span>
@@ -160,14 +167,23 @@
                 <option value="ERROR">ERROR</option>
                 <option value="WARNING">WARNING</option>
                 <option value="INFO">INFO</option>
+                <option value="DEBUG">DEBUG</option>
               </select>
             </label>
-            <button id="loadLogBtn" class="btn primary" type="button">加载</button>
+            <button id="loadLogBtn" class="btn primary" type="button">开始实时</button>
+            <button id="stopLogBtn" class="btn danger hidden" type="button">停止</button>
+            <button id="clearLogBtn" class="btn ghost" type="button">清空显示</button>
           </div>
-          <p id="logMeta" class="muted"></p>
-          <pre id="logContent" class="log-view">选择文件后点击加载</pre>
+          <div class="log-toolbar">
+            <p id="logMeta" class="muted"></p>
+            <label class="check">
+              <input id="logAutoScroll" type="checkbox" checked>
+              <span>自动滚动</span>
+            </label>
+          </div>
+          <div id="logContent" class="log-view" aria-live="polite"></div>
         </div>
-        <p class="hint">运行日志来自 log 目录；聊天记录来自 data/chat_logs。文件较大时只读取末尾约 512KB。</p>
+        <p class="hint">实时模式会持续接收新日志，适合盯着运行状态；全文模式无关键字时读取文件末尾快照，有关键字或级别时会在整个文件中搜索并返回最近匹配。实时模式最多保留最近 5000 行。</p>
       </section>
 
       <section id="tab-tasks" class="tab-panel">
