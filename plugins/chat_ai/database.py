@@ -4,6 +4,8 @@ from typing import Optional
 
 from nonebot import logger
 
+from .prompt_utils import clean_prompt_text
+
 
 class Database:
     """SQLite 数据库管理类"""
@@ -93,11 +95,46 @@ class Database:
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS group_prompts (
+                        group_id INTEGER PRIMARY KEY,
+                        name TEXT DEFAULT '',
+                        prompt TEXT NOT NULL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS group_names (
+                        group_id INTEGER PRIMARY KEY,
+                        group_name TEXT NOT NULL DEFAULT '',
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
+                self._migrate_group_prompts(conn)
                 self._init_default_ad_keywords(conn)
                 logger.info("数据库初始化完成")
         except Exception as e:
             logger.error(f"数据库初始化失败: {e}")
+
+    def _migrate_group_prompts(self, conn: sqlite3.Connection) -> None:
+        """清理旧版 Markdown 编辑器写入的代码块围栏。"""
+        try:
+            cursor = conn.execute("SELECT group_id, prompt FROM group_prompts")
+            changed = False
+            for row in cursor.fetchall():
+                cleaned = clean_prompt_text(row["prompt"])
+                if cleaned and cleaned != row["prompt"]:
+                    conn.execute(
+                        "UPDATE group_prompts SET prompt = ? WHERE group_id = ?",
+                        (cleaned, row["group_id"]),
+                    )
+                    changed = True
+            if changed:
+                conn.commit()
+                logger.info("已修复历史群提示词中的代码块围栏")
+        except Exception as e:
+            logger.error(f"清理历史群提示词失败: {e}")
 
     def _init_default_ad_keywords(self, conn: sqlite3.Connection) -> None:
         """初始化默认广告关键词（仅在表为空时插入）"""
@@ -357,6 +394,113 @@ class Database:
         except Exception as e:
             logger.error(f"获取欢迎语失败: {e}")
             return None
+
+    def get_all_group_prompts(self) -> list[dict]:
+        """获取所有群专属提示词"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT group_id, name, prompt, updated_at FROM group_prompts ORDER BY group_id"
+                )
+                return [
+                    {
+                        "group_id": row["group_id"],
+                        "name": row["name"] or "",
+                        "prompt": clean_prompt_text(row["prompt"]),
+                        "updated_at": row["updated_at"],
+                    }
+                    for row in cursor.fetchall()
+                ]
+        except Exception as e:
+            logger.error(f"获取群提示词列表失败: {e}")
+            return []
+
+    def get_group_prompt(self, group_id: int) -> Optional[dict]:
+        """获取指定群的专属提示词"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT group_id, name, prompt, updated_at FROM group_prompts WHERE group_id = ?",
+                    (group_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                return {
+                    "group_id": row["group_id"],
+                    "name": row["name"] or "",
+                    "prompt": clean_prompt_text(row["prompt"]),
+                    "updated_at": row["updated_at"],
+                }
+        except Exception as e:
+            logger.error(f"获取群提示词失败: {e}")
+            return None
+
+    def set_group_prompt(self, group_id: int, prompt: str, name: str = "") -> bool:
+        """设置群专属提示词"""
+        try:
+            prompt = clean_prompt_text(prompt)
+            if not prompt:
+                return False
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO group_prompts (group_id, name, prompt, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                    (group_id, name, prompt),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"设置群提示词失败: {e}")
+            return False
+
+    def delete_group_prompt(self, group_id: int) -> bool:
+        """删除群专属提示词"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM group_prompts WHERE group_id = ?", (group_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"删除群提示词失败: {e}")
+            return False
+
+    # ==================== 群名称缓存 ====================
+
+    def get_all_group_names(self) -> dict[int, str]:
+        """获取缓存的群名称"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute("SELECT group_id, group_name FROM group_names")
+                return {
+                    row["group_id"]: row["group_name"]
+                    for row in cursor.fetchall()
+                    if row["group_name"]
+                }
+        except Exception as e:
+            logger.error(f"获取群名称缓存失败: {e}")
+            return {}
+
+    def save_group_names(self, names: dict[int, str]) -> bool:
+        """保存群名称缓存"""
+        items = [
+            (int(group_id), str(group_name).strip())
+            for group_id, group_name in names.items()
+            if str(group_name or "").strip()
+        ]
+        if not items:
+            return True
+        try:
+            with self._get_conn() as conn:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO group_names (group_id, group_name, updated_at) "
+                    "VALUES (?, ?, CURRENT_TIMESTAMP)",
+                    items,
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"保存群名称缓存失败: {e}")
+            return False
 
     def add_ad_keyword(self, keyword: str) -> bool:
         """添加广告关键词"""

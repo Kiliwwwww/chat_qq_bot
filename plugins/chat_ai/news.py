@@ -12,10 +12,11 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime
 
 import httpx
-from nonebot import get_bot, logger
+from nonebot import get_bots, logger
 
 from .state import db
 
@@ -131,16 +132,31 @@ def format_news_text(
     )
 
 
-async def send_news_to_all_groups(text: str) -> tuple[int, int]:
+async def wait_for_bot(timeout: float = 20.0):
+    """等待任意一个 Bot 上线，超时返回 None。
+
+    Bot 刚重启、或矩阵里跑了多个实例时，定时任务/手动推送有可能在连接建立前触发，
+    这里短暂等待可以避免新闻直接因为 "There are no bots to get" 而放弃。
+    """
+    deadline = time.monotonic() + max(0.0, timeout)
+    while True:
+        bots = list(get_bots().values())
+        if bots:
+            return bots
+        if time.monotonic() >= deadline:
+            return []
+        await asyncio.sleep(1)
+
+
+async def send_news_to_all_groups(text: str, timeout: float = 20.0) -> tuple[int, int]:
     """把新闻文本发送到 groupsettings 群白名单里的所有群，返回 (成功数, 失败数)。"""
     groups = sorted(db.get_all_groups())
     if not groups:
         return 0, 0
 
-    try:
-        bot = get_bot()
-    except Exception as e:
-        logger.error(f"今日新闻：获取 bot 失败，本次发送中止: {e}")
+    bots = await wait_for_bot(timeout)
+    if not bots:
+        logger.error("今日新闻：等待超时，当前没有在线的 Bot，本次发送中止")
         return 0, len(groups)
 
     ok = 0
@@ -149,10 +165,18 @@ async def send_news_to_all_groups(text: str) -> tuple[int, int]:
         if index:
             # 群与群之间稍微间隔，避免发得太快被风控
             await asyncio.sleep(1)
-        try:
-            await bot.send_group_msg(group_id=group_id, message=text)
+        sent = False
+        last_error = None
+        for bot in bots:
+            try:
+                await bot.send_group_msg(group_id=group_id, message=text)
+                sent = True
+                break
+            except Exception as e:
+                last_error = e
+        if sent:
             ok += 1
-        except Exception as e:
+        else:
             fail += 1
-            logger.error(f"今日新闻发送失败 群:{group_id}: {e}")
+            logger.error(f"今日新闻发送失败 群:{group_id}: {last_error}")
     return ok, fail

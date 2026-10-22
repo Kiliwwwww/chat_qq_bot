@@ -172,12 +172,18 @@ async def handle_private_msg(event: MessageEvent):
                     result.voice_instruct or config.tts_instruct,
                 )
             except Exception as e:
-                logger.error(f"私聊语音生成失败，改为不发 用户:{user_id}: {e}")
-                await private_msg.finish()
+                logger.error(f"私聊语音生成失败，降级发文字 用户:{user_id}: {e}")
+                await private_msg.finish(result.voice_text)
             logger.info(f"私聊语音回复 用户:{user_id} 内容:{result.voice_text[:20]}...")
-            await private_msg.finish(
-                MessageSegment.record(f"base64://{base64.b64encode(audio).decode()}")
-            )
+            try:
+                await private_msg.finish(
+                    MessageSegment.record(f"base64://{base64.b64encode(audio).decode()}")
+                )
+            except FinishedException:
+                raise
+            except Exception as e:
+                logger.warning(f"私聊语音消息发送失败，回退纯文本 用户:{user_id}: {e}")
+                await private_msg.finish(result.voice_text)
 
         reply = result.text
 

@@ -16,6 +16,7 @@ pairing_manager = PairingManager(config)
 
 # 今日老婆命令（群聊和私聊都可用）
 daily_wife_cmd = on_command("今日老婆", priority=5, block=True)
+daily_beizi_cmd = on_command("今日杯子", priority=5, block=True)
 
 # 原神家庭命令（群聊）
 daily_baby_cmd = on_command("原神家庭", priority=5, block=True)
@@ -50,6 +51,7 @@ async def handle_daily_wife_set(bot: Bot, event: PrivateMessageEvent, args: Mess
         await daily_wife_set_cmd.finish("配置失败，Redis连接异常")
 
 
+@daily_beizi_cmd.handle()
 @daily_wife_cmd.handle()
 async def handle_daily_wife(bot: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     """处理今日老婆命令（群聊）"""

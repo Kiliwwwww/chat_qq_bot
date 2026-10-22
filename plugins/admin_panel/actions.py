@@ -85,14 +85,9 @@ def get_action_states() -> list[dict[str, Any]]:
 
 async def _execute_action(name: str) -> str:
     if name == "news":
-        from nonebot import get_plugin_config
         from plugins.chat_ai.commands.scheduler import daily_news_push
-        from plugins.chat_ai.config import Config as ChatAIConfig
 
-        if not get_plugin_config(ChatAIConfig).daily_news_enabled:
-            return "今日新闻推送未启用，已跳过"
-        await daily_news_push()
-        return "今日新闻推送任务已执行，详情见日志"
+        return await daily_news_push()
     if name == "kb_upload":
         from nonebot import get_plugin_config
         from plugins.chat_ai.commands.scheduler import daily_kb_upload

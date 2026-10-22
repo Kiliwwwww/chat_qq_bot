@@ -86,8 +86,9 @@ SEND_VOICE_TOOL = {
         "name": "send_voice",
         "description": (
             "把你要说的话用语音（女声朗读）发出来。"
-            "当群友在攻击、辱骂、嘲讽、挑衅你，或者情绪很激烈、适合用语气（生气/委屈/嘲讽/得意）表达时，"
-            "请主动调用此工具，用语音回复更有冲击力。"
+            "以下场景请主动调用此工具："
+            "1. 用户要求你发语音、唱歌、朗读、念一段话、听你的声音时（这是明确的语音请求，必须调用）；"
+            "2. 群友在攻击、辱骂、嘲讽、挑衅你，或者情绪很激烈、适合用语气（生气/委屈/嘲讽/得意）表达时。"
             "调用后本轮不要再输出文字内容，直接用语音作为你的回复。"
             "text 填你要说的完整口语内容（1~2 句，简短自然，不要写括号动作、表情符号、markdown）。"
         ),
@@ -514,12 +515,15 @@ class AIService:
         if allow_followup:
             tools.append(SEND_FOLLOWUP_TOOL)
 
+        # 实际用于请求的消息（图片失败时会替换为去掉图片的版本）
+        request_messages = base_messages
+
         request_start = time.time()
         self.ai_logger.info(f"开始调用 API (chat_with_tools)，model={self.model}")
         try:
             resp = await self.client.chat.completions.create(
                 model=self.model,
-                messages=base_messages,
+                messages=request_messages,
                 tools=tools,
                 tool_choice="auto",
                 max_tokens=self.max_tokens,
@@ -529,9 +533,33 @@ class AIService:
             )
         except Exception as e:
             elapsed = time.time() - request_start
-            self.ai_logger.warning(f"带工具调用失败，回退普通对话，耗时 {elapsed:.2f}s: {e}")
-            text = await self.chat_with_history(messages, system_prompt=system_prompt)
-            return ChatResult(text=text)
+            self.ai_logger.warning(f"带工具调用失败，耗时 {elapsed:.2f}s: {e}")
+            # 若因消息中图片过期/格式不支持导致失败，去掉图片但保留工具重试一次
+            if self._has_images(request_messages):
+                self.ai_logger.warning("检测到消息包含图片，可能是图片过期或格式不支持导致失败，去掉图片重试一次（保留工具）")
+                request_messages = self._strip_images(request_messages)
+                try:
+                    resp = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=request_messages,
+                        tools=tools,
+                        tool_choice="auto",
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        top_p=self.top_p,
+                        timeout=120.0,
+                    )
+                    elapsed = time.time() - request_start
+                    self.ai_logger.info(f"去掉图片后重试成功（保留工具），耗时 {elapsed:.2f}s")
+                except Exception as e2:
+                    elapsed = time.time() - request_start
+                    self.ai_logger.warning(f"去掉图片后重试仍失败，回退普通对话，耗时 {elapsed:.2f}s: {e2}")
+                    text = await self.chat_with_history(messages, system_prompt=system_prompt)
+                    return ChatResult(text=text)
+            else:
+                self.ai_logger.warning("回退普通对话（无图片可去）")
+                text = await self.chat_with_history(messages, system_prompt=system_prompt)
+                return ChatResult(text=text)
 
         if self.db:
             self.db.increment_stat("ai_request_count")
@@ -572,7 +600,7 @@ class AIService:
             try:
                 resp2 = await self.client.chat.completions.create(
                     model=self.model,
-                    messages=base_messages + context_messages,
+                    messages=request_messages + context_messages,
                     tools=tools,
                     tool_choice="auto",
                     max_tokens=self.max_tokens,
@@ -601,7 +629,7 @@ class AIService:
                 self.ai_logger.info(
                     f"强制连发：目标 {force_followup} 条，当前 {current_total} 条，补充 {deficit} 条"
                 )
-                seed_messages = list(base_messages)
+                seed_messages = list(request_messages)
                 if content.strip():
                     seed_messages = seed_messages + [{"role": "assistant", "content": content}]
                 extra_lines = await self._generate_followup_lines(

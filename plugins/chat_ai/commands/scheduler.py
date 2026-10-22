@@ -6,7 +6,7 @@ import asyncio
 import random
 import time
 
-from nonebot import get_plugin_config, require, logger, get_bot
+from nonebot import get_plugin_config, require, logger, get_bot, get_bots
 from nonebot_plugin_apscheduler import scheduler
 
 from plugins.meme_sync import meme_library
@@ -102,6 +102,29 @@ def _iter_unprocessed_logs(group_id: int, today_str: str) -> list[Path]:
             continue
         paths.append(p)
     return sorted(paths)
+
+
+@scheduler.scheduled_job(
+    "interval",
+    minutes=30,
+    id="refresh_group_names",
+    coalesce=True,
+    max_instances=1,
+)
+async def refresh_group_names():
+    """定期缓存群名称，管理面板在 Bot 离线时也能显示群名。"""
+    names: dict[int, str] = {}
+    for bot in get_bots().values():
+        try:
+            for item in await bot.get_group_list():
+                group_id = int(item.get("group_id") or 0)
+                name = str(item.get("group_name") or "").strip()
+                if group_id and name:
+                    names[group_id] = name
+        except Exception as e:
+            logger.warning(f"刷新群名称缓存失败: {e}")
+    if names:
+        db.save_group_names(names)
 
 
 @scheduler.scheduled_job("cron", hour=0, minute=0, id="daily_kb_upload")
@@ -243,10 +266,10 @@ async def group_bubble_check():
     max_instances=1,
     misfire_grace_time=3600,
 )
-async def daily_news_push():
+async def daily_news_push() -> str:
     """每天早上定时把微博热搜 + 知乎热榜推送到 groupsettings 里的所有群"""
     if not plugin_config.daily_news_enabled:
-        return
+        return "今日新闻推送未启用，已跳过"
 
     logger.info(
         "开始执行今日新闻推送"
@@ -261,12 +284,16 @@ async def daily_news_push():
         )
         if not weibo and not zhihu:
             logger.error("今日新闻：微博热搜和知乎热榜都没抓到数据，跳过本次推送")
-            return
+            return "微博热搜和知乎热榜都没抓到数据，本次推送跳过"
 
         text = format_news_text(weibo, zhihu)
-        ok, fail = await send_news_to_all_groups(text)
+        ok, fail = await send_news_to_all_groups(text, timeout=30.0)
     except Exception as e:  # noqa: BLE001 - 定时任务不能把异常抛给调度器
         logger.error(f"今日新闻推送失败: {e}")
-        return
+        return f"今日新闻推送失败: {e}"
 
-    logger.info(f"今日新闻推送完成：成功 {ok} 个群，失败 {fail} 个群")
+    summary = f"今日新闻推送完成：成功 {ok} 个群，失败 {fail} 个群"
+    if ok == 0 and fail > 0:
+        summary += "（机器人可能不在线，请确认 Bot 已连接后重试）"
+    logger.info(summary)
+    return summary

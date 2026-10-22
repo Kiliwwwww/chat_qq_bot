@@ -17,6 +17,7 @@ from nonebot.exception import FinishedException
 
 from ..config import Config
 from .. import state
+from ..prompt_utils import clean_prompt_text
 from ..state import (
     db,
     group_histories,
@@ -436,8 +437,17 @@ async def handle_group_msg(event: MessageEvent):
             admin_maid_prompt = "\n\n当前是主人在艾特你，请切换成女仆模式，用恭敬、温柔、撒娇的语气回复主人。"
         # 时间感知提示词
         time_prompt = get_time_hint()
+        # 群专属提示词：配置了则完全替换默认人格提示词
+        base_prompt = state.ai_service.system_prompt
+        group_prompt_row = db.get_group_prompt(group_id)
+        if group_prompt_row:
+            custom_prompt = clean_prompt_text(group_prompt_row.get("prompt") or "")
+            if custom_prompt:
+                base_prompt = custom_prompt
+                base_prompt = base_prompt.replace("{admin_qq}", str(config.admin_qq))
+                base_prompt = base_prompt.replace("{admin_name}", config.admin_name)
         system_prompt = (
-            state.ai_service.system_prompt + keywords_prompt + admin_maid_prompt
+            base_prompt + keywords_prompt + admin_maid_prompt
             + time_prompt + NO_META_RULE
         )
         if config.multi_message_enabled:
@@ -494,11 +504,17 @@ async def handle_group_msg(event: MessageEvent):
                     result.voice_instruct or config.tts_instruct,
                 )
             except Exception as e:
-                logger.error(f"语音生成失败，改为不发 群:{group_id}: {e}")
-                await group_msg.finish()
+                logger.error(f"语音生成失败，降级发文字 群:{group_id}: {e}")
+                await group_msg.finish(result.voice_text)
             logger.info(f"AI 语音回复 群:{group_id} 内容:{result.voice_text[:20]}...")
             record = MessageSegment.record(f"base64://{base64.b64encode(audio).decode()}")
-            await group_msg.finish(record)
+            try:
+                await group_msg.finish(record)
+            except FinishedException:
+                raise
+            except Exception as e:
+                logger.warning(f"语音消息发送失败，回退纯文本 群:{group_id}: {e}")
+                await group_msg.finish(result.voice_text)
 
         reply = result.text
 
@@ -599,7 +615,8 @@ async def handle_group_msg(event: MessageEvent):
         # 高风险内容拦截
         if "high risk" in str(e).lower():
             await group_msg.finish("别发些奇奇怪怪的东西！")
-        # 其他失败情况静默处理，不回复群消息
+        # 其他失败情况给个文字兜底，避免群里完全没反应
+        await group_msg.finish("人家刚才卡住了嘛 稍等再叫人家好不好")
 
 
 @member_join.handle()

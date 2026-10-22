@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import mimetypes
 import time
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,7 @@ from .auth import (
 from .checks import get_check_targets, mask_key, run_checks
 from .config import Config
 from .log_stream import stream_log_file
+from .reports import get_ai_usage, get_group_activity, get_operations
 from .runtime import STARTED_AT
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -80,6 +82,11 @@ class WelcomePayload(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
 
 
+class GroupSendPayload(BaseModel):
+    group_id: int = Field(gt=0)
+    message: str = Field(min_length=1, max_length=4000)
+
+
 class AdKeywordPayload(BaseModel):
     keyword: str = Field(min_length=1, max_length=200)
 
@@ -91,6 +98,12 @@ class KeywordPayload(BaseModel):
 class KbGroupPayload(BaseModel):
     group_id: int = Field(gt=0)
     kb_id: str = Field(min_length=1, max_length=200)
+
+
+class GroupPromptPayload(BaseModel):
+    group_id: int = Field(gt=0)
+    name: str = Field(default="", max_length=100)
+    prompt: str = Field(min_length=1, max_length=100000)
 
 
 class CheckPayload(BaseModel):
@@ -117,13 +130,22 @@ def _chat_state():
     return chat_state
 
 
+async def _wait_for_bots(timeout: float = 5.0) -> list[Any]:
+    """等待 Bot 上线，返回当前已连接的所有 Bot。"""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(0.0, timeout)
+    while True:
+        bots = list(nonebot.get_bots().values())
+        if bots or loop.time() >= deadline:
+            return bots
+        await asyncio.sleep(0.5)
+
+
 def _iso_now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-@router.get("", include_in_schema=False)
-@router.get("/", include_in_schema=False)
-async def index_page():
+def _serve_index() -> FileResponse:
     return FileResponse(
         STATIC_DIR / "index.html",
         media_type="text/html",
@@ -131,15 +153,56 @@ async def index_page():
     )
 
 
-@router.get("/assets/{filename}", include_in_schema=False)
-async def static_asset(filename: str):
-    if filename not in {"app.js", "app.css"}:
+@router.get("", include_in_schema=False)
+@router.get("/", include_in_schema=False)
+async def index_page():
+    return _serve_index()
+
+
+PAGE_PATHS = (
+    "overview",
+    "reports",
+    "checks",
+    "ai",
+    "services",
+    "business",
+    "prompts",
+    "logs",
+    "tasks",
+    "config",
+)
+
+
+for _page in PAGE_PATHS:
+    router.add_api_route(
+        f"/{_page}",
+        _serve_index,
+        methods=["GET"],
+        include_in_schema=False,
+        name=f"admin_page_{_page}",
+    )
+
+
+@router.get("/assets/{asset_path:path}", include_in_schema=False)
+async def static_asset(asset_path: str):
+    base = STATIC_DIR.resolve()
+    target = (STATIC_DIR / asset_path).resolve()
+    try:
+        rel = target.relative_to(base).as_posix()
+    except ValueError:
         raise HTTPException(status_code=404, detail="文件不存在")
-    media_type = "text/javascript" if filename.endswith(".js") else "text/css"
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    if not (rel.startswith("vendor/") or rel.startswith("js/") or rel.startswith("css/")):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    cacheable = rel.startswith("vendor/")
     return FileResponse(
-        STATIC_DIR / filename,
+        target,
         media_type=media_type,
-        headers={"Cache-Control": "no-cache"},
+        headers={
+            "Cache-Control": "public, max-age=604800" if cacheable else "no-cache"
+        },
     )
 
 
@@ -276,6 +339,21 @@ async def overview():
             "kb_groups": len(db.get_all_kb_groups()),
         },
     }
+
+
+@router.get("/api/reports/group-activity", dependencies=AUTH)
+async def report_group_activity(days: int = 7, group_id: str = "all"):
+    return await asyncio.to_thread(get_group_activity, days, group_id)
+
+
+@router.get("/api/reports/ai-usage", dependencies=AUTH)
+async def report_ai_usage(days: int = 7):
+    return await asyncio.to_thread(get_ai_usage, days)
+
+
+@router.get("/api/reports/operations", dependencies=AUTH)
+async def report_operations(days: int = 7):
+    return await asyncio.to_thread(get_operations, days)
 
 
 @router.get("/api/checks", dependencies=AUTH)
@@ -502,6 +580,90 @@ async def remove_kb_group(group_id: int):
     return await _business_payload()
 
 
+def _group_prompt_public(item: dict[str, Any]) -> dict[str, Any]:
+    prompt = item.get("prompt") or ""
+    return {
+        "group_id": item["group_id"],
+        "name": item.get("name") or "",
+        "prompt": prompt,
+        "length": len(prompt),
+        "summary": prompt[:80].replace("\n", " "),
+        "updated_at": item.get("updated_at"),
+    }
+
+
+@router.get("/api/group-prompts", dependencies=AUTH)
+async def list_group_prompts():
+    chat_state = _chat_state()
+    db = chat_state.db
+    items = db.get_all_group_prompts()
+    whitelisted = set(db.get_all_groups())
+    return {
+        "items": [_group_prompt_public(item) for item in items],
+        "whitelisted_groups": sorted(whitelisted),
+    }
+
+
+@router.get("/api/group-prompts/default-preview", dependencies=AUTH)
+async def group_prompt_default_preview():
+    chat_state = _chat_state()
+    from plugins.chat_ai.config import Config as ChatAIConfig
+    from plugins.chat_ai.service import AIService
+
+    prompt_file = (
+        chat_state.PROMPT_KIND_FILE
+        if chat_state.current_prompt_mode == "kind"
+        else chat_state.PROMPT_FILE
+    )
+    prompt = AIService.load_prompt_from_file(prompt_file)
+    chat_config = get_plugin_config(ChatAIConfig)
+    if not prompt:
+        prompt = chat_config.ai_system_prompt
+    if prompt:
+        prompt = prompt.replace("{admin_qq}", str(chat_config.admin_qq))
+        prompt = prompt.replace("{admin_name}", chat_config.admin_name)
+    return {
+        "mode": chat_state.current_prompt_mode,
+        "prompt": prompt,
+    }
+
+
+@router.post("/api/group-prompts", dependencies=AUTH)
+async def create_group_prompt(payload: GroupPromptPayload):
+    chat_state = _chat_state()
+    if chat_state.db.get_group_prompt(payload.group_id):
+        raise HTTPException(status_code=409, detail="该群已配置专属提示词，请使用编辑")
+    if not chat_state.db.set_group_prompt(
+        payload.group_id, payload.prompt, payload.name.strip()
+    ):
+        raise HTTPException(status_code=500, detail="保存失败，请查看日志")
+    return await list_group_prompts()
+
+
+@router.put("/api/group-prompts/{group_id}", dependencies=AUTH)
+async def update_group_prompt(group_id: int, payload: GroupPromptPayload):
+    chat_state = _chat_state()
+    if payload.group_id != group_id:
+        raise HTTPException(status_code=400, detail="群号不匹配")
+    if not chat_state.db.get_group_prompt(group_id):
+        raise HTTPException(status_code=404, detail="该群尚未配置专属提示词")
+    if not chat_state.db.set_group_prompt(
+        group_id, payload.prompt, payload.name.strip()
+    ):
+        raise HTTPException(status_code=500, detail="保存失败，请查看日志")
+    return await list_group_prompts()
+
+
+@router.delete("/api/group-prompts/{group_id}", dependencies=AUTH)
+async def delete_group_prompt(group_id: int):
+    chat_state = _chat_state()
+    if not chat_state.db.get_group_prompt(group_id):
+        raise HTTPException(status_code=404, detail="该群尚未配置专属提示词")
+    if not chat_state.db.delete_group_prompt(group_id):
+        raise HTTPException(status_code=500, detail="删除失败，请查看日志")
+    return await list_group_prompts()
+
+
 @router.post("/api/keywords", dependencies=AUTH)
 async def add_keyword(payload: KeywordPayload):
     chat_state = _chat_state()
@@ -516,6 +678,76 @@ async def remove_keyword(keyword_id: int):
     if not chat_state.db.remove_keyword(keyword_id):
         raise HTTPException(status_code=500, detail="删除失败")
     return await _business_payload()
+
+
+@router.get("/api/groups", dependencies=AUTH)
+async def list_bot_groups():
+    chat_db = _chat_state().db
+    whitelisted = {int(group_id) for group_id in chat_db.get_all_groups()}
+    groups: dict[int, str] = {}
+    error = ""
+    bots = await _wait_for_bots(3.0)
+    if bots:
+        for bot in bots:
+            try:
+                for item in await bot.get_group_list():
+                    group_id = int(item.get("group_id") or 0)
+                    if group_id:
+                        groups[group_id] = str(item.get("group_name") or "").strip()
+            except Exception as exc:
+                error = str(exc)
+                nonebot.logger.warning(f"获取群列表失败: {exc}")
+
+        # 部分 OneBot 实现不会在群列表里返回群名，单独补一次群信息
+        for group_id in whitelisted:
+            if groups.get(group_id):
+                continue
+            for bot in bots:
+                try:
+                    info = await bot.get_group_info(group_id=group_id)
+                    name = str(info.get("group_name") or "").strip()
+                except Exception:
+                    continue
+                if name:
+                    groups[group_id] = name
+                    break
+
+        chat_db.save_group_names({gid: name for gid, name in groups.items() if name})
+
+    # 机器人离线时回退到数据库里缓存的群名，避免下拉框只剩群号
+    for group_id, name in chat_db.get_all_group_names().items():
+        groups.setdefault(int(group_id), name)
+    for group_id in whitelisted:
+        groups.setdefault(group_id, "")
+
+    return {
+        "groups": [
+            {"group_id": group_id, "group_name": name}
+            for group_id, name in sorted(groups.items())
+        ],
+        "bot_online": bool(bots),
+        "error": error,
+    }
+
+
+@router.post("/api/send-group", dependencies=AUTH)
+async def send_group_message(payload: GroupSendPayload):
+    bots = await _wait_for_bots(5.0)
+    if not bots:
+        raise HTTPException(status_code=503, detail="机器人不在线，无法发送消息")
+    content = payload.message.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="消息内容不能为空")
+    last_error: Exception | None = None
+    for bot in bots:
+        try:
+            await bot.send_group_msg(group_id=payload.group_id, message=content)
+            nonebot.logger.info(f"管理面板向群 {payload.group_id} 发送消息: {content[:30]}")
+            return {"ok": True, "group_id": payload.group_id}
+        except Exception as error:
+            last_error = error
+            nonebot.logger.warning(f"向群 {payload.group_id} 发送消息失败: {error}")
+    raise HTTPException(status_code=400, detail=f"发送失败: {last_error}")
 
 
 @router.get("/api/logs/files", dependencies=AUTH)
