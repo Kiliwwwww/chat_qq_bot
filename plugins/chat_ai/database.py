@@ -110,6 +110,21 @@ class Database:
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS skills (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        title TEXT NOT NULL,
+                        description TEXT DEFAULT '',
+                        type TEXT NOT NULL DEFAULT 'prompt',
+                        content TEXT NOT NULL DEFAULT '',
+                        scope TEXT NOT NULL DEFAULT 'global',
+                        group_id INTEGER,
+                        enabled INTEGER DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
                 conn.commit()
                 self._migrate_group_prompts(conn)
                 self._init_default_ad_keywords(conn)
@@ -801,6 +816,163 @@ class Database:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"检查知识库群失败: {e}")
+            return False
+
+    # ==================== 技能管理 ====================
+
+    def _skill_row_to_dict(self, row: sqlite3.Row) -> dict:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "title": row["title"],
+            "description": row["description"] or "",
+            "type": row["type"],
+            "content": row["content"] or "",
+            "scope": row["scope"],
+            "group_id": row["group_id"],
+            "enabled": bool(row["enabled"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def get_all_skills(self) -> list[dict]:
+        """获取所有技能"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT id, name, title, description, type, content, scope, "
+                    "group_id, enabled, created_at, updated_at FROM skills ORDER BY id"
+                )
+                return [self._skill_row_to_dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"获取技能列表失败: {e}")
+            return []
+
+    def get_skill(self, skill_id: int) -> Optional[dict]:
+        """获取指定技能"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT id, name, title, description, type, content, scope, "
+                    "group_id, enabled, created_at, updated_at FROM skills WHERE id = ?",
+                    (skill_id,),
+                )
+                row = cursor.fetchone()
+                return self._skill_row_to_dict(row) if row else None
+        except Exception as e:
+            logger.error(f"获取技能失败: {e}")
+            return None
+
+    def get_skill_by_name(self, name: str) -> Optional[dict]:
+        """按标识获取技能"""
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT id, name, title, description, type, content, scope, "
+                    "group_id, enabled, created_at, updated_at FROM skills WHERE name = ?",
+                    (name,),
+                )
+                row = cursor.fetchone()
+                return self._skill_row_to_dict(row) if row else None
+        except Exception as e:
+            logger.error(f"获取技能失败: {e}")
+            return None
+
+    def add_skill(
+        self,
+        name: str,
+        title: str,
+        description: str,
+        skill_type: str,
+        content: str,
+        scope: str,
+        group_id: Optional[int],
+        enabled: bool = True,
+    ) -> bool:
+        """新增技能"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "INSERT INTO skills "
+                    "(name, title, description, type, content, scope, group_id, enabled) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        name,
+                        title,
+                        description,
+                        skill_type,
+                        content,
+                        scope,
+                        group_id,
+                        1 if enabled else 0,
+                    ),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"新增技能失败: {e}")
+            return False
+
+    def update_skill(
+        self,
+        skill_id: int,
+        name: str,
+        title: str,
+        description: str,
+        skill_type: str,
+        content: str,
+        scope: str,
+        group_id: Optional[int],
+        enabled: bool,
+    ) -> bool:
+        """更新技能"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "UPDATE skills SET name = ?, title = ?, description = ?, type = ?, "
+                    "content = ?, scope = ?, group_id = ?, enabled = ?, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (
+                        name,
+                        title,
+                        description,
+                        skill_type,
+                        content,
+                        scope,
+                        group_id,
+                        1 if enabled else 0,
+                        skill_id,
+                    ),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"更新技能失败: {e}")
+            return False
+
+    def set_skill_enabled(self, skill_id: int, enabled: bool) -> bool:
+        """启用/停用技能"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute(
+                    "UPDATE skills SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (1 if enabled else 0, skill_id),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"更新技能状态失败: {e}")
+            return False
+
+    def remove_skill(self, skill_id: int) -> bool:
+        """删除技能"""
+        try:
+            with self._get_conn() as conn:
+                conn.execute("DELETE FROM skills WHERE id = ?", (skill_id,))
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"删除技能失败: {e}")
             return False
 
     # ==================== 统计计数管理 ====================

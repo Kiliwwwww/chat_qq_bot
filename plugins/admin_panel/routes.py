@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import mimetypes
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import nonebot
 import psutil
@@ -110,6 +111,21 @@ class CheckPayload(BaseModel):
     ids: list[str] | None = None
 
 
+class SkillPayload(BaseModel):
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    title: str = Field(min_length=1, max_length=100)
+    description: str = Field(default="", max_length=1000)
+    type: Literal["prompt", "tool"]
+    content: str = Field(min_length=1, max_length=50000)
+    scope: Literal["global", "group"] = "global"
+    group_id: int | None = None
+    enabled: bool = True
+
+
+class SkillEnabledPayload(BaseModel):
+    enabled: bool
+
+
 def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
@@ -165,6 +181,7 @@ PAGE_PATHS = (
     "checks",
     "ai",
     "services",
+    "skills",
     "business",
     "prompts",
     "logs",
@@ -451,6 +468,145 @@ async def activate_ai_service(service_id: int):
         raise HTTPException(status_code=500, detail="切换失败，请查看日志")
     chat_state.init_ai_service()
     return await _ai_services_payload()
+
+
+def _normalize_skill_payload(payload: SkillPayload) -> dict[str, Any]:
+    from plugins.chat_ai.skills import RESERVED_TOOL_NAMES, parse_tool_config
+
+    name = payload.name.strip()
+    title = payload.title.strip()
+    description = payload.description.strip()
+    content = payload.content.strip()
+    if not name or not title or not content:
+        raise HTTPException(status_code=400, detail="标识、名称和内容都不能为空")
+    if name in RESERVED_TOOL_NAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"标识 {name} 是内置工具名，请换一个",
+        )
+
+    group_id = payload.group_id
+    if payload.scope == "group":
+        if not group_id or group_id <= 0:
+            raise HTTPException(status_code=400, detail="作用域为指定群时必须填写群号")
+    else:
+        group_id = None
+
+    if payload.type == "tool":
+        try:
+            config = parse_tool_config(content)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        content = json.dumps(config, ensure_ascii=False, indent=2)
+
+    return {
+        "name": name,
+        "title": title,
+        "description": description,
+        "type": payload.type,
+        "content": content,
+        "scope": payload.scope,
+        "group_id": group_id,
+        "enabled": payload.enabled,
+    }
+
+
+def _skill_public(skill: dict[str, Any]) -> dict[str, Any]:
+    item = {
+        "id": skill["id"],
+        "name": skill["name"],
+        "title": skill["title"],
+        "description": skill.get("description") or "",
+        "type": skill["type"],
+        "content": skill.get("content") or "",
+        "scope": skill.get("scope") or "global",
+        "group_id": skill.get("group_id"),
+        "enabled": bool(skill.get("enabled")),
+        "created_at": skill.get("created_at"),
+        "updated_at": skill.get("updated_at"),
+    }
+    if item["type"] == "tool":
+        try:
+            item["config"] = json.loads(item["content"])
+        except (TypeError, ValueError):
+            item["config"] = None
+    return item
+
+
+@router.get("/api/skills", dependencies=AUTH)
+async def list_skills():
+    from plugins.chat_ai.skills import RESERVED_TOOL_NAMES
+
+    chat_state = _chat_state()
+    skills = chat_state.db.get_all_skills()
+    return {
+        "skills": [_skill_public(skill) for skill in skills],
+        "reserved_names": sorted(RESERVED_TOOL_NAMES),
+    }
+
+
+@router.post("/api/skills", dependencies=AUTH)
+async def create_skill(payload: SkillPayload):
+    data = _normalize_skill_payload(payload)
+    chat_state = _chat_state()
+    if chat_state.db.get_skill_by_name(data["name"]):
+        raise HTTPException(status_code=409, detail="技能标识已存在，请换一个")
+    if not chat_state.db.add_skill(
+        data["name"],
+        data["title"],
+        data["description"],
+        data["type"],
+        data["content"],
+        data["scope"],
+        data["group_id"],
+        data["enabled"],
+    ):
+        raise HTTPException(status_code=500, detail="新增失败，请查看日志")
+    return await list_skills()
+
+
+@router.put("/api/skills/{skill_id}", dependencies=AUTH)
+async def update_skill(skill_id: int, payload: SkillPayload):
+    data = _normalize_skill_payload(payload)
+    chat_state = _chat_state()
+    if not chat_state.db.get_skill(skill_id):
+        raise HTTPException(status_code=404, detail="技能不存在")
+    same_name = chat_state.db.get_skill_by_name(data["name"])
+    if same_name and same_name["id"] != skill_id:
+        raise HTTPException(status_code=409, detail="技能标识已存在，请换一个")
+    if not chat_state.db.update_skill(
+        skill_id,
+        data["name"],
+        data["title"],
+        data["description"],
+        data["type"],
+        data["content"],
+        data["scope"],
+        data["group_id"],
+        data["enabled"],
+    ):
+        raise HTTPException(status_code=500, detail="更新失败，请查看日志")
+    return await list_skills()
+
+
+@router.patch("/api/skills/{skill_id}/enabled", dependencies=AUTH)
+async def toggle_skill(skill_id: int, payload: SkillEnabledPayload):
+    chat_state = _chat_state()
+    if not chat_state.db.get_skill(skill_id):
+        raise HTTPException(status_code=404, detail="技能不存在")
+    if not chat_state.db.set_skill_enabled(skill_id, payload.enabled):
+        raise HTTPException(status_code=500, detail="更新失败，请查看日志")
+    return await list_skills()
+
+
+@router.delete("/api/skills/{skill_id}", dependencies=AUTH)
+async def delete_skill(skill_id: int):
+    chat_state = _chat_state()
+    if not chat_state.db.get_skill(skill_id):
+        raise HTTPException(status_code=404, detail="技能不存在")
+    if not chat_state.db.remove_skill(skill_id):
+        raise HTTPException(status_code=500, detail="删除失败，请查看日志")
+    return await list_skills()
 
 
 async def _business_payload() -> dict[str, Any]:

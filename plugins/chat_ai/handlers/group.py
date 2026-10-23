@@ -484,6 +484,7 @@ async def handle_group_msg(event: MessageEvent):
             force_followup=force_target,
             kb_ids=group_kb_ids,
             web_search_client=state.web_search_client if user_message else None,
+            skill_group_id=group_id,
         )
 
         # AI 决定用语音回复：只发语音，不引用群友消息

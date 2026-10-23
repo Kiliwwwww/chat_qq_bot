@@ -10,6 +10,8 @@ from datetime import datetime
 from loguru import logger as loguru_logger
 import httpx
 
+from .skills import SkillManager
+
 # AI专用日志配置
 AI_LOG_FILE = Path(__file__).parent.parent.parent / "log" / "ai_log.log"
 AI_REQUEST_LOG_FILE = Path(__file__).parent.parent.parent / "log" / "ai_request.log"
@@ -489,9 +491,10 @@ class AIService:
         max_tool_calls: int = 2,
         kb_ids: list[str] | None = None,
         web_search_client=None,
+        skill_group_id: Optional[int] = None,
     ) -> "ChatResult":
         """
-        带工具调用（知识库检索 + 联网搜索 + 语音回复 + 连发消息）的聊天：
+        带工具调用（知识库检索 + 联网搜索 + 语音回复 + 连发消息 + 管理面板技能）的聊天：
         由 AI 自主决定是否检索、是否联网搜索、是否用语音回复、是否多回几句。
 
         Args:
@@ -499,11 +502,19 @@ class AIService:
             web_search_client: 可选的博查联网搜索客户端
             allow_followup: 是否允许 AI 在主回复之外补发额外消息
             force_followup: >0 时强制本轮消息总条数不少于该值（关键词触发）
+            skill_group_id: 传入群号时启用该群的专属技能，同时始终启用全局技能
         """
+        system_prompt = system_prompt or self.system_prompt
+
+        skill_manager = SkillManager(self.db) if self.db else None
+        skill_prompt = skill_manager.build_prompt(skill_group_id) if skill_manager else ""
+        if skill_prompt:
+            system_prompt = f"{system_prompt.rstrip()}\n{skill_prompt}"
+
         base_messages = [
             {
                 "role": "system",
-                "content": system_prompt or self.system_prompt,
+                "content": system_prompt,
             },
         ] + list(messages)
 
@@ -518,6 +529,8 @@ class AIService:
         tools = [RAG_SEARCH_TOOL]
         if web_search_client is not None:
             tools.append(WEB_SEARCH_TOOL)
+        if skill_manager:
+            tools.extend(skill_manager.build_tools(skill_group_id))
         tools.extend(answer_tools)
 
         # 实际用于请求的消息（图片失败时会替换为去掉图片的版本）
@@ -571,7 +584,14 @@ class AIService:
 
         first_msg = resp.choices[0].message
         content = first_msg.content or ""
-        voice_text, voice_instruct, queries, web_queries, followups = self._parse_tool_calls(
+        (
+            voice_text,
+            voice_instruct,
+            queries,
+            web_queries,
+            followups,
+            skill_calls,
+        ) = self._parse_tool_calls(
             getattr(first_msg, "tool_calls", None) or [], content
         )
 
@@ -600,10 +620,21 @@ class AIService:
             except Exception as e:
                 self.ai_logger.warning(f"联网搜索失败: {e}")
 
-        # 需要检索/搜索：补充资料后再生成一次。
+        # 管理面板配置的 HTTP 工具型技能：执行后把结果作为参考资料
+        if skill_calls and skill_manager:
+            for name, args in skill_calls[:max_tool_calls]:
+                self.ai_logger.info(f"AI 决定调用技能: {name} 参数: {args}")
+                try:
+                    result_text = await skill_manager.execute(name, args, skill_group_id)
+                except Exception as e:
+                    self.ai_logger.warning(f"技能 {name} 执行异常: {e}")
+                    result_text = f"技能 {name} 执行失败：{e}"
+                context_messages.append({"role": "system", "content": result_text})
+
+        # 需要检索/搜索/调用技能：补充资料后再生成一次。
         # 二次生成只带语音/连发工具，避免模型拿到结果后又发起一轮工具调用，
         # 只返回 tool_calls 而没有正文，导致机器人静默不回复。
-        if context_messages or queries or web_queries:
+        if context_messages or queries or web_queries or skill_calls:
             messages_with_context = request_messages + context_messages
             try:
                 second_kwargs = {
@@ -622,7 +653,7 @@ class AIService:
                     self.db.increment_stat("ai_request_count")
                 second_msg = resp2.choices[0].message
                 content = second_msg.content or ""
-                v2, i2, _, _, f2 = self._parse_tool_calls(
+                v2, i2, _, _, f2, _ = self._parse_tool_calls(
                     getattr(second_msg, "tool_calls", None) or [], content
                 )
                 if v2:
@@ -739,17 +770,20 @@ class AIService:
 
     @staticmethod
     def _parse_tool_calls(tool_calls, content: str):
-        """解析工具调用，返回 (voice_text, voice_instruct, rag_queries, web_queries, followups)"""
+        """解析工具调用，返回 (语音文本, 语气, 知识库查询, 联网查询, 连发消息, 技能调用)"""
         voice_text = ""
         voice_instruct = ""
         queries: list[str] = []
         web_queries: list[str] = []
         followups: list[str] = []
+        skill_calls: list[tuple[str, dict]] = []
         for tc in tool_calls:
             name = getattr(getattr(tc, "function", None), "name", "") or ""
             try:
                 args = json.loads(getattr(tc.function, "arguments", "") or "{}")
             except Exception:
+                args = {}
+            if not isinstance(args, dict):
                 args = {}
             if name == "search_knowledge_base":
                 q = str(args.get("query") or "").strip()
@@ -768,6 +802,8 @@ class AIService:
                 t = str(args.get("text") or "").strip()
                 if t:
                     followups.append(t)
+            elif name:
+                skill_calls.append((name, args))
 
         # 兼容文本形式的 send_voice 调用
         if not voice_text and "send_voice" in (content or ""):
@@ -796,7 +832,7 @@ class AIService:
                     if t:
                         followups.append(t)
 
-        return voice_text, voice_instruct, queries, web_queries, followups
+        return voice_text, voice_instruct, queries, web_queries, followups, skill_calls
 
     @staticmethod
     def _extract_query_from_tool_call(text: str, tool_name: str = "search_knowledge_base") -> list[str]:

@@ -8,6 +8,7 @@ import OverviewView from "./views/overview.js";
 import ReportsView from "./views/reports.js";
 import ChecksView from "./views/checks.js";
 import ServicesView from "./views/services.js";
+import SkillsView from "./views/skills.js";
 import BusinessView from "./views/business.js";
 import PromptsView from "./views/prompts.js";
 import LogsView from "./views/logs.js";
@@ -21,6 +22,7 @@ const VIEWS = {
   reports: ReportsView,
   checks: ChecksView,
   services: ServicesView,
+  skills: SkillsView,
   business: BusinessView,
   prompts: PromptsView,
   logs: LogsView,
@@ -33,6 +35,7 @@ const VIEW_META = {
   reports: { title: "数据报表", subtitle: "群活跃、AI 调用与开箱运营数据", icon: "TrendCharts" },
   checks: { title: "API Key 体检", subtitle: "检测当前配置的密钥与服务连通性", icon: "CircleCheck" },
   services: { title: "AI 服务", subtitle: "管理数据库中的多个 AI 服务配置", icon: "MagicStick" },
+  skills: { title: "技能管理", subtitle: "提示词型技能与 HTTP 工具型技能", icon: "Cpu" },
   business: { title: "业务数据", subtitle: "白名单、欢迎语、广告词与知识库群", icon: "Operation" },
   prompts: { title: "提示词管理", subtitle: "每个群的专属系统提示词，未配置则使用默认人格", icon: "EditPen" },
   logs: { title: "日志与记录", subtitle: "查看运行日志和群聊记录", icon: "Document" },
@@ -41,7 +44,7 @@ const VIEW_META = {
 };
 
 const NAV_ORDER = [
-  "overview", "reports", "checks", "services",
+  "overview", "reports", "checks", "services", "skills",
   "business", "prompts", "logs", "tasks", "config",
 ];
 
