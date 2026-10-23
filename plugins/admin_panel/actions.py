@@ -303,7 +303,6 @@ def _build_backup() -> bytes:
         pass
     items.extend(
         [
-            ("xiuxian.db", DATA_DIR / "xiuxian" / "xiuxian.db"),
             ("lottery.db", DATA_DIR / "lottery" / "lottery.db"),
             ("meme_groups.json", DATA_DIR / "meme_sync" / "groups.json"),
             ("pig.json", DATA_DIR / "pig.json"),
