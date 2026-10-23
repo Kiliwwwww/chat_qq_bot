@@ -5,6 +5,22 @@ const COLORS = [
   "#a371f7", "#39c5cf", "#ff7b72", "#79c0ff",
 ];
 
+const RARITY_COLORS = {
+  "白色": "#d0d7de",
+  "绿色": "#3fb950",
+  "蓝色": "#58a6ff",
+  "紫色": "#a371f7",
+  "金色": "#e3b341",
+  "红色": "#f85149",
+};
+
+const RARITY_ORDER = ["白色", "绿色", "蓝色", "紫色", "金色", "红色"];
+
+function rarityRank(name) {
+  const index = RARITY_ORDER.indexOf(name);
+  return index === -1 ? RARITY_ORDER.length : index;
+}
+
 function reportBase() {
   return {
     backgroundColor: "transparent",
@@ -96,7 +112,6 @@ export default {
       "chart-group-daily", "chart-group-users", "chart-group-heatmap", "chart-group-ranking",
       "chart-ai-daily", "chart-ai-models", "chart-ai-hourly",
       "chart-lottery-daily", "chart-lottery-rarity",
-      "chart-xiuxian-realm", "chart-xiuxian-battles",
     ];
 
     function renderChart(id, option) {
@@ -302,7 +317,10 @@ export default {
         renderChart("chart-lottery-daily", emptyChartOption("暂无开箱数据"));
       }
 
-      const rarity = lottery.rarity || [];
+      const rarity = (lottery.rarity || []).slice().sort((a, b) => {
+        const rankDiff = rarityRank(a.rarity) - rarityRank(b.rarity);
+        return rankDiff || a.rarity.localeCompare(b.rarity);
+      });
       if (rarity.length) {
         renderChart("chart-lottery-rarity", Object.assign(reportBase(), {
           tooltip: {
@@ -318,49 +336,17 @@ export default {
             center: ["50%", "54%"],
             itemStyle: { borderColor: "#151d27", borderWidth: 2 },
             label: { color: "#b6c2cf" },
-            data: rarity.map((item) => ({ name: item.rarity, value: item.count })),
+            data: rarity.map((item, index) => ({
+              name: item.rarity,
+              value: item.count,
+              itemStyle: {
+                color: RARITY_COLORS[item.rarity] || COLORS[index % COLORS.length],
+              },
+            })),
           }],
         }));
       } else {
         renderChart("chart-lottery-rarity", emptyChartOption("暂无开箱数据"));
-      }
-
-      const xiuxian = ops.xiuxian || {};
-      const realms = xiuxian.realms || [];
-      if (realms.length) {
-        renderChart("chart-xiuxian-realm", Object.assign(reportBase(), {
-          xAxis: categoryAxis(realms.map((item) => item.name)),
-          yAxis: valueAxis(),
-          series: [{
-            name: "玩家数",
-            type: "bar",
-            data: realms.map((item) => item.count),
-            barMaxWidth: 26,
-            itemStyle: { color: "#3fb950", borderRadius: [4, 4, 0, 0] },
-          }],
-        }));
-      } else {
-        renderChart("chart-xiuxian-realm", emptyChartOption("暂无修仙玩家"));
-      }
-
-      const battles = xiuxian.daily_battles || [];
-      if (xiuxian.available && battles.some((item) => item.battles > 0)) {
-        renderChart("chart-xiuxian-battles", Object.assign(reportBase(), {
-          xAxis: categoryAxis(battles.map((item) => shortDate(item.date))),
-          yAxis: valueAxis(),
-          series: [{
-            name: "战斗次数",
-            type: "line",
-            smooth: true,
-            symbolSize: 5,
-            data: battles.map((item) => item.battles),
-            lineStyle: { color: "#f85149" },
-            areaStyle: { color: "rgba(248, 81, 73, 0.12)" },
-            itemStyle: { color: "#f85149" },
-          }],
-        }));
-      } else {
-        renderChart("chart-xiuxian-battles", emptyChartOption("暂无战斗数据"));
       }
     }
 
@@ -378,7 +364,6 @@ export default {
         groupOptions.value = group.groups || [];
         const aiSummary = ai.summary || {};
         const lottery = (ops.lottery || {}).summary || {};
-        const xiuxian = (ops.xiuxian || {}).summary || {};
         cards.value = [
           { label: "群消息总数", value: fmtNumber((group.summary || {}).messages), sub: `${fmtNumber((group.summary || {}).active_groups)} 个活跃群` },
           { label: "活跃用户", value: fmtNumber((group.summary || {}).active_users), sub: `日均 ${fmtNumber((group.summary || {}).average_daily)} 条` },
@@ -386,8 +371,6 @@ export default {
           { label: "AI 成功率", value: `${fmtNumber(aiSummary.success_rate)}%`, sub: `平均 ${fmtNumber(aiSummary.average_latency)} 秒` },
           { label: "开箱次数", value: fmtNumber(lottery.draws), sub: `${fmtNumber(lottery.users)} 人参与` },
           { label: "开箱总价值", value: fmtNumber(lottery.total_value), sub: `最高 ${fmtNumber(lottery.max_value)}` },
-          { label: "修仙玩家", value: fmtNumber(xiuxian.players), sub: `${fmtNumber(xiuxian.groups)} 个群` },
-          { label: "修仙战斗", value: fmtNumber(xiuxian.battles), sub: `${fmtNumber(xiuxian.active_battle_users)} 人参与` },
         ];
         await nextTick();
         renderAll(group, ai, ops);
@@ -468,10 +451,6 @@ export default {
       <div class="grid-2">
         <div class="panel"><div class="panel-head"><h2>开箱每日趋势</h2></div><div id="chart-lottery-daily" class="chart-box"></div></div>
         <div class="panel"><div class="panel-head"><h2>开箱稀有度</h2></div><div id="chart-lottery-rarity" class="chart-box"></div></div>
-      </div>
-      <div class="grid-2">
-        <div class="panel"><div class="panel-head"><h2>修仙境界分布</h2></div><div id="chart-xiuxian-realm" class="chart-box"></div></div>
-        <div class="panel"><div class="panel-head"><h2>修仙每日战斗</h2></div><div id="chart-xiuxian-battles" class="chart-box"></div></div>
       </div>
       <p class="hint">{{ notes }}</p>
     </div>

@@ -507,13 +507,18 @@ class AIService:
             },
         ] + list(messages)
 
+        # 二次生成时只保留语音/连发工具，避免模型拿到搜索结果后
+        # 又发起一轮联网搜索（会返回空正文，导致机器人静默不回复）
+        answer_tools: list[dict] = []
+        if allow_voice:
+            answer_tools.append(SEND_VOICE_TOOL)
+        if allow_followup:
+            answer_tools.append(SEND_FOLLOWUP_TOOL)
+
         tools = [RAG_SEARCH_TOOL]
         if web_search_client is not None:
             tools.append(WEB_SEARCH_TOOL)
-        if allow_voice:
-            tools.append(SEND_VOICE_TOOL)
-        if allow_followup:
-            tools.append(SEND_FOLLOWUP_TOOL)
+        tools.extend(answer_tools)
 
         # 实际用于请求的消息（图片失败时会替换为去掉图片的版本）
         request_messages = base_messages
@@ -595,19 +600,24 @@ class AIService:
             except Exception as e:
                 self.ai_logger.warning(f"联网搜索失败: {e}")
 
-        # 需要检索/搜索：补充资料后再生成一次（仍带工具，允许模型继续决定语音）
-        if context_messages:
+        # 需要检索/搜索：补充资料后再生成一次。
+        # 二次生成只带语音/连发工具，避免模型拿到结果后又发起一轮工具调用，
+        # 只返回 tool_calls 而没有正文，导致机器人静默不回复。
+        if context_messages or queries or web_queries:
+            messages_with_context = request_messages + context_messages
             try:
-                resp2 = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=request_messages + context_messages,
-                    tools=tools,
-                    tool_choice="auto",
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                    top_p=self.top_p,
-                    timeout=120.0,
-                )
+                second_kwargs = {
+                    "model": self.model,
+                    "messages": messages_with_context,
+                    "max_tokens": self.max_tokens,
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                    "timeout": 120.0,
+                }
+                if answer_tools:
+                    second_kwargs["tools"] = answer_tools
+                    second_kwargs["tool_choice"] = "auto"
+                resp2 = await self.client.chat.completions.create(**second_kwargs)
                 if self.db:
                     self.db.increment_stat("ai_request_count")
                 second_msg = resp2.choices[0].message
@@ -618,8 +628,41 @@ class AIService:
                 if v2:
                     voice_text, voice_instruct = v2, i2
                 followups = f2
+
+                # 兜底：仍然没有正文/语音/连发时，强制一次纯文本生成，避免空回复
+                if not content.strip() and not voice_text and not followups:
+                    self.ai_logger.warning("补充资料后未生成有效回复，强制纯文本兜底")
+                    resp3 = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages_with_context,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        top_p=self.top_p,
+                        timeout=120.0,
+                    )
+                    if self.db:
+                        self.db.increment_stat("ai_request_count")
+                    content = (resp3.choices[0].message.content or "") if resp3.choices else ""
             except Exception as e:
-                self.ai_logger.warning(f"二次生成失败，使用首次结果: {e}")
+                self.ai_logger.warning(f"二次生成失败，尝试纯文本兜底: {e}")
+                # 二次生成失败时不要直接返回空回复（会让机器人静默），
+                # 再尝试一次不带工具的纯文本生成；仍失败则交给上层兜底提示。
+                try:
+                    resp3 = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages_with_context,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        top_p=self.top_p,
+                        timeout=120.0,
+                    )
+                    if self.db:
+                        self.db.increment_stat("ai_request_count")
+                    content = (resp3.choices[0].message.content or "") if resp3.choices else ""
+                except Exception as e2:
+                    self.ai_logger.warning(f"纯文本兜底也失败: {e2}")
+                    if not content.strip() and not voice_text and not followups:
+                        raise
 
         # 关键词强制连发：用户明确要求多说几句时，补足消息条数（语音优先，不补）
         if force_followup > 0 and not voice_text:

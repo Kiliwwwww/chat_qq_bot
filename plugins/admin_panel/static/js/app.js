@@ -30,7 +30,7 @@ const VIEWS = {
 
 const VIEW_META = {
   overview: { title: "运行概览", subtitle: "机器人、系统与外部服务状态", icon: "Monitor" },
-  reports: { title: "数据报表", subtitle: "群活跃、AI 调用与开箱/修仙运营数据", icon: "TrendCharts" },
+  reports: { title: "数据报表", subtitle: "群活跃、AI 调用与开箱运营数据", icon: "TrendCharts" },
   checks: { title: "API Key 体检", subtitle: "检测当前配置的密钥与服务连通性", icon: "CircleCheck" },
   services: { title: "AI 服务", subtitle: "管理数据库中的多个 AI 服务配置", icon: "MagicStick" },
   business: { title: "业务数据", subtitle: "白名单、欢迎语、广告词与知识库群", icon: "Operation" },

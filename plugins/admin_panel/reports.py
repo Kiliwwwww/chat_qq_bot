@@ -5,28 +5,17 @@ import sqlite3
 import threading
 import time
 from collections import Counter, defaultdict
-from datetime import date, datetime, time as dt_time, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
+
+from nonebot import logger
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHAT_LOG_DIR = PROJECT_ROOT / "data" / "chat_logs"
 AI_REQUEST_LOG = PROJECT_ROOT / "log" / "ai_request.log"
 LOTTERY_DB = PROJECT_ROOT / "data" / "lottery" / "lottery.db"
-XIUXIAN_DB = PROJECT_ROOT / "data" / "xiuxian" / "xiuxian.db"
-
-REALM_NAMES = [
-    "炼气",
-    "筑基",
-    "金丹",
-    "元婴",
-    "化神",
-    "炼虚",
-    "合体",
-    "大乘",
-    "渡劫",
-    "飞升",
-]
+REPORT_DB = PROJECT_ROOT / "data" / "report_cache.db"
 
 CHAT_FILE_RE = re.compile(r"^(\d+)_(\d{4}-\d{2}-\d{2})(?:_uploaded)?\.txt$")
 CHAT_LINE_RE = re.compile(
@@ -38,12 +27,13 @@ AI_REQUEST_RE = re.compile(
 )
 DURATION_RE = re.compile(r"耗时\s*([0-9.]+)s")
 
-_chat_cache: dict[str, tuple[float, int, dict[str, Any]]] = {}
-_chat_cache_lock = threading.Lock()
-
-_ai_cache: dict[str, Any] = {"at": 0.0, "data": None}
-_ai_cache_lock = threading.Lock()
-_AI_CACHE_SECONDS = 30.0
+_refresh_lock = threading.Lock()
+_refresh_thread_lock = threading.Lock()
+_refresh_thread: threading.Thread | None = None
+_last_refresh_at = 0.0
+_REFRESH_THROTTLE_SECONDS = 1.0
+_BACKGROUND_REFRESH_SECONDS = 60.0
+_schema_ready = False
 
 
 def _clamp_days(days: int | str | None) -> int:
@@ -59,218 +49,290 @@ def _date_range(days: int) -> list[str]:
     return [(start + timedelta(days=offset)).isoformat() for offset in range(days)]
 
 
-def _empty_ai_day() -> dict[str, float]:
-    return {
-        "attempts": 0,
-        "success": 0,
-        "failure": 0,
-        "latency_sum": 0.0,
-        "latency_count": 0,
-    }
+def _connect_report_db() -> sqlite3.Connection:
+    REPORT_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(REPORT_DB), timeout=10)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    return conn
 
 
-def _chat_file_aggregate(path: Path, group_id: int, day: str) -> dict[str, Any]:
-    try:
-        stat = path.stat()
-    except OSError:
-        return {"group_id": group_id, "date": day, "total": 0, "hours": [0] * 24, "users": {}, "names": {}}
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    global _schema_ready
+    if _schema_ready:
+        return
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS group_daily (
+            group_id INTEGER NOT NULL,
+            day TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (group_id, day)
+        );
+        CREATE TABLE IF NOT EXISTS group_hourly (
+            group_id INTEGER NOT NULL,
+            day TEXT NOT NULL,
+            hour INTEGER NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (group_id, day, hour)
+        );
+        CREATE TABLE IF NOT EXISTS group_user_daily (
+            group_id INTEGER NOT NULL,
+            day TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (group_id, day, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS group_files (
+            group_id INTEGER NOT NULL,
+            day TEXT NOT NULL,
+            file_path TEXT NOT NULL DEFAULT '',
+            offset INTEGER NOT NULL DEFAULT 0,
+            size INTEGER NOT NULL DEFAULT 0,
+            mtime REAL NOT NULL DEFAULT 0,
+            PRIMARY KEY (group_id, day)
+        );
+        CREATE TABLE IF NOT EXISTS ai_daily (
+            day TEXT PRIMARY KEY,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            success INTEGER NOT NULL DEFAULT 0,
+            failure INTEGER NOT NULL DEFAULT 0,
+            latency_sum REAL NOT NULL DEFAULT 0,
+            latency_count INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS ai_hourly (
+            day TEXT NOT NULL,
+            hour INTEGER NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (day, hour)
+        );
+        CREATE TABLE IF NOT EXISTS ai_model_daily (
+            day TEXT NOT NULL,
+            model TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (day, model)
+        );
+        CREATE TABLE IF NOT EXISTS ai_error_daily (
+            day TEXT NOT NULL,
+            message TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (day, message)
+        );
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_group_daily_day ON group_daily(day);
+        CREATE INDEX IF NOT EXISTS idx_group_hourly_day ON group_hourly(day);
+        CREATE INDEX IF NOT EXISTS idx_group_user_daily_day ON group_user_daily(day);
+        CREATE INDEX IF NOT EXISTS idx_group_user_daily_day_group ON group_user_daily(day, group_id);
+        CREATE INDEX IF NOT EXISTS idx_group_files_day ON group_files(day);
+        CREATE INDEX IF NOT EXISTS idx_ai_hourly_day ON ai_hourly(day);
+        CREATE INDEX IF NOT EXISTS idx_ai_model_daily_day ON ai_model_daily(day);
+        CREATE INDEX IF NOT EXISTS idx_ai_error_daily_day ON ai_error_daily(day);
+        """
+    )
+    _schema_ready = True
 
-    key = str(path)
-    with _chat_cache_lock:
-        cached = _chat_cache.get(key)
-        if cached and cached[0] == stat.st_mtime and cached[1] == stat.st_size:
-            return cached[2]
 
-    text = path.read_text(encoding="utf-8", errors="replace")
-    hours = [0] * 24
-    users: Counter[str] = Counter()
-    names: dict[str, str] = {}
-    total = 0
-    for match in CHAT_LINE_RE.finditer(text):
-        line_day, hour_text, name, user_id = match.groups()
-        if line_day != day:
+def _collect_group_files() -> dict[tuple[int, str], Path]:
+    files: dict[tuple[int, str], Path] = {}
+    sizes: dict[tuple[int, str], int] = {}
+    if not CHAT_LOG_DIR.exists():
+        return files
+    for path in CHAT_LOG_DIR.glob("*.txt"):
+        match = CHAT_FILE_RE.match(path.name)
+        if not match:
             continue
-        hour = int(hour_text)
-        if hour < 0 or hour > 23:
-            continue
-        hours[hour] += 1
-        users[user_id] += 1
-        names[user_id] = name
-        total += 1
-
-    aggregate = {
-        "group_id": group_id,
-        "date": day,
-        "total": total,
-        "hours": hours,
-        "users": dict(users),
-        "names": names,
-    }
-    with _chat_cache_lock:
-        if len(_chat_cache) > 3000:
-            _chat_cache.clear()
-        _chat_cache[key] = (stat.st_mtime, stat.st_size, aggregate)
-    return aggregate
-
-
-def _merge_group_aggregate(
-    target: dict[str, Any],
-    aggregate: dict[str, Any],
-) -> None:
-    day = aggregate["date"]
-    target["daily"][day] += aggregate["total"]
-    for hour, count in enumerate(aggregate["hours"]):
-        target["daily_hours"][day][hour] += count
-    target["users"].update(aggregate["users"])
-    target["names"].update(aggregate["names"])
-
-
-def _new_group_aggregate() -> dict[str, Any]:
-    return {
-        "daily": Counter(),
-        "daily_hours": defaultdict(lambda: [0] * 24),
-        "users": Counter(),
-        "names": {},
-    }
-
-
-def get_group_activity(days: int | str = 7, group_id: str = "all") -> dict[str, Any]:
-    days = _clamp_days(days)
-    dates = _date_range(days)
-    start, end = dates[0], dates[-1]
-
-    all_groups: set[int] = set()
-    files: list[tuple[Path, int, str]] = []
-    if CHAT_LOG_DIR.exists():
-        for path in CHAT_LOG_DIR.glob("*.txt"):
-            match = CHAT_FILE_RE.match(path.name)
-            if not match:
-                continue
-            gid = int(match.group(1))
-            day = match.group(2)
-            if day < start or day > end:
-                continue
-            all_groups.add(gid)
-            files.append((path, gid, day))
-    files.sort(key=lambda item: (item[2], item[1]))
-
-    by_group: dict[int, dict[str, Any]] = defaultdict(_new_group_aggregate)
-    for path, gid, day in files:
-        aggregate = _chat_file_aggregate(path, gid, day)
-        _merge_group_aggregate(by_group[gid], aggregate)
-
-    selected_gid: int | None = None
-    if group_id not in ("", "all", None):
+        group_id = int(match.group(1))
+        day = match.group(2)
         try:
-            selected_gid = int(group_id)
-        except (TypeError, ValueError):
-            selected_gid = None
+            size = path.stat().st_size
+        except OSError:
+            continue
+        key = (group_id, day)
+        if key not in files or size > sizes[key]:
+            files[key] = path
+            sizes[key] = size
+    return files
 
-    if selected_gid is None:
-        selected = _new_group_aggregate()
-        for aggregate in by_group.values():
-            for day, count in aggregate["daily"].items():
-                selected["daily"][day] += count
-            for day, hours in aggregate["daily_hours"].items():
-                for hour, count in enumerate(hours):
-                    selected["daily_hours"][day][hour] += count
-            selected["users"].update(aggregate["users"])
-            selected["names"].update(aggregate["names"])
-        active_groups = len(by_group)
-    else:
-        selected = by_group.get(selected_gid, _new_group_aggregate())
-        active_groups = 1 if selected_gid in by_group else 0
 
-    daily = [
-        {"date": day, "count": selected["daily"].get(day, 0)}
-        for day in dates
-    ]
-    hourly = [0] * 24
-    heatmap = []
-    for day_index, day in enumerate(dates):
-        day_hours = selected["daily_hours"].get(day, [0] * 24)
-        for hour, count in enumerate(day_hours):
-            hourly[hour] += count
-            heatmap.append([day_index, hour, count])
+def _reset_group_day(conn: sqlite3.Connection, group_id: int, day: str) -> None:
+    conn.execute(
+        "DELETE FROM group_daily WHERE group_id = ? AND day = ?", (group_id, day)
+    )
+    conn.execute(
+        "DELETE FROM group_hourly WHERE group_id = ? AND day = ?", (group_id, day)
+    )
+    conn.execute(
+        "DELETE FROM group_user_daily WHERE group_id = ? AND day = ?", (group_id, day)
+    )
 
-    top_users = [
-        {
-            "user_id": user_id,
-            "name": selected["names"].get(user_id) or user_id,
-            "count": count,
-        }
-        for user_id, count in selected["users"].most_common(10)
-    ]
 
-    group_ranking = []
-    for gid, aggregate in by_group.items():
-        group_ranking.append(
-            {
-                "group_id": gid,
-                "count": sum(aggregate["daily"].values()),
-                "users": len(aggregate["users"]),
-            }
+def _sync_group_stats(conn: sqlite3.Connection) -> None:
+    for (group_id, day), path in sorted(_collect_group_files().items()):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+
+        row = conn.execute(
+            "SELECT offset, size, file_path, mtime FROM group_files WHERE group_id = ? AND day = ?",
+            (group_id, day),
+        ).fetchone()
+        if (
+            row
+            and stat.st_size == int(row["size"])
+            and int(row["offset"]) == int(row["size"])
+            and row["file_path"] == str(path)
+            and abs(float(row["mtime"]) - stat.st_mtime) < 1e-6
+        ):
+            continue
+        offset = int(row["offset"]) if row else 0
+        if stat.st_size < offset:
+            _reset_group_day(conn, group_id, day)
+            offset = 0
+        if row and stat.st_size == offset:
+            conn.execute(
+                "UPDATE group_files SET file_path = ?, mtime = ? WHERE group_id = ? AND day = ?",
+                (str(path), stat.st_mtime, group_id, day),
+            )
+            continue
+
+        hours: Counter[int] = Counter()
+        users: Counter[int] = Counter()
+        names: dict[int, str] = {}
+        total = 0
+        try:
+            with path.open("rb") as handle:
+                handle.seek(offset)
+                while True:
+                    raw = handle.readline()
+                    if not raw or not raw.endswith(b"\n"):
+                        break
+                    offset += len(raw)
+                    line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                    match = CHAT_LINE_RE.match(line)
+                    if not match:
+                        continue
+                    line_day, hour_text, name, user_id = match.groups()
+                    if line_day != day:
+                        continue
+                    hour = int(hour_text)
+                    if hour < 0 or hour > 23:
+                        continue
+                    uid = int(user_id)
+                    hours[hour] += 1
+                    users[uid] += 1
+                    names[uid] = name
+                    total += 1
+        except OSError as exc:
+            logger.warning(f"读取群聊记录失败 {path}: {exc}")
+            continue
+
+        if total:
+            conn.execute(
+                "INSERT INTO group_daily (group_id, day, count) VALUES (?, ?, ?) "
+                "ON CONFLICT(group_id, day) DO UPDATE SET count = count + excluded.count",
+                (group_id, day, total),
+            )
+            conn.executemany(
+                "INSERT INTO group_hourly (group_id, day, hour, count) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(group_id, day, hour) DO UPDATE SET count = count + excluded.count",
+                [(group_id, day, hour, count) for hour, count in hours.items()],
+            )
+            conn.executemany(
+                "INSERT INTO group_user_daily (group_id, day, user_id, name, count) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(group_id, day, user_id) DO UPDATE SET "
+                "count = count + excluded.count, name = excluded.name",
+                [
+                    (group_id, day, user_id, names.get(user_id, ""), count)
+                    for user_id, count in users.items()
+                ],
+            )
+
+        conn.execute(
+            "INSERT INTO group_files (group_id, day, file_path, offset, size, mtime) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(group_id, day) DO UPDATE SET "
+            "file_path = excluded.file_path, offset = excluded.offset, "
+            "size = excluded.size, mtime = excluded.mtime",
+            (group_id, day, str(path), offset, stat.st_size, stat.st_mtime),
         )
-    group_ranking.sort(key=lambda item: item["count"], reverse=True)
 
-    total = sum(item["count"] for item in daily)
-    return {
-        "days": days,
-        "start": start,
-        "end": end,
-        "groups": sorted(all_groups),
-        "selected_group": selected_gid if selected_gid is not None else "all",
-        "summary": {
-            "messages": total,
-            "active_groups": active_groups,
-            "active_users": len(selected["users"]),
-            "average_daily": round(total / days, 1),
-        },
-        "daily": daily,
-        "hourly": [{"hour": hour, "count": count} for hour, count in enumerate(hourly)],
-        "heatmap": heatmap,
-        "top_users": top_users,
-        "group_ranking": group_ranking,
-        "source_files": len(files),
-        "note": "仅统计已开启知识库聊天记录（data/chat_logs）的群。",
+
+def _parse_ai_model(line: bytes) -> tuple[str, str] | None:
+    match = AI_REQUEST_RE.match(line[:1024].decode("utf-8", errors="replace"))
+    if not match:
+        return None
+    return match.groups()
+
+
+def _sync_ai_stats(conn: sqlite3.Connection) -> None:
+    if not AI_REQUEST_LOG.exists():
+        return
+
+    try:
+        stat = AI_REQUEST_LOG.stat()
+    except OSError:
+        return
+
+    meta = {
+        row["key"]: row["value"]
+        for row in conn.execute(
+            "SELECT key, value FROM meta WHERE key IN ('ai_offset', 'ai_inode')"
+        )
     }
+    offset = int(meta.get("ai_offset", "0") or 0)
+    inode = str(getattr(stat, "st_ino", ""))
+    if stat.st_size < offset or (meta.get("ai_inode") and meta["ai_inode"] != inode):
+        offset = 0
+    if stat.st_size == offset:
+        return
 
-
-def _parse_ai_raw() -> dict[str, Any]:
-    daily: dict[str, dict[str, float]] = defaultdict(_empty_ai_day)
-    hourly: dict[str, list[int]] = defaultdict(lambda: [0] * 24)
+    daily: dict[str, dict[str, float]] = defaultdict(
+        lambda: {
+            "attempts": 0,
+            "success": 0,
+            "failure": 0,
+            "latency_sum": 0.0,
+            "latency_count": 0,
+        }
+    )
+    hourly: dict[str, Counter[int]] = defaultdict(Counter)
     models: dict[str, Counter[str]] = defaultdict(Counter)
     errors: dict[str, Counter[str]] = defaultdict(Counter)
 
-    if not AI_REQUEST_LOG.exists():
-        return {
-            "available": False,
-            "daily": {},
-            "hourly": {},
-            "models": {},
-            "errors": {},
-            "file_size": 0,
-        }
-
     try:
-        with AI_REQUEST_LOG.open("r", encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                if line.startswith('{"timestamp"'):
-                    match = AI_REQUEST_RE.match(line)
-                    if match:
-                        timestamp, model = match.groups()
-                        day = timestamp[:10]
-                        models[day][model] += 1
+        with AI_REQUEST_LOG.open("rb") as handle:
+            handle.seek(offset)
+            while True:
+                raw = handle.readline()
+                if not raw or not raw.endswith(b"\n"):
+                    break
+                offset += len(raw)
+
+                if raw.startswith(b'{"timestamp"'):
+                    parsed = _parse_ai_model(raw)
+                    if parsed:
+                        timestamp, model = parsed
+                        if len(timestamp) >= 10:
+                            models[timestamp[:10]][model] += 1
                     continue
 
+                line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
                 match = AI_EVENT_RE.match(line)
                 if not match:
                     continue
                 timestamp, message = match.groups()
-                day = timestamp[:10]
                 if len(timestamp) < 13:
                     continue
-                hour = int(timestamp[11:13]) if timestamp[11:13].isdigit() else 0
+                day = timestamp[:10]
+                hour_text = timestamp[11:13]
+                hour = int(hour_text) if hour_text.isdigit() else 0
 
                 success = "API 调用成功" in message and "开始" not in message
                 failure = "API 调用失败" in message
@@ -294,24 +356,126 @@ def _parse_ai_raw() -> dict[str, Any]:
                     hourly[day][hour] += 1
                 if failure:
                     errors[day][_error_label(message)] += 1
-    except OSError:
-        return {
-            "available": False,
-            "daily": {},
-            "hourly": {},
-            "models": {},
-            "errors": {},
-            "file_size": 0,
-        }
+    except OSError as exc:
+        logger.warning(f"读取 AI 请求日志失败: {exc}")
+        return
 
-    return {
-        "available": True,
-        "daily": dict(daily),
-        "hourly": dict(hourly),
-        "models": {day: dict(counter) for day, counter in models.items()},
-        "errors": {day: dict(counter) for day, counter in errors.items()},
-        "file_size": AI_REQUEST_LOG.stat().st_size,
-    }
+    for day, item in daily.items():
+        conn.execute(
+            "INSERT INTO ai_daily (day, attempts, success, failure, latency_sum, latency_count) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(day) DO UPDATE SET "
+            "attempts = attempts + excluded.attempts, "
+            "success = success + excluded.success, "
+            "failure = failure + excluded.failure, "
+            "latency_sum = latency_sum + excluded.latency_sum, "
+            "latency_count = latency_count + excluded.latency_count",
+            (
+                day,
+                int(item["attempts"]),
+                int(item["success"]),
+                int(item["failure"]),
+                float(item["latency_sum"]),
+                int(item["latency_count"]),
+            ),
+        )
+    for day, counter in hourly.items():
+        conn.executemany(
+            "INSERT INTO ai_hourly (day, hour, count) VALUES (?, ?, ?) "
+            "ON CONFLICT(day, hour) DO UPDATE SET count = count + excluded.count",
+            [(day, hour, count) for hour, count in counter.items()],
+        )
+    for day, counter in models.items():
+        conn.executemany(
+            "INSERT INTO ai_model_daily (day, model, count) VALUES (?, ?, ?) "
+            "ON CONFLICT(day, model) DO UPDATE SET count = count + excluded.count",
+            [(day, model, count) for model, count in counter.items()],
+        )
+    for day, counter in errors.items():
+        conn.executemany(
+            "INSERT INTO ai_error_daily (day, message, count) VALUES (?, ?, ?) "
+            "ON CONFLICT(day, message) DO UPDATE SET count = count + excluded.count",
+            [(day, message, count) for message, count in counter.items()],
+        )
+
+    conn.executemany(
+        "INSERT INTO meta (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [
+            ("ai_offset", str(offset)),
+            ("ai_inode", inode),
+        ],
+    )
+    conn.commit()
+
+
+def refresh_report_cache(force: bool = False) -> None:
+    """增量刷新报表缓存。页面接口和定时任务都会调用。"""
+    global _last_refresh_at
+
+    with _refresh_lock:
+        now = time.monotonic()
+        if not force and now - _last_refresh_at < _REFRESH_THROTTLE_SECONDS:
+            return
+        started = time.monotonic()
+        conn = _connect_report_db()
+        try:
+            _ensure_schema(conn)
+            _sync_group_stats(conn)
+            _sync_ai_stats(conn)
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES ('cache_initialized', '1') "
+                "ON CONFLICT(key) DO UPDATE SET value = '1'"
+            )
+            conn.commit()
+        except Exception as exc:
+            logger.error(f"报表缓存刷新失败: {exc}")
+        finally:
+            conn.close()
+        _last_refresh_at = time.monotonic()
+        elapsed = _last_refresh_at - started
+        if elapsed >= 1:
+            logger.info(f"报表缓存刷新完成，耗时 {elapsed:.2f}s")
+
+
+def _cache_initialized() -> bool:
+    try:
+        conn = _connect_report_db()
+    except sqlite3.Error:
+        return False
+    try:
+        return (
+            conn.execute(
+                "SELECT 1 FROM meta WHERE key = 'cache_initialized'"
+            ).fetchone()
+            is not None
+        )
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+
+
+def _maybe_start_background_refresh() -> None:
+    global _refresh_thread
+    with _refresh_thread_lock:
+        if _refresh_thread is not None and _refresh_thread.is_alive():
+            return
+        if time.monotonic() - _last_refresh_at < _BACKGROUND_REFRESH_SECONDS:
+            return
+        _refresh_thread = threading.Thread(
+            target=refresh_report_cache,
+            kwargs={"force": True},
+            daemon=True,
+        )
+        _refresh_thread.start()
+
+
+def _prepare_report_cache() -> None:
+    if not _cache_initialized():
+        refresh_report_cache(force=True)
+        return
+    _maybe_start_background_refresh()
 
 
 def _error_label(message: str) -> str:
@@ -324,49 +488,209 @@ def _error_label(message: str) -> str:
     return text[:140] or "未知错误"
 
 
-def _ai_raw_cached() -> dict[str, Any]:
-    now = time.time()
-    with _ai_cache_lock:
-        cached = _ai_cache.get("data")
-        if cached is not None and now - _ai_cache["at"] < _AI_CACHE_SECONDS:
-            return cached
+def get_group_activity(days: int | str = 7, group_id: str = "all") -> dict[str, Any]:
+    _prepare_report_cache()
+    days = _clamp_days(days)
+    dates = _date_range(days)
+    start, end = dates[0], dates[-1]
 
-    data = _parse_ai_raw()
-    with _ai_cache_lock:
-        _ai_cache["at"] = time.time()
-        _ai_cache["data"] = data
-    return data
+    selected_gid: int | None = None
+    if group_id not in ("", "all", None):
+        try:
+            selected_gid = int(group_id)
+        except (TypeError, ValueError):
+            selected_gid = None
+
+    conn = _connect_report_db()
+    try:
+        groups = [
+            int(row[0])
+            for row in conn.execute(
+                "SELECT DISTINCT group_id FROM group_daily "
+                "WHERE day BETWEEN ? AND ? ORDER BY group_id",
+                (start, end),
+            )
+        ]
+
+        where = "day BETWEEN ? AND ?"
+        params: list[Any] = [start, end]
+        if selected_gid is not None:
+            where += " AND group_id = ?"
+            params.append(selected_gid)
+
+        daily_rows = {
+            row[0]: int(row[1])
+            for row in conn.execute(
+                f"SELECT day, SUM(count) FROM group_daily WHERE {where} GROUP BY day",
+                params,
+            )
+        }
+        daily = [{"date": day, "count": daily_rows.get(day, 0)} for day in dates]
+
+        hourly_rows = {
+            int(row[0]): int(row[1])
+            for row in conn.execute(
+                f"SELECT hour, SUM(count) FROM group_hourly WHERE {where} GROUP BY hour",
+                params,
+            )
+        }
+        hourly = [
+            {"hour": hour, "count": hourly_rows.get(hour, 0)} for hour in range(24)
+        ]
+
+        heatmap_rows = {
+            (row[0], int(row[1])): int(row[2])
+            for row in conn.execute(
+                f"SELECT day, hour, SUM(count) FROM group_hourly "
+                f"WHERE {where} GROUP BY day, hour",
+                params,
+            )
+        }
+        heatmap = [
+            [day_index, hour, heatmap_rows.get((day, hour), 0)]
+            for day_index, day in enumerate(dates)
+            for hour in range(24)
+        ]
+
+        top_users = [
+            {
+                "user_id": row[0],
+                "name": row[1] or str(row[0]),
+                "count": int(row[2]),
+            }
+            for row in conn.execute(
+                f"SELECT user_id, MAX(name), SUM(count) AS total "
+                f"FROM group_user_daily WHERE {where} "
+                f"GROUP BY user_id ORDER BY total DESC LIMIT 10",
+                params,
+            )
+        ]
+
+        active_users = int(
+            conn.execute(
+                f"SELECT COUNT(DISTINCT user_id) FROM group_user_daily WHERE {where}",
+                params,
+            ).fetchone()[0]
+        )
+
+        ranking_users = {
+            int(row[0]): int(row[1])
+            for row in conn.execute(
+                "SELECT group_id, COUNT(DISTINCT user_id) FROM group_user_daily "
+                "WHERE day BETWEEN ? AND ? GROUP BY group_id",
+                (start, end),
+            )
+        }
+        group_ranking = [
+            {
+                "group_id": int(row[0]),
+                "count": int(row[1]),
+                "users": ranking_users.get(int(row[0]), 0),
+            }
+            for row in conn.execute(
+                "SELECT group_id, SUM(count) AS total FROM group_daily "
+                "WHERE day BETWEEN ? AND ? GROUP BY group_id ORDER BY total DESC",
+                (start, end),
+            )
+        ]
+
+        source_files = int(
+            conn.execute(
+                "SELECT COUNT(*) FROM group_files WHERE day BETWEEN ? AND ?",
+                (start, end),
+            ).fetchone()[0]
+        )
+    finally:
+        conn.close()
+
+    total = sum(item["count"] for item in daily)
+    active_groups = len(groups) if selected_gid is None else (1 if selected_gid in groups else 0)
+    return {
+        "days": days,
+        "start": start,
+        "end": end,
+        "groups": groups,
+        "selected_group": selected_gid if selected_gid is not None else "all",
+        "summary": {
+            "messages": total,
+            "active_groups": active_groups,
+            "active_users": active_users,
+            "average_daily": round(total / days, 1),
+        },
+        "daily": daily,
+        "hourly": hourly,
+        "heatmap": heatmap,
+        "top_users": top_users,
+        "group_ranking": group_ranking,
+        "source_files": source_files,
+        "note": "仅统计已开启知识库聊天记录（data/chat_logs）的群，数据来自报表缓存。",
+    }
 
 
 def get_ai_usage(days: int | str = 7) -> dict[str, Any]:
+    _prepare_report_cache()
     days = _clamp_days(days)
     dates = _date_range(days)
-    raw = _ai_raw_cached()
-    daily_raw = raw.get("daily", {})
-    hourly_raw = raw.get("hourly", {})
-    models_raw = raw.get("models", {})
-    errors_raw = raw.get("errors", {})
+    start, end = dates[0], dates[-1]
+
+    conn = _connect_report_db()
+    try:
+        daily_rows = {
+            row["day"]: row
+            for row in conn.execute(
+                "SELECT day, attempts, success, failure, latency_sum, latency_count "
+                "FROM ai_daily WHERE day BETWEEN ? AND ?",
+                (start, end),
+            )
+        }
+        hourly_rows = {
+            int(row[0]): int(row[1])
+            for row in conn.execute(
+                "SELECT hour, SUM(count) FROM ai_hourly "
+                "WHERE day BETWEEN ? AND ? GROUP BY hour",
+                (start, end),
+            )
+        }
+        models = [
+            {"model": row[0], "count": int(row[1])}
+            for row in conn.execute(
+                "SELECT model, SUM(count) AS total FROM ai_model_daily "
+                "WHERE day BETWEEN ? AND ? GROUP BY model ORDER BY total DESC LIMIT 12",
+                (start, end),
+            )
+        ]
+        errors = [
+            {"message": row[0], "count": int(row[1])}
+            for row in conn.execute(
+                "SELECT message, SUM(count) AS total FROM ai_error_daily "
+                "WHERE day BETWEEN ? AND ? GROUP BY message ORDER BY total DESC LIMIT 10",
+                (start, end),
+            )
+        ]
+    finally:
+        conn.close()
 
     daily = []
-    hourly = [0] * 24
-    models: Counter[str] = Counter()
-    errors: Counter[str] = Counter()
     attempts = success = failure = 0
     latency_sum = 0.0
     latency_count = 0
-
     for day in dates:
-        item = daily_raw.get(day) or _empty_ai_day()
-        day_attempts = int(item["attempts"])
-        day_success = int(item["success"])
-        day_failure = int(item["failure"])
-        day_latency_count = int(item["latency_count"])
-        day_latency = round(item["latency_sum"] / day_latency_count, 2) if day_latency_count else 0
+        row = daily_rows.get(day)
+        day_attempts = int(row["attempts"]) if row else 0
+        day_success = int(row["success"]) if row else 0
+        day_failure = int(row["failure"]) if row else 0
+        day_latency_count = int(row["latency_count"]) if row else 0
+        day_latency = (
+            round(float(row["latency_sum"]) / day_latency_count, 2)
+            if row and day_latency_count
+            else 0
+        )
         attempts += day_attempts
         success += day_success
         failure += day_failure
-        latency_sum += item["latency_sum"]
-        latency_count += day_latency_count
+        if row:
+            latency_sum += float(row["latency_sum"])
+            latency_count += day_latency_count
         daily.append(
             {
                 "date": day,
@@ -376,20 +700,19 @@ def get_ai_usage(days: int | str = 7) -> dict[str, Any]:
                 "average_latency": day_latency,
             }
         )
-        day_hours = hourly_raw.get(day) or []
-        for hour, count in enumerate(day_hours[:24]):
-            hourly[hour] += count
-        models.update(models_raw.get(day, {}))
-        errors.update(errors_raw.get(day, {}))
 
     average_latency = round(latency_sum / latency_count, 2) if latency_count else 0
     success_rate = round(success / attempts * 100, 1) if attempts else 0
+    try:
+        file_size = AI_REQUEST_LOG.stat().st_size
+    except OSError:
+        file_size = 0
     return {
         "days": days,
         "start": dates[0],
         "end": dates[-1],
-        "available": raw.get("available", False),
-        "file_size": raw.get("file_size", 0),
+        "available": AI_REQUEST_LOG.exists(),
+        "file_size": file_size,
         "summary": {
             "attempts": attempts,
             "success": success,
@@ -398,16 +721,12 @@ def get_ai_usage(days: int | str = 7) -> dict[str, Any]:
             "average_latency": average_latency,
         },
         "daily": daily,
-        "hourly": [{"hour": hour, "count": count} for hour, count in enumerate(hourly)],
-        "models": [
-            {"model": model, "count": count}
-            for model, count in models.most_common(12)
+        "hourly": [
+            {"hour": hour, "count": hourly_rows.get(hour, 0)} for hour in range(24)
         ],
-        "errors": [
-            {"message": message, "count": count}
-            for message, count in errors.most_common(10)
-        ],
-        "note": "AI 报表来自 log/ai_request.log；旧日志没有 token 用量，暂不统计成本。",
+        "models": models,
+        "errors": errors,
+        "note": "AI 报表由后台增量解析 log/ai_request.log 生成；旧日志没有 token 用量，暂不统计成本。",
     }
 
 
@@ -505,76 +824,6 @@ def _lottery_report(days: int, dates: list[str]) -> dict[str, Any]:
     }
 
 
-def _xiuxian_report(days: int, dates: list[str]) -> dict[str, Any]:
-    conn = _connect_ro(XIUXIAN_DB)
-    if conn is None:
-        return {"available": False, "summary": {}, "realms": [], "groups": [], "daily_battles": []}
-
-    try:
-        start, end = dates[0], dates[-1]
-        start_ts = datetime.combine(date.fromisoformat(start), dt_time.min).timestamp()
-        total_players, total_groups = conn.execute(
-            "SELECT COUNT(*), COUNT(DISTINCT group_id) FROM players"
-        ).fetchone()
-        new_players = conn.execute(
-            "SELECT COUNT(*) FROM players WHERE created_at >= ?",
-            (start_ts,),
-        ).fetchone()[0]
-        realm_rows = conn.execute(
-            "SELECT realm, COUNT(*) FROM players GROUP BY realm ORDER BY realm"
-        ).fetchall()
-        group_rows = conn.execute(
-            "SELECT group_id, COUNT(*) FROM players GROUP BY group_id ORDER BY COUNT(*) DESC LIMIT 20"
-        ).fetchall()
-        battle_rows = conn.execute(
-            "SELECT date_str, COUNT(DISTINCT user_id), COALESCE(SUM(count), 0) "
-            "FROM battle_daily WHERE date_str BETWEEN ? AND ? GROUP BY date_str ORDER BY date_str",
-            (start, end),
-        ).fetchall()
-        battle_summary = conn.execute(
-            "SELECT COUNT(DISTINCT user_id), COALESCE(SUM(count), 0) "
-            "FROM battle_daily WHERE date_str BETWEEN ? AND ?",
-            (start, end),
-        ).fetchone()
-    except sqlite3.Error:
-        conn.close()
-        return {"available": False, "summary": {}, "realms": [], "groups": [], "daily_battles": []}
-
-    conn.close()
-    battle_map = {row[0]: row for row in battle_rows}
-    daily_battles = []
-    for day in dates:
-        row = battle_map.get(day)
-        daily_battles.append(
-            {
-                "date": day,
-                "battles": row[2] if row else 0,
-                "users": row[1] if row else 0,
-            }
-        )
-
-    return {
-        "available": True,
-        "summary": {
-            "players": total_players,
-            "groups": total_groups,
-            "new_players": new_players,
-            "active_battle_users": battle_summary[0] if battle_summary else 0,
-            "battles": battle_summary[1] if battle_summary else 0,
-        },
-        "realms": [
-            {
-                "realm": row[0],
-                "name": REALM_NAMES[row[0]] if 0 <= row[0] < len(REALM_NAMES) else f"境界 {row[0]}",
-                "count": row[1],
-            }
-            for row in realm_rows
-        ],
-        "groups": [{"group_id": row[0], "count": row[1]} for row in group_rows],
-        "daily_battles": daily_battles,
-    }
-
-
 def get_operations(days: int | str = 7) -> dict[str, Any]:
     days = _clamp_days(days)
     dates = _date_range(days)
@@ -583,6 +832,5 @@ def get_operations(days: int | str = 7) -> dict[str, Any]:
         "start": dates[0],
         "end": dates[-1],
         "lottery": _lottery_report(days, dates),
-        "xiuxian": _xiuxian_report(days, dates),
-        "note": "开箱统计只计算状态为 completed 的记录；修仙数据为当前数据库快照。",
+        "note": "开箱统计只计算状态为 completed 的记录。",
     }

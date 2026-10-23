@@ -130,6 +130,7 @@ def init_ai_service():
                 api_key=config.web_search_api_key,
                 count=config.web_search_count,
                 db=db,
+                max_length=config.web_search_max_length,
             )
             logger.info("联网搜索客户端初始化完成 (Bocha)")
         else:

@@ -32,10 +32,12 @@ class BochaWebSearchClient:
         count: int = 5,
         timeout: float = 15.0,
         db=None,
+        max_length: int = 2000,
     ):
         self.api_key = api_key
         self.count = count
         self.timeout = timeout
+        self.max_length = max_length
         self._client: httpx.AsyncClient | None = None
         self.db = db
 
