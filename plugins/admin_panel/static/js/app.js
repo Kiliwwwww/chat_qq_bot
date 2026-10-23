@@ -11,6 +11,7 @@ import ServicesView from "./views/services.js";
 import SkillsView from "./views/skills.js";
 import BusinessView from "./views/business.js";
 import PromptsView from "./views/prompts.js";
+import CommandsView from "./views/commands.js";
 import LogsView from "./views/logs.js";
 import TasksView from "./views/tasks.js";
 import ConfigView from "./views/config.js";
@@ -25,6 +26,7 @@ const VIEWS = {
   skills: SkillsView,
   business: BusinessView,
   prompts: PromptsView,
+  commands: CommandsView,
   logs: LogsView,
   tasks: TasksView,
   config: ConfigView,
@@ -38,6 +40,7 @@ const VIEW_META = {
   skills: { title: "技能管理", subtitle: "提示词型技能与 HTTP 工具型技能", icon: "Cpu" },
   business: { title: "业务数据", subtitle: "白名单、欢迎语、广告词与知识库群", icon: "Operation" },
   prompts: { title: "提示词管理", subtitle: "每个群的专属系统提示词，未配置则使用默认人格", icon: "EditPen" },
+  commands: { title: "命令帮助", subtitle: "机器人全部聊天命令、用法和权限说明", icon: "Notebook" },
   logs: { title: "日志与记录", subtitle: "查看运行日志和群聊记录", icon: "Document" },
   tasks: { title: "任务与表情包", subtitle: "定时任务、手动操作与表情包库统计", icon: "Timer" },
   config: { title: "配置与备份", subtitle: "只读配置速览与数据库备份", icon: "Tools" },
@@ -45,7 +48,7 @@ const VIEW_META = {
 
 const NAV_ORDER = [
   "overview", "reports", "checks", "services", "skills",
-  "business", "prompts", "logs", "tasks", "config",
+  "business", "prompts", "commands", "logs", "tasks", "config",
 ];
 
 const app = createApp({

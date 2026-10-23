@@ -184,6 +184,7 @@ PAGE_PATHS = (
     "skills",
     "business",
     "prompts",
+    "commands",
     "logs",
     "tasks",
     "config",
@@ -355,6 +356,18 @@ async def overview():
             "ad_keywords": len(db.get_all_ad_keywords()),
             "kb_groups": len(db.get_all_kb_groups()),
         },
+    }
+
+
+@router.get("/api/commands", dependencies=AUTH)
+async def list_commands():
+    from .command_catalog import COMMAND_GROUPS, COMMAND_NOTES
+
+    total = sum(len(group["commands"]) for group in COMMAND_GROUPS)
+    return {
+        "groups": COMMAND_GROUPS,
+        "notes": COMMAND_NOTES,
+        "total": total,
     }
 
 
